@@ -1,0 +1,41 @@
+﻿Save your AI conversations in a clean, portable format you actually own.
+
+LLM Chat Exporter takes the chat you're currently looking at on Claude or ChatGPT and turns it into a Markdown file or a ZIP archive — locally, in your browser. No accounts, no servers, no data leaves your machine.
+
+━━━ FEATURES ━━━
+
+• Two output formats
+  – Markdown: a single .md file with images embedded as base64. Drop it into Obsidian, Notion, GitHub, or any Markdown editor.
+  – ZIP: a tidy folder with images in /assets, attachments in /files, artifacts in /artifacts, and the .md referencing them by path.
+
+• Supported platforms
+  – Claude.ai — text, images, file uploads, artifacts, thinking blocks, and tool calls.
+  – ChatGPT.com — text, images, file uploads, and reasoning.
+
+• Configurable
+  – Include or exclude the model's reasoning (thinking + tool calls).
+  – Inline pasted text files (.md, .txt, .json…) into the body, or keep them as separate attachments.
+  – Render Markdown attachments inline so headings and lists stay readable.
+
+━━━ PRIVACY ━━━
+
+The extension reads conversation data only on the active tab, and only when you click Export. There is no analytics, no telemetry, and no remote server. The only data stored is your default-format preferences (via chrome.storage.sync).
+
+━━━ PERMISSIONS ━━━
+
+• activeTab — read the chat tab when you trigger an export.
+• storage — remember your option toggles.
+• Host access to claude.ai and chatgpt.com — run the scripts that extract the conversation.
+
+━━━ HOW TO USE ━━━
+
+1. Open a conversation on claude.ai or chatgpt.com.
+2. Click the LLM Chat Exporter icon.
+3. Pick Markdown or ZIP, toggle the options you want, hit Export.
+4. The file is saved through your browser's normal download flow.
+
+Defaults are configurable on the Options page (gear icon in the popup).
+
+━━━ FEEDBACK ━━━
+
+Bug reports and feature requests are welcome on the GitHub repo.

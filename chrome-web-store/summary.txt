@@ -1,0 +1,1 @@
+﻿Export your Claude and ChatGPT conversations to Markdown or ZIP — with images, attachments, artifacts, and reasoning.

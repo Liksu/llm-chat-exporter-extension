@@ -29,6 +29,7 @@ build/
 scratch/
 tmp/
 notes.local.md
+*.psd
 
 # Logs
 *.log
