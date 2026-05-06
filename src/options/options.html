@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>LLM Chat Exporter — Options</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        max-width: 520px;
+        margin: 32px auto;
+        padding: 0 16px;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 16px;
+      }
+      h2 {
+        font-size: 13px;
+        margin: 24px 0 8px;
+        color: #555;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      label {
+        display: block;
+        margin: 8px 0;
+      }
+      .hint {
+        color: #6b7280;
+        font-size: 12px;
+        margin: 4px 0 12px 22px;
+      }
+      button {
+        margin-top: 16px;
+        padding: 8px 16px;
+        border: 1px solid #6366f1;
+        border-radius: 6px;
+        background: #6366f1;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #4f46e5;
+      }
+      #savedMsg {
+        margin-left: 12px;
+        color: #059669;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>LLM Chat Exporter — Options</h1>
+
+    <h2>Defaults</h2>
+    <p class="hint" style="margin-left: 0">
+      These values pre-fill the popup. You can still override them per export.
+    </p>
+
+    <label>Default format:</label>
+    <label><input type="radio" name="mode" value="md" /> Markdown (.md)</label>
+    <label><input type="radio" name="mode" value="zip" /> ZIP archive</label>
+
+    <label style="margin-top: 12px">
+      <input type="checkbox" id="includeReasoning" />
+      Include reasoning by default (thinking + tool calls)
+    </label>
+
+    <label style="margin-top: 8px">
+      <input type="checkbox" id="inlineTextFiles" />
+      Inline uploaded text files by default (.md, .txt, .json…)
+    </label>
+
+    <label style="margin-top: 8px">
+      <input type="checkbox" id="attachmentsAsMarkdown" />
+      Render attachments as Markdown (no code block) by default
+    </label>
+
+    <h2>Per-adapter</h2>
+    <p class="hint" style="margin-left: 0">No per-adapter options yet.</p>
+
+    <button id="saveBtn">Save</button>
+    <span id="savedMsg" hidden>Saved.</span>
+
+    <script src="../core/settings.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

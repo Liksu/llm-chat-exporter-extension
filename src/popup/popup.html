@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>LLM Chat Exporter</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body data-view="idle">
+    <header class="header">
+      <h1 class="title">Export conversation</h1>
+      <button id="gearBtn" class="gear" type="button" title="Options" aria-label="Options">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </header>
+
+    <div id="unsupportedAlert" class="unsupported-alert" role="alert">
+      <svg class="alert-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.5"/>
+        <path d="M8 5v3.5M8 11v0.01"/>
+      </svg>
+      <span id="unsupportedAlertText">Open a Claude or ChatGPT chat tab to export.</span>
+    </div>
+
+    <div id="detected" class="detected">
+      <span id="detectedGlyph" class="detected-glyph"></span>
+      <span class="detected-text">Detected <span id="detectedName" class="detected-name"></span></span>
+    </div>
+
+    <div id="formArea" class="form-area">
+      <div class="caps-label">Format</div>
+      <div class="segmented" aria-label="Format">
+        <button type="button" class="segment" data-mode="md" aria-pressed="true">Markdown</button>
+        <button type="button" class="segment" data-mode="zip" aria-pressed="false">ZIP</button>
+      </div>
+      <p id="helperText" class="helper"></p>
+
+      <div class="toggles">
+        <label class="toggle-row">
+          <input id="includeReasoning" type="checkbox" class="visually-hidden" />
+          <span class="switch" aria-hidden="true"><span class="thumb"></span></span>
+          <span class="toggle-label">Include reasoning<span class="toggle-hint"> · thinking + tool calls</span></span>
+        </label>
+        <label class="toggle-row">
+          <input id="inlineTextFiles" type="checkbox" class="visually-hidden" />
+          <span class="switch" aria-hidden="true"><span class="thumb"></span></span>
+          <span class="toggle-label">Inline text uploads<span class="toggle-hint"> · .md, .txt, .json…</span></span>
+        </label>
+        <label class="toggle-row">
+          <input id="attachmentsAsMarkdown" type="checkbox" class="visually-hidden" />
+          <span class="switch" aria-hidden="true"><span class="thumb"></span></span>
+          <span class="toggle-label">Markdown attachments<span class="toggle-hint"> · render inline, not as code</span></span>
+        </label>
+      </div>
+    </div>
+
+    <button id="exportBtn" class="export-btn" type="button"></button>
+
+    <div id="postError" class="post-error" role="alert" aria-live="polite"></div>
+    <div id="postSuccess" class="post-success" role="status" aria-live="polite"></div>
+
+    <script src="../adapters/claude/info.js"></script>
+    <script src="../adapters/chatgpt/info.js"></script>
+    <script src="../core/utils.js"></script>
+    <script src="../core/settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+{
+  "manifest_version": 3,
+  "name": "LLM Chat Exporter",
+  "version": "0.6.2",
+  "description": "Export LLM chat conversations (Claude, ChatGPT...) to Markdown or ZIP, with images and pasted attachments inline.",
+  "action": {
+    "default_title": "LLM Chat Exporter",
+    "default_popup": "src/popup/popup.html"
+  },
+  "options_page": "src/options/options.html",
+  "icons": {
+    "16": "src/icons/icon16.png",
+    "48": "src/icons/icon48.png",
+    "128": "src/icons/icon128.png"
+  },
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["https://claude.ai/*", "https://chatgpt.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "run_at": "document_idle",
+      "js": [
+        "src/vendor/fflate.min.js",
+        "src/core/utils.js",
+        "src/core/fetch-binary.js",
+        "src/core/markdown.js",
+        "src/core/zip.js",
+        "src/core/download.js",
+        "src/adapters/claude/api.js",
+        "src/adapters/claude/normalize.js",
+        "src/adapters/claude/content.js"
+      ]
+    },
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "js": ["src/adapters/chatgpt/hook-main.js"]
+    },
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "run_at": "document_start",
+      "js": ["src/adapters/chatgpt/hook-iso.js"]
+    },
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "run_at": "document_idle",
+      "js": [
+        "src/vendor/fflate.min.js",
+        "src/core/utils.js",
+        "src/core/fetch-binary.js",
+        "src/core/markdown.js",
+        "src/core/zip.js",
+        "src/core/download.js",
+        "src/adapters/chatgpt/api.js",
+        "src/adapters/chatgpt/normalize.js",
+        "src/adapters/chatgpt/content.js"
+      ]
+    }
+  ]
+}

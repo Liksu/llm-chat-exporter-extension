@@ -1,0 +1,398 @@
+/* ==========================================================================
+   Design tokens (V1 — Minimal/Plain)
+   ========================================================================== */
+:root {
+  --purple-500: #6366f1;
+  --purple-600: #4f46e5;
+  --green-600: #16a34a;
+  --red-600: #dc2626;
+  --red-700: #991b1b;
+  --red-bg: #fef2f2;
+  --red-border: #fecaca;
+  --ink-900: #18181b;
+  --ink-500: #71717a;
+  --ink-400: #a1a1aa;
+  --ink-100: #e4e4e7;
+  --ink-50: #f4f4f5;
+  --switch-off: #d4d4d8;
+  --surface: #ffffff;
+  --segment-active: #ffffff;
+  --segment-active-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --cta-text: #ffffff;
+  --cta-success-text: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 300px;
+  margin: 0;
+  padding: 12px 14px 14px;
+  background: var(--surface);
+  color: var(--ink-900);
+  font:
+    400 12px/1.35 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    system-ui,
+    sans-serif;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   Header (always visible)
+   ========================================================================== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--ink-900);
+}
+
+.gear {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--ink-500);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.gear:hover {
+  color: var(--ink-900);
+}
+.gear:focus-visible {
+  outline: 2px solid var(--purple-500);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Detected adapter line
+   ========================================================================== */
+.detected {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-500);
+  margin-bottom: 14px;
+}
+.detected-glyph {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+.detected-name {
+  color: var(--ink-900);
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   Unsupported alert
+   ========================================================================== */
+.unsupported-alert {
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--red-bg);
+  border: 1px solid var(--red-border);
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--red-700);
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+}
+.unsupported-alert .alert-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ==========================================================================
+   Form area (segmented + helper + toggles) — collectively dimmable
+   ========================================================================== */
+.form-area {
+  transition: opacity 0.15s;
+}
+
+/* FORMAT caps label */
+.caps-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--ink-500);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+
+/* Segmented control */
+.segmented {
+  display: flex;
+  background: var(--ink-50);
+  border-radius: 6px;
+  padding: 2px;
+  margin-bottom: 12px;
+}
+.segment {
+  flex: 1;
+  height: 26px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-500);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.segment[aria-pressed='true'] {
+  background: var(--segment-active);
+  color: var(--ink-900);
+  font-weight: 600;
+  box-shadow: var(--segment-active-shadow);
+}
+.segment:focus-visible {
+  outline: 2px solid var(--purple-500);
+  outline-offset: 2px;
+}
+
+/* Helper line */
+.helper {
+  font-size: 11px;
+  color: var(--ink-500);
+  line-height: 1.4;
+  min-height: 30px;
+  margin: 0 0 14px;
+}
+
+/* Toggles */
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ink-100);
+}
+.toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.switch {
+  width: 26px;
+  height: 16px;
+  border-radius: 9px;
+  background: var(--switch-off);
+  position: relative;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: background 0.15s;
+}
+.switch .thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: left 0.15s;
+}
+input[type='checkbox']:checked ~ .switch {
+  background: var(--purple-500);
+}
+input[type='checkbox']:checked ~ .switch .thumb {
+  left: 12px;
+}
+input[type='checkbox']:focus-visible ~ .switch {
+  outline: 2px solid var(--purple-500);
+  outline-offset: 2px;
+}
+.toggle-label {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ink-900);
+}
+.toggle-hint {
+  color: var(--ink-400);
+  font-size: 11px;
+}
+
+/* ==========================================================================
+   Action button
+   ========================================================================== */
+.export-btn {
+  width: 100%;
+  height: 36px;
+  border: none;
+  border-radius: 6px;
+  background: var(--purple-500);
+  color: var(--cta-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s;
+}
+.export-btn:hover {
+  background: var(--purple-600);
+}
+.export-btn:focus-visible {
+  outline: 2px solid var(--purple-500);
+  outline-offset: 2px;
+}
+.export-btn[disabled] {
+  cursor: default;
+}
+
+/* Post-action lines */
+.post-error {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--red-600);
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+}
+.post-error .alert-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.post-success {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--ink-500);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  word-break: break-all;
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  animation: pv-spin 0.7s linear infinite;
+}
+@keyframes pv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   State machine (driven by body[data-view])
+   ========================================================================== */
+
+/* unsupported: hide everything except header + alert */
+body[data-view='unsupported'] .detected,
+body[data-view='unsupported'] .form-area,
+body[data-view='unsupported'] .export-btn,
+body[data-view='unsupported'] .post-error,
+body[data-view='unsupported'] .post-success {
+  display: none;
+}
+body:not([data-view='unsupported']) .unsupported-alert {
+  display: none;
+}
+
+/* exporting/success: dim and disable form area */
+body[data-view='exporting'] .form-area,
+body[data-view='success'] .form-area {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* post-error appears only in error state */
+body:not([data-view='error']) .post-error {
+  display: none;
+}
+
+/* post-success appears only in success state */
+body:not([data-view='success']) .post-success {
+  display: none;
+}
+
+/* button state visuals */
+body[data-view='exporting'] .export-btn {
+  background: var(--purple-500);
+  opacity: 0.85;
+  cursor: default;
+}
+body[data-view='exporting'] .export-btn:hover {
+  background: var(--purple-500);
+}
+body[data-view='success'] .export-btn {
+  background: var(--green-600);
+  color: var(--cta-success-text);
+  cursor: default;
+}
+body[data-view='success'] .export-btn:hover {
+  background: var(--green-600);
+}
+
+/* ==========================================================================
+   Dark mode
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #18181b;
+    --ink-900: #f4f4f5;
+    --ink-500: #a1a1aa;
+    --ink-400: #71717a;
+    --ink-100: #27272a;
+    --ink-50: #27272a;
+    --switch-off: #3f3f46;
+    --purple-500: #818cf8;
+    --purple-600: #a5b4fc;
+    --cta-text: #0b0b0e;
+    --cta-success-text: #052010;
+    --green-600: #22c55e;
+    --red-bg: rgba(220, 38, 38, 0.1);
+    --red-border: rgba(220, 38, 38, 0.35);
+    --red-700: #fca5a5;
+    --red-600: #fca5a5;
+    --segment-active: #3f3f46;
+    --segment-active-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+  .switch .thumb {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+}

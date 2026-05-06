@@ -1,0 +1,34 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node (in case you ever add tooling)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build / packaging artifacts
+dist/
+build/
+*.crx
+*.pem
+*.zip
+
+# Local-only project notes / scratch
+.claude/
+scratch/
+tmp/
+notes.local.md
+
+# Logs
+*.log
