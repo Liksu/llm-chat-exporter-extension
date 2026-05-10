@@ -1,0 +1,61 @@
+Texts to paste into the Chrome Web Store submission form (Privacy practices tab).
+Each block is a separate field on the CWS dashboard.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Single purpose
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Export the user's currently open chat on Claude.ai, ChatGPT.com, or Gemini.google.com to a Markdown file or ZIP archive saved locally in the browser.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Permission justification: activeTab
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Required to read the conversation in the user's currently active tab when they click Export. Without it the extension can't see the page it was invoked on.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Permission justification: storage
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Used to persist the user's preferences from the Options page (default output format, include-reasoning toggle, inline-text-files toggle, render-attachments-as-Markdown toggle) via chrome.storage.sync. No conversation content is ever written to storage.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Permission justification: declarativeNetRequestWithHostAccess
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Required to embed Gemini-attached files and inline / generated images into the export. Google's asset CDNs (lh*.googleusercontent.com, lh*.google.com, contribution-rt.usercontent.google.com) reply to authenticated requests with `Access-Control-Allow-Origin: *`, which Chrome refuses to combine with credentials, so a plain fetch is blocked. The extension installs a single dynamic DNR rule scoped to those CDN hosts that overrides the response's `Access-Control-Allow-Origin` to the extension's own origin and adds `Access-Control-Allow-Credentials: true`. The rule modifies only those two CORS headers; it does not redirect requests, change URLs, block traffic, or affect any host outside the listed CDNs.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Host permission justification
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- claude.ai, chatgpt.com, gemini.google.com: required to run the content scripts that read the conversation tree (text, attachments, reasoning) when the user clicks Export. The extension does not run on any other site.
+
+- *.googleusercontent.com, *.usercontent.google.com, lh1.google.com through lh7.google.com: required so the extension's service worker can download the file attachments and images already shown in a Gemini conversation, and embed them into the export. These are Google's asset CDNs — the same ones the chat page itself already loads them from. The downloads happen only as part of an export the user just triggered, and the bytes never leave the user's browser.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Remote code use
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+No. All JavaScript executed by the extension is bundled in the package. The extension does not load, eval, or fetch any executable code from a remote source.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Data usage disclosures
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The extension does NOT collect, transmit, or sell any user data. Specifically:
+
+[ ] Personally identifiable information — not collected
+[ ] Health information — not collected
+[ ] Financial and payment information — not collected
+[ ] Authentication information — not collected (the extension reuses the user's existing logged-in session for the chat platform; it does not read, store, or transmit credentials)
+[ ] Personal communications — not collected (chat content is read only when the user clicks Export, used solely to build the local export file, and is not transmitted anywhere)
+[ ] Location — not collected
+[ ] Web history — not collected
+[ ] User activity — not collected
+[ ] Website content — not collected (the extension reads the active chat page only, only when the user clicks Export, and only to assemble the export file the user is requesting)
+
+I certify that:
+- I do not sell user data to third parties.
+- I do not use or transfer user data for purposes that are unrelated to my item's single purpose.
+- I do not use or transfer user data to determine creditworthiness or for lending purposes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Privacy policy URL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Point this at the hosted PRIVACY.md from the GitHub repo (e.g.
+https://github.com/<your-username>/llm-chat-exporter-extension/blob/main/PRIVACY.md)
+or any other URL where the policy is publicly accessible.

@@ -1,6 +1,6 @@
-﻿Save your AI conversations in a clean, portable format you actually own.
+Save your AI conversations in a clean, portable format you actually own.
 
-LLM Chat Exporter takes the chat you're currently looking at on Claude or ChatGPT and turns it into a Markdown file or a ZIP archive — locally, in your browser. No accounts, no servers, no data leaves your machine.
+LLM Chat Exporter takes the chat you're currently looking at on Claude, ChatGPT, or Gemini and turns it into a Markdown file or a ZIP archive — locally, in your browser. No accounts, no servers, no data leaves your machine.
 
 ━━━ FEATURES ━━━
 
@@ -11,6 +11,7 @@ LLM Chat Exporter takes the chat you're currently looking at on Claude or ChatGP
 • Supported platforms
   – Claude.ai — text, images, file uploads, artifacts, thinking blocks, and tool calls.
   – ChatGPT.com — text, images, file uploads, and reasoning.
+  – Gemini.google.com — text, images, file uploads, thinking, and AI-generated images (including image-gen models like Nano Banana).
 
 • Configurable
   – Include or exclude the model's reasoning (thinking + tool calls).
@@ -21,15 +22,19 @@ LLM Chat Exporter takes the chat you're currently looking at on Claude or ChatGP
 
 The extension reads conversation data only on the active tab, and only when you click Export. There is no analytics, no telemetry, and no remote server. The only data stored is your default-format preferences (via chrome.storage.sync).
 
+For Gemini specifically, the extension also downloads attached and inline images from Google's asset CDNs (the same ones the chat page already loads them from) so they can be embedded into the export. Those bytes never leave your browser.
+
 ━━━ PERMISSIONS ━━━
 
 • activeTab — read the chat tab when you trigger an export.
 • storage — remember your option toggles.
-• Host access to claude.ai and chatgpt.com — run the scripts that extract the conversation.
+• declarativeNetRequestWithHostAccess — rewrite CORS response headers from Google's image CDNs so Gemini-attached files and inline images can be embedded into the export. Scoped to those CDN hosts only.
+• Host access to claude.ai, chatgpt.com, gemini.google.com — run the scripts that extract the conversation.
+• Host access to *.googleusercontent.com, *.usercontent.google.com, and lh1.google.com–lh7.google.com — fetch Gemini-uploaded files and inline / generated images via the extension's service worker.
 
 ━━━ HOW TO USE ━━━
 
-1. Open a conversation on claude.ai or chatgpt.com.
+1. Open a conversation on claude.ai, chatgpt.com, or gemini.google.com.
 2. Click the LLM Chat Exporter icon.
 3. Pick Markdown or ZIP, toggle the options you want, hit Export.
 4. The file is saved through your browser's normal download flow.
