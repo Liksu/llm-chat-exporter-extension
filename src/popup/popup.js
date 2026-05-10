@@ -14,7 +14,7 @@
   const postSuccess = document.getElementById('postSuccess');
 
   // Adapter registry (loaded via <script src="../adapters/.../info.js">).
-  const ADAPTERS = [self.__adapterClaude, self.__adapterChatGPT].filter(Boolean);
+  const ADAPTERS = [self.__adapterClaude, self.__adapterChatGPT, self.__adapterGemini].filter(Boolean);
 
   // -- Local view state ------------------------------------------------------
   let view = 'idle'; // 'idle' | 'exporting' | 'success' | 'error' | 'unsupported'
@@ -50,6 +50,11 @@
       '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">' +
         '<circle cx="6" cy="6" r="5" fill="#10A37F"/>' +
         '<path d="M4 4.5 L6 3.5 L8 4.5 L8 7.5 L6 8.5 L4 7.5 Z" stroke="#fff" stroke-width="0.9" fill="none"/>' +
+      '</svg>',
+    glyphGemini:
+      '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">' +
+        '<circle cx="6" cy="6" r="5" fill="#4285F4"/>' +
+        '<path d="M6 2.5 L6.9 5.1 L9.5 6 L6.9 6.9 L6 9.5 L5.1 6.9 L2.5 6 L5.1 5.1 Z" fill="#fff"/>' +
       '</svg>',
   };
 
@@ -120,7 +125,9 @@
         ? SVG.glyphClaude
         : adapter.id === 'chatgpt'
           ? SVG.glyphChatgpt
-          : '';
+          : adapter.id === 'gemini'
+            ? SVG.glyphGemini
+            : '';
   };
 
   // -- Init ------------------------------------------------------------------
@@ -159,7 +166,7 @@
     activeAdapter = ADAPTERS.find((a) => a.matches(hostname)) || null;
 
     if (!activeAdapter) {
-      unsupportedAlertText.textContent = 'Open a Claude or ChatGPT chat tab to export.';
+      unsupportedAlertText.textContent = 'Open a Claude, ChatGPT, or Gemini chat tab to export.';
       setView('unsupported');
       return;
     }

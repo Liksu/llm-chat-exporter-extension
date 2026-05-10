@@ -23,6 +23,7 @@ build/
 *.crx
 *.pem
 *.zip
+releases/
 
 # Local-only project notes / scratch
 .claude/

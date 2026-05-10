@@ -153,24 +153,58 @@
       `/files/${eid}/download`,
       `/files/${eid}`,
     ];
+    // Signed URL fetch modes. Order matters — the cascade stops at the first
+    // 2xx, so we want the most-likely-to-succeed mode FIRST to avoid
+    // noisy 403s in DevTools (Chrome logs every failed network request).
+    //
+    // For chatgpt.com signed URLs (current /backend-api/estuary/content?…sig=…),
+    // session cookies are what authorises the request — `credentials:'include'`
+    // succeeds, `omit` always 403s. We used to try cookie-less modes first as
+    // a defensive measure for hypothetical external CDN signed URLs, but
+    // empirically every signed URL OpenAI hands out today is on chatgpt.com,
+    // so cookies-included is the right starting point.
+    //
+    // The `auth:true` modes add `Authorization: Bearer <token>` for cases
+    // where OpenAI tightens the auth requirement on signed endpoints. We
+    // never send Bearer to non-chatgpt.com hosts (would leak the token to a
+    // CDN that can't use it).
+    //
+    // The cookie-less modes are kept as last-resort fallbacks in case some
+    // future CDN signed URL truly needs them.
     const SIGNED_MODES = [
-      { credentials: 'omit', referrerPolicy: 'no-referrer' },
-      { credentials: 'omit', referrerPolicy: 'origin' },
-      { credentials: 'include', referrerPolicy: 'origin' },
+      { credentials: 'include', referrerPolicy: 'origin', auth: false },
+      { credentials: 'include', referrerPolicy: 'origin', auth: true },
+      { credentials: 'omit', referrerPolicy: 'no-referrer', auth: false },
+      { credentials: 'omit', referrerPolicy: 'origin', auth: false },
+      { credentials: 'omit', referrerPolicy: 'no-referrer', auth: true },
     ];
+
+    const isChatgptHost = (url) => {
+      try {
+        return new URL(url).hostname.endsWith('chatgpt.com');
+      } catch {
+        return false;
+      }
+    };
 
     const attemptLog = [];
 
     const trySigned = async (url, mime) => {
+      const sameHost = isChatgptHost(url);
       for (const mode of SIGNED_MODES) {
+        if (mode.auth && !sameHost) continue; // never leak bearer to a CDN
         try {
+          const headers = { accept: '*/*' };
+          if (mode.auth) headers.authorization = `Bearer ${token}`;
           const r = await fetch(url, {
             credentials: mode.credentials,
             referrerPolicy: mode.referrerPolicy,
-            headers: { accept: '*/*' },
+            headers,
           });
           if (!r.ok) {
-            attemptLog.push(`signed[${mode.credentials}/${mode.referrerPolicy}] → ${r.status}`);
+            attemptLog.push(
+              `signed[${mode.credentials}/${mode.referrerPolicy}${mode.auth ? '/auth' : ''}] → ${r.status}`
+            );
             continue;
           }
           const ct = (r.headers.get('content-type') || mime || '').split(';')[0].trim();
@@ -178,7 +212,7 @@
           return { bytes: new Uint8Array(buf), mime: ct || 'application/octet-stream' };
         } catch (err) {
           attemptLog.push(
-            `signed[${mode.credentials}/${mode.referrerPolicy}] → ${err && err.message ? err.message : 'fetch-error'}`
+            `signed[${mode.credentials}/${mode.referrerPolicy}${mode.auth ? '/auth' : ''}] → ${err && err.message ? err.message : 'fetch-error'}`
           );
         }
       }

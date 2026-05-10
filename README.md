@@ -1,6 +1,6 @@
 # LLM Chat Exporter
 
-A Chrome extension that exports your conversations from **Claude** and **ChatGPT** to a single Markdown file or a ZIP archive — including images, pasted attachments, artifacts, and (optionally) the model's reasoning.
+A Chrome extension that exports your conversations from **Claude**, **ChatGPT**, and **Gemini** to a single Markdown file or a ZIP archive — including images, pasted attachments, artifacts, and (optionally) the model's reasoning.
 
 ## Features
 
@@ -10,6 +10,7 @@ A Chrome extension that exports your conversations from **Claude** and **ChatGPT
 - **Supported platforms**
   - [claude.ai](https://claude.ai) — text, images, file uploads, artifacts, thinking blocks, tool calls.
   - [chatgpt.com](https://chatgpt.com) — text, images, file uploads, reasoning.
+  - [gemini.google.com](https://gemini.google.com) — text, images, file uploads, thinking, generated images (multi-account `/u/N/` URLs supported).
 - **Configurable output**
   - Include or exclude the model's reasoning (thinking + tool calls).
   - Inline pasted text files (`.md`, `.txt`, `.json`, …) into the Markdown body, or keep them as separate attachments.
@@ -48,7 +49,9 @@ Required permissions:
 |---|---|
 | `activeTab` | Read the current chat tab when you trigger an export. |
 | `storage` | Persist your default-format and toggle preferences. |
-| `host_permissions: claude.ai, chatgpt.com` | Run the content scripts that read conversation data. |
+| `declarativeNetRequestWithHostAccess` | Rewrite CORS response headers from Google's asset CDNs (`lh*.googleusercontent.com`, `lh*.google.com`) so the extension can embed Gemini-generated images and uploaded files into the export. |
+| Host access to `claude.ai`, `chatgpt.com`, `gemini.google.com` | Run the content scripts that read conversation data. |
+| Host access to `*.googleusercontent.com`, `*.usercontent.google.com`, `lh1.google.com`–`lh7.google.com` | Fetch Gemini-uploaded files and inline / generated images via the extension's service worker (these CDNs are not the chat origin and would otherwise be blocked by CORS). |
 
 ## Project layout
 
@@ -57,10 +60,13 @@ manifest.json
 src/
   popup/        Popup UI (the dropdown when you click the icon)
   options/      Options page
+  background/   Service worker — proxies cross-origin asset fetches and
+                installs the DNR rule that fixes CORS on Google's asset CDNs
   core/         Shared logic: Markdown rendering, ZIP packing, downloads
   adapters/
     claude/    Claude.ai-specific extraction & normalization
     chatgpt/   ChatGPT-specific extraction & normalization
+    gemini/    Gemini-specific extraction & normalization (batchexecute RPC)
   icons/
   vendor/      fflate (ZIP)
 ```

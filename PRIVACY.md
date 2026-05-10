@@ -1,7 +1,7 @@
 # Privacy Policy
 
 **Extension:** LLM Chat Exporter
-**Last updated:** 2026-05-06
+**Last updated:** 2026-05-10
 
 ## Summary
 
@@ -9,7 +9,9 @@ LLM Chat Exporter does not collect, transmit, sell, or share any personal data. 
 
 ## What the extension does
 
-When you open the popup on a supported site ([claude.ai](https://claude.ai) or [chatgpt.com](https://chatgpt.com)) and click **Export**, the extension reads the contents of the conversation in the active tab — text, images, file attachments, artifacts, and (optionally) reasoning — and assembles a Markdown file or a ZIP archive. The result is saved to your computer through Chrome's normal download flow.
+When you open the popup on a supported site ([claude.ai](https://claude.ai), [chatgpt.com](https://chatgpt.com), or [gemini.google.com](https://gemini.google.com)) and click **Export**, the extension reads the contents of the conversation in the active tab — text, images, file attachments, artifacts, and (optionally) reasoning — and assembles a Markdown file or a ZIP archive. The result is saved to your computer through Chrome's normal download flow.
+
+The extension includes a small service worker that proxies asset downloads (uploaded files and inline / generated images) when those live on a different host than the chat page. This is purely a CORS workaround so the same bytes the page already displays can be embedded in the export — the bytes never leave your browser and are not transmitted to any third party.
 
 ## Data the extension accesses
 
@@ -26,13 +28,15 @@ The extension does not read tabs other than the active one, and does not access 
 |---|---|
 | `activeTab` | Read the current chat tab when you click Export. |
 | `storage` | Remember your default-format and toggle preferences. |
-| Host access to `claude.ai` and `chatgpt.com` | Run the content scripts that extract the conversation. |
+| `declarativeNetRequestWithHostAccess` | Rewrite CORS response headers on requests to Google's asset CDNs so the extension can read Gemini's inline images and file uploads. The rule is scoped to the asset hosts listed below and only modifies `Access-Control-Allow-Origin` and `Access-Control-Allow-Credentials`; no request URLs are changed and no traffic is redirected. |
+| Host access to `claude.ai`, `chatgpt.com`, and `gemini.google.com` | Run the content scripts that extract the conversation. |
+| Host access to `*.googleusercontent.com`, `*.usercontent.google.com`, and `lh1.google.com`–`lh7.google.com` | Fetch Gemini-attached files and inline / generated images. The extension's service worker downloads these via the user's existing Google session — same files the browser already loads when displaying the chat. |
 
 ## Third parties
 
 None. The extension makes no network requests of its own. It does not contact any analytics, advertising, or telemetry service.
 
-The only network activity that may occur is when the extension fetches images already shown in your conversation (from the same domain) so it can embed them into the export. Those requests go to the LLM provider's own servers, just like the ones your browser already makes when displaying the chat.
+The only network activity that may occur is when the extension fetches images and file attachments already shown in your conversation, so it can embed them into the export. Those requests go to the LLM provider's own servers (Anthropic for Claude, OpenAI for ChatGPT, and Google's asset CDNs for Gemini) — the same ones your browser already loads when displaying the chat.
 
 ## Data retention and deletion
 

@@ -18,7 +18,7 @@
  *   Consecutive same-role nodes coalesce into one turn so that the assistant's
  *   reasoning trace + tool dance + final answer all live under one "## Assistant".
  *
- * Content-type mapping:
+ * Content-type mapping (note: role and channel override these; see below):
  *   - text                  parts:[string]                          → text block(s)
  *   - multimodal_text       parts:[string | image_asset_pointer]   → text + image blocks
  *   - thoughts              {thoughts:[{summary,content}]}          → thinking block
@@ -27,6 +27,20 @@
  *   - execution_output      {text}                                  → tool_result
  *   - tether_*              search/citation payloads                → tool_call (with includeReasoning)
  *   - everything else                                                → tool_call dump
+ *
+ * Role/channel overrides (applied BEFORE the content-type table):
+ *   - role==='tool' + text                            → tool_result
+ *   - role==='tool' + multimodal_text (strings only) → tool_result
+ *     file_search/web.run/container.exec emit text-shaped payloads that look
+ *     like prose but are raw context fed to the model (parsed PDF pages,
+ *     "Make sure to include filecite…" boilerplate). Without this rule the
+ *     full text of every uploaded PDF leaks into the assistant turn.
+ *   - role==='tool' + multimodal_text with image_asset_pointer → falls
+ *     through to the multimodal_text handler. This is the image-generation
+ *     tool's deliverable (the picture itself); we must keep it.
+ *   - role==='assistant' + channel==='commentary'    → thinking
+ *     "Thinking preamble" messages flash in the UI before tool calls but
+ *     aren't part of the final answer.
  *
  * Files / images:
  *   image_asset_pointer.asset_pointer = "sediment://file-..." → register an
@@ -97,10 +111,56 @@
     const content = isObject(m.content) ? m.content : null;
     const meta = isObject(m.metadata) ? m.metadata : {};
     const role = m.author && m.author.role;
+    const channel = typeof m.channel === 'string' ? m.channel : '';
     const ct = content && content.content_type;
     const out = [];
 
     if (!content) return out;
+
+    // Tool-role text payloads are NEVER user-visible content. file_search,
+    // web.run, container.exec and friends emit `content_type:"text"` /
+    // `"multimodal_text"` strings that look like prose but are raw context
+    // fed to the model (parsed PDF pages, "All files loaded" status pings,
+    // "Make sure to include filecite…" boilerplate). Surface them as
+    // tool_result so they're hidden by default and only show with
+    // reasoning on. Without this the export leaks the full text of every
+    // uploaded PDF into the assistant turn.
+    //
+    // EXCEPTION: tool multimodal_text containing image_asset_pointer parts
+    // is the image-generation tool's actual deliverable (the picture the
+    // user asked for). Those need to fall through to the normal
+    // multimodal_text handler below so they become real image blocks.
+    if (role === 'tool' && ct === 'text') {
+      const text = partsToText(content.parts);
+      if (text) out.push({ block: { kind: 'tool_result', text, isError: false } });
+      return out;
+    }
+    if (role === 'tool' && ct === 'multimodal_text') {
+      const parts = Array.isArray(content.parts) ? content.parts : [];
+      const hasImage = parts.some(
+        (p) => isObject(p) && p.content_type === 'image_asset_pointer'
+      );
+      if (!hasImage) {
+        const text = parts
+          .filter((p) => typeof p === 'string')
+          .join('\n\n')
+          .trim();
+        if (text) out.push({ block: { kind: 'tool_result', text, isError: false } });
+        return out;
+      }
+      // else: image-gen output, fall through to the multimodal_text handler.
+    }
+
+    // Assistant "commentary" messages are pre-tool-call thinking preambles
+    // ("I'll check the docs first…", flagged with channel:"commentary" and
+    // metadata.is_thinking_preamble_message). They flash in the chat UI
+    // while the model reasons but aren't part of the final answer. Treat
+    // as thinking so the include-reasoning toggle controls visibility.
+    if (role === 'assistant' && channel === 'commentary' && ct === 'text') {
+      const text = partsToText(content.parts);
+      if (text) out.push({ block: { kind: 'thinking', text } });
+      return out;
+    }
 
     if (ct === 'text') {
       const text = partsToText(content.parts);

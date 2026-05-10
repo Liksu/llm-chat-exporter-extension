@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "LLM Chat Exporter",
-  "version": "0.6.3",
-  "description": "Export LLM chat conversations (Claude, ChatGPT...) to Markdown or ZIP, with images and pasted attachments inline.",
+  "version": "0.7.15",
+  "description": "Export LLM chat conversations (Claude, ChatGPT, Gemini...) to Markdown or ZIP, with images and pasted attachments inline.",
   "action": {
     "default_title": "LLM Chat Exporter",
     "default_popup": "src/popup/popup.html"
@@ -14,8 +14,24 @@
     "64": "src/icons/icon64.png",
     "128": "src/icons/icon128.png"
   },
-  "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://claude.ai/*", "https://chatgpt.com/*"],
+  "permissions": ["storage", "activeTab", "declarativeNetRequestWithHostAccess"],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://gemini.google.com/*",
+    "https://*.usercontent.google.com/*",
+    "https://*.googleusercontent.com/*",
+    "https://lh1.google.com/*",
+    "https://lh2.google.com/*",
+    "https://lh3.google.com/*",
+    "https://lh4.google.com/*",
+    "https://lh5.google.com/*",
+    "https://lh6.google.com/*",
+    "https://lh7.google.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
   "content_scripts": [
     {
       "matches": ["https://claude.ai/*"],
@@ -56,6 +72,32 @@
         "src/adapters/chatgpt/api.js",
         "src/adapters/chatgpt/normalize.js",
         "src/adapters/chatgpt/content.js"
+      ]
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "js": ["src/adapters/gemini/hook-main.js"]
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "run_at": "document_start",
+      "js": ["src/adapters/gemini/hook-iso.js"]
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "run_at": "document_idle",
+      "js": [
+        "src/vendor/fflate.min.js",
+        "src/core/utils.js",
+        "src/core/fetch-binary.js",
+        "src/core/markdown.js",
+        "src/core/zip.js",
+        "src/core/download.js",
+        "src/adapters/gemini/api.js",
+        "src/adapters/gemini/normalize.js",
+        "src/adapters/gemini/content.js"
       ]
     }
   ]
