@@ -194,9 +194,18 @@
       const path = opts.artifactFileById.get(art.id) ?? `${opts.artifactsDir}/${art.fileName}`;
       return `- [${art.fileName}](${path})`;
     }
+    const anchor = `<a id="artifact-${slugifyAnchor(art.id)}"></a>`;
+    // The "Markdown attachments · render inline" toggle also covers
+    // markdown-flavored artifacts. Without it, an .md artifact would render
+    // as a ```markdown fenced block, which defeats the point of having
+    // markdown content in a markdown export.
+    const isMarkdown =
+      (art.language || '').toLowerCase() === 'markdown' || /\.mdx?$/i.test(art.fileName || '');
+    if (opts.attachmentsAsMarkdown && isMarkdown) {
+      return `### ${anchor}${art.fileName}\n\n${art.content}`;
+    }
     const fence = fenceFor(art.content);
     const lang = art.language || '';
-    const anchor = `<a id="artifact-${slugifyAnchor(art.id)}"></a>`;
     return `### ${anchor}${art.fileName}\n\n${fence}${lang}\n${art.content}\n${fence}`;
   };
 
