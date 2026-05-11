@@ -131,27 +131,34 @@ try {
     # Em dash inserted at runtime to keep this .ps1 source ASCII-only.
     $emDash = [char]0x2014
 
-    $entry = @"
+    # The here-string captures the body of the entry without committing to
+    # specific leading/trailing newlines -- we normalize those below so the
+    # log gets exactly one blank line on either side of the new entry
+    # regardless of how the existing file is whitespaced.
+    $entryBody = @"
 ## v$version $emDash $date
 
 $ReleaseNotes
-
 "@
+    $entryBody = $entryBody.Trim()
 
     if (Test-Path $logPath) {
       $existing = Get-Content -Raw -Encoding UTF8 $logPath
-      # If the log starts with a "# Title" header, keep it pinned at the
-      # top and prepend the new entry after it. Otherwise prepend at the
-      # very start.
-      if ($existing -match '(?s)^(# [^\r\n]*[\r\n]+)(.*)$') {
-        $newContent = $Matches[1] + "`r`n" + $entry + $Matches[2].TrimStart()
+      # Capture the "# Title" header (without trailing newlines) and the rest
+      # separately, then re-glue with a canonical "\r\n\r\n" separator on
+      # both sides of the new entry. Any existing whitespace gluing those
+      # parts together is discarded.
+      if ($existing -match '(?s)^(# [^\r\n]*)\r?\n[\r\n]*(.*?)\s*$') {
+        $title = $Matches[1]
+        $rest  = $Matches[2]
+        $newContent = "$title`r`n`r`n$entryBody`r`n`r`n$rest`r`n"
       }
       else {
-        $newContent = $entry + $existing
+        $newContent = "$entryBody`r`n`r`n" + $existing.TrimStart()
       }
     }
     else {
-      $newContent = "# LLM Chat Exporter $emDash Release Log`r`n`r`n" + $entry
+      $newContent = "# LLM Chat Exporter $emDash Release Log`r`n`r`n$entryBody`r`n"
     }
 
     Set-Content -Path $logPath -Value $newContent -Encoding UTF8 -NoNewline

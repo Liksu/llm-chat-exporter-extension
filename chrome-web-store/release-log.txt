@@ -1,7 +1,6 @@
 ﻿# LLM Chat Exporter — Release Log
 
-
-## v0.7.19 — 2026-05-10
+## v0.7.20 — 2026-05-10
 
 Fixed Claude artifacts in exports. Also fixed some other reasoning items
 
