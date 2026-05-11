@@ -1,0 +1,1 @@
+@powershell -NoProfile -ExecutionPolicy Bypass -File .\release.ps1 -ReleaseNotes %*

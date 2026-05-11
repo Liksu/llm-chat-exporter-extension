@@ -1,0 +1,22 @@
+﻿# LLM Chat Exporter — Release Log
+
+
+## v0.7.19 — 2026-05-10
+
+Fixed Claude artifacts in exports. Also fixed some other reasoning items
+
+## v0.7.15 — 2026-05-10
+
+• Added support for gemini.google.com — text, images, file uploads, thinking, and AI-generated images (Nano Banana / Imagen).
+• ChatGPT: cleaner exports of chats that use file search or image generation — no more leaked tool boilerplate or missing pictures.
+• ChatGPT: fixed an issue where attached files would fail to download with a 403 error.
+
+## v0.6.3 — 2026-05-06
+
+• Claude.ai and ChatGPT.com support.
+• Two export formats:
+  – Markdown — single .md file with images embedded as base64.
+  – ZIP — folder layout with assets / files / artifacts and the .md referencing them.
+• Toggles: include reasoning, inline pasted text files, render Markdown attachments inline.
+• Options page for setting defaults.
+• No accounts, no telemetry — extraction runs locally in the browser.
