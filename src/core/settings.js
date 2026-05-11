@@ -11,7 +11,10 @@
  *       inlineTextFiles: boolean,
  *       attachmentsAsMarkdown: boolean,
  *     },
- *     perAdapter: { claude: {}, chatgpt: {} }
+ *     // Per-adapter overrides. A key present in perAdapter[id] overrides
+ *     // the global value for that adapter; a missing key inherits global.
+ *     // Use resolveFor() to merge them before prefilling the popup.
+ *     perAdapter: { claude: {}, chatgpt: {}, gemini: {} }
  *   }
  */
 (function () {
@@ -29,8 +32,18 @@
       inlineTextFiles: false,
       attachmentsAsMarkdown: false,
     },
-    perAdapter: { claude: {}, chatgpt: {} },
+    perAdapter: { claude: {}, chatgpt: {}, gemini: {} },
   };
+
+  /** Keys that count as per-adapter overrides. Used by options UI to know
+   *  which controls to render and by resolveFor() to know what to merge. */
+  const OVERRIDABLE_KEYS = [
+    'mode',
+    'includeReasoning',
+    'inlineImages',
+    'inlineTextFiles',
+    'attachmentsAsMarkdown',
+  ];
 
   const load = async () => {
     try {
@@ -38,7 +51,10 @@
       const s = got.settings || {};
       return {
         global: { ...DEFAULTS.global, ...(s.global || {}) },
-        perAdapter: { ...DEFAULTS.perAdapter, ...(s.perAdapter || {}) },
+        perAdapter: {
+          ...DEFAULTS.perAdapter,
+          ...(s.perAdapter || {}),
+        },
       };
     } catch {
       return structuredClone(DEFAULTS);
@@ -49,5 +65,32 @@
     await chrome.storage.sync.set({ settings });
   };
 
-  ns.settings = { load, save, DEFAULTS };
+  /**
+   * Merge global defaults with the per-adapter override map. A key missing
+   * from `perAdapter[adapterId]` inherits the global value; a key present
+   * (even with value `false`) wins. Returns a fresh object — safe to mutate.
+   */
+  const resolveFor = (settings, adapterId) => {
+    const override = (settings.perAdapter && settings.perAdapter[adapterId]) || {};
+    const out = { ...settings.global };
+    for (const k of OVERRIDABLE_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(override, k)) {
+        out[k] = override[k];
+      }
+    }
+    return out;
+  };
+
+  /** Count of override keys actually set for an adapter (drives the
+   *  "(N overrides)" badge on the options page). */
+  const countOverrides = (override) => {
+    if (!override) return 0;
+    let n = 0;
+    for (const k of OVERRIDABLE_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(override, k)) n++;
+    }
+    return n;
+  };
+
+  ns.settings = { load, save, resolveFor, countOverrides, DEFAULTS, OVERRIDABLE_KEYS };
 })();

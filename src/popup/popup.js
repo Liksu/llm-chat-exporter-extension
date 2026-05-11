@@ -145,15 +145,33 @@
   const init = async () => {
     gearBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
-    // Pre-fill from sync settings (defaults set in core/settings.js).
-    const settings = await self.__exporter.settings.load();
-    setMode(settings.global.mode);
-    includeReasoningEl.checked = !!settings.global.includeReasoning;
-    // inlineImages is ON by default — fall back to true if a pre-0.7.21
-    // settings record exists without the field.
-    inlineImagesEl.checked = settings.global.inlineImages !== false;
-    inlineTextFilesEl.checked = !!settings.global.inlineTextFiles;
-    attachmentsAsMarkdownEl.checked = !!settings.global.attachmentsAsMarkdown;
+    // Resolve active tab + matching adapter BEFORE prefilling toggles, so we
+    // can apply per-adapter overrides on top of the global defaults.
+    const [tabs, settings] = await Promise.all([
+      chrome.tabs.query({ active: true, currentWindow: true }),
+      self.__exporter.settings.load(),
+    ]);
+    activeTab = tabs[0] || null;
+    let hostname = '';
+    try {
+      if (activeTab && activeTab.url) hostname = new URL(activeTab.url).hostname;
+    } catch {
+      hostname = '';
+    }
+    activeAdapter = ADAPTERS.find((a) => a.matches(hostname)) || null;
+
+    // Pre-fill from per-adapter overrides if we have a matching adapter,
+    // otherwise fall back to plain global defaults.
+    const effective = activeAdapter
+      ? self.__exporter.settings.resolveFor(settings, activeAdapter.id)
+      : settings.global;
+    setMode(effective.mode);
+    includeReasoningEl.checked = !!effective.includeReasoning;
+    // inlineImages is ON by default — treat anything that isn't explicit
+    // false as enabled (covers pre-0.7.21 settings records).
+    inlineImagesEl.checked = effective.inlineImages !== false;
+    inlineTextFilesEl.checked = !!effective.inlineTextFiles;
+    attachmentsAsMarkdownEl.checked = !!effective.attachmentsAsMarkdown;
 
     segments.forEach((s) => {
       s.addEventListener('click', () => {
@@ -170,17 +188,6 @@
       if (view !== 'idle' && view !== 'error') return;
       doExport();
     });
-
-    // Resolve active tab + matching adapter.
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    activeTab = tabs[0] || null;
-    let hostname = '';
-    try {
-      if (activeTab && activeTab.url) hostname = new URL(activeTab.url).hostname;
-    } catch {
-      hostname = '';
-    }
-    activeAdapter = ADAPTERS.find((a) => a.matches(hostname)) || null;
 
     if (!activeAdapter) {
       unsupportedAlertText.textContent = 'Open a Claude, ChatGPT, or Gemini chat tab to export.';
