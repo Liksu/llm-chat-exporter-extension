@@ -14,7 +14,7 @@
   const { claudeApi, claudeNormalize, markdown, zip, download, utils } = ns;
   const { sanitizeFilename, todayStamp, utf8ToBytes, log } = utils;
 
-  const handleExport = async ({ mode, includeReasoning, inlineTextFiles, attachmentsAsMarkdown }) => {
+  const handleExport = async ({ mode, includeReasoning, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
     const convId = claudeApi.parseConvIdFromUrl(location.href);
     if (!convId) {
       return { ok: false, error: 'Not on a claude.ai conversation page.' };
@@ -32,27 +32,33 @@
     const { conversation, imageRefs, binaryAttachmentRefs, textFileRefs } =
       claudeNormalize.normalize(raw, { inlineTextFiles });
 
-    // Images are needed in BOTH modes (md = inline base64; zip = assets/).
-    for (const { turnIndex, blockIndex, ref } of imageRefs) {
-      const block = conversation.turns[turnIndex].blocks[blockIndex];
-      try {
-        let bytes;
-        let mime = ref.mime;
-        if (ref.url) {
-          const r = await ns.fetchBinary.fetchAsBytes(ref.url);
-          bytes = r.bytes;
-          if (r.mime) mime = r.mime;
-        } else if (ref.fileUuid) {
-          const r = await claudeApi.fetchFile(orgId, ref.fileUuid, userScopeId);
-          bytes = r.bytes;
-          if (r.mime) mime = r.mime;
+    // Images: in zip mode we always fetch (they're written to /assets/,
+    // not embedded inline -- "inline" is an md-only concept). In md mode,
+    // the inlineImages toggle controls fetching; when off, the empty
+    // block.bytes left over from normalize() triggers the placeholder
+    // branch in markdown.js (`_[image: name]_`).
+    if (mode === 'zip' || inlineImages) {
+      for (const { turnIndex, blockIndex, ref } of imageRefs) {
+        const block = conversation.turns[turnIndex].blocks[blockIndex];
+        try {
+          let bytes;
+          let mime = ref.mime;
+          if (ref.url) {
+            const r = await ns.fetchBinary.fetchAsBytes(ref.url);
+            bytes = r.bytes;
+            if (r.mime) mime = r.mime;
+          } else if (ref.fileUuid) {
+            const r = await claudeApi.fetchFile(orgId, ref.fileUuid, userScopeId);
+            bytes = r.bytes;
+            if (r.mime) mime = r.mime;
+          }
+          if (bytes) {
+            block.bytes = bytes;
+            block.mime = mime;
+          }
+        } catch (err) {
+          log.warn('image fetch failed', ref, err);
         }
-        if (bytes) {
-          block.bytes = bytes;
-          block.mime = mime;
-        }
-      } catch (err) {
-        log.warn('image fetch failed', ref, err);
       }
     }
 
@@ -110,6 +116,7 @@
     if (mode === 'zip') {
       const blob = await zip.build(conversation, {
         includeReasoning,
+        inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'Claude',
       });
@@ -118,6 +125,7 @@
       const md = markdown.render(conversation, {
         mode: 'md',
         includeReasoning,
+        inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'Claude',
       });
@@ -133,6 +141,9 @@
     handleExport({
       mode: msg.mode === 'zip' ? 'zip' : 'md',
       includeReasoning: !!msg.includeReasoning,
+      // Default to true so an older popup (or a programmatic caller that
+      // forgets the field) still inlines images, matching the new default.
+      inlineImages: msg.inlineImages !== false,
       inlineTextFiles: !!msg.inlineTextFiles,
       attachmentsAsMarkdown: !!msg.attachmentsAsMarkdown,
     })

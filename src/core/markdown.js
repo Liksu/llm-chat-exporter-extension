@@ -132,7 +132,14 @@
           if (block.fetchError) return `_[image not loaded: ${alt} — ${block.fetchError}]_`;
           return `_[image: ${alt}]_`;
         }
-        if (opts.mode === 'zip') {
+        // The inlineImages flag picks the representation when bytes are
+        // available: true  → base64 data-URL inside the .md (works in both
+        // modes; in zip the caller skips /assets/), false → relative path
+        // reference (zip only; md has nowhere to reference to). Default
+        // when the flag is absent: inline for md, external for zip — i.e.
+        // the historical behavior.
+        const inline = opts.inlineImages ?? (opts.mode !== 'zip');
+        if (opts.mode === 'zip' && !inline) {
           const path = opts.imagePathByName.get(block.name) ?? `${opts.assetsDir}/${alt}`;
           return `![${alt}](${path})`;
         }

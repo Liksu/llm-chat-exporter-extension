@@ -35,7 +35,7 @@
     return cleaned;
   };
 
-  const handleExport = async ({ mode, includeReasoning, inlineTextFiles, attachmentsAsMarkdown }) => {
+  const handleExport = async ({ mode, includeReasoning, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
     const locator = geminiApi.parseConvLocator(location.href);
     if (!locator) {
       return { ok: false, error: 'Not on a gemini.google.com conversation page.' };
@@ -65,16 +65,20 @@
         inlineTextFiles,
       });
 
-    // Images: needed in both modes (md = base64; zip = assets/).
-    for (const { turnIndex, blockIndex, ref } of imageRefs) {
-      const block = conversation.turns[turnIndex].blocks[blockIndex];
-      try {
-        const r = await geminiApi.fetchAsset(ref.url);
-        block.bytes = r.bytes;
-        if (r.mime) block.mime = r.mime;
-      } catch (err) {
-        log.warn('gemini image fetch failed', ref.url, err);
-        block.fetchError = err instanceof Error ? err.message : String(err);
+    // Images: zip always fetches (writes to /assets/); md respects the
+    // inlineImages toggle. When skipped, empty bytes from normalize() turn
+    // into `_[image: name]_` placeholders via markdown.js.
+    if (mode === 'zip' || inlineImages) {
+      for (const { turnIndex, blockIndex, ref } of imageRefs) {
+        const block = conversation.turns[turnIndex].blocks[blockIndex];
+        try {
+          const r = await geminiApi.fetchAsset(ref.url);
+          block.bytes = r.bytes;
+          if (r.mime) block.mime = r.mime;
+        } catch (err) {
+          log.warn('gemini image fetch failed', ref.url, err);
+          block.fetchError = err instanceof Error ? err.message : String(err);
+        }
       }
     }
 
@@ -117,6 +121,7 @@
     if (mode === 'zip') {
       const blob = await zip.build(conversation, {
         includeReasoning,
+        inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'Gemini',
       });
@@ -125,6 +130,7 @@
       const md = markdown.render(conversation, {
         mode: 'md',
         includeReasoning,
+        inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'Gemini',
       });
@@ -140,6 +146,7 @@
     handleExport({
       mode: msg.mode === 'zip' ? 'zip' : 'md',
       includeReasoning: !!msg.includeReasoning,
+      inlineImages: msg.inlineImages !== false,
       inlineTextFiles: !!msg.inlineTextFiles,
       attachmentsAsMarkdown: !!msg.attachmentsAsMarkdown,
     })

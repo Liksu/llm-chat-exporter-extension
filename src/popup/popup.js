@@ -7,6 +7,7 @@
   const segments = Array.from(document.querySelectorAll('.segment'));
   const helperText = document.getElementById('helperText');
   const includeReasoningEl = document.getElementById('includeReasoning');
+  const inlineImagesEl = document.getElementById('inlineImages');
   const inlineTextFilesEl = document.getElementById('inlineTextFiles');
   const attachmentsAsMarkdownEl = document.getElementById('attachmentsAsMarkdown');
   const exportBtn = document.getElementById('exportBtn');
@@ -102,15 +103,25 @@
     exportBtn.removeAttribute('aria-busy');
   };
 
+  const refreshHelper = () => {
+    const inline = inlineImagesEl.checked;
+    if (mode === 'md') {
+      helperText.textContent = inline
+        ? 'Single .md file. Images embedded inline as base64.'
+        : 'Single .md file. Image placeholders only — no embedded data.';
+    } else {
+      helperText.textContent = inline
+        ? 'Folder of files. chat.md is self-contained with images inline.'
+        : 'Folder of files: chat.md plus images in /assets/.';
+    }
+  };
+
   const setMode = (m) => {
     mode = m === 'zip' ? 'zip' : 'md';
     segments.forEach((s) => {
       s.setAttribute('aria-pressed', s.dataset.mode === mode ? 'true' : 'false');
     });
-    helperText.textContent =
-      mode === 'md'
-        ? 'Single .md file. Images embedded inline as base64.'
-        : 'Folder of files: chat.md plus images & uploads.';
+    refreshHelper();
   };
 
   const showAdapter = (adapter) => {
@@ -138,6 +149,9 @@
     const settings = await self.__exporter.settings.load();
     setMode(settings.global.mode);
     includeReasoningEl.checked = !!settings.global.includeReasoning;
+    // inlineImages is ON by default — fall back to true if a pre-0.7.21
+    // settings record exists without the field.
+    inlineImagesEl.checked = settings.global.inlineImages !== false;
     inlineTextFilesEl.checked = !!settings.global.inlineTextFiles;
     attachmentsAsMarkdownEl.checked = !!settings.global.attachmentsAsMarkdown;
 
@@ -147,6 +161,9 @@
         setMode(s.dataset.mode);
       });
     });
+
+    // The md helper line reflects the inlineImages state, so refresh on toggle.
+    inlineImagesEl.addEventListener('change', refreshHelper);
 
     exportBtn.addEventListener('click', () => {
       // Both 'idle' and 'error' (Try again) trigger an export.
@@ -188,6 +205,7 @@
         kind: 'export',
         mode,
         includeReasoning: !!includeReasoningEl.checked,
+        inlineImages: !!inlineImagesEl.checked,
         inlineTextFiles: !!inlineTextFilesEl.checked,
         attachmentsAsMarkdown: !!attachmentsAsMarkdownEl.checked,
       });

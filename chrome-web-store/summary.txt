@@ -1,1 +1,1 @@
-Export your Claude, ChatGPT, and Gemini conversations to Markdown or ZIP — with images, attachments, artifacts, and reasoning.
+Save Claude, ChatGPT, and Gemini chats as Markdown or ZIP — with images, files, and artifacts. Ready for Obsidian, Notion, or any LLM.

@@ -19,7 +19,12 @@
 
   /**
    * @param {import('./utils.js').NormalizedConversation} conv
-   * @param {{ includeReasoning: boolean, sourceLabel?: string }} options
+   * @param {{
+   *   includeReasoning: boolean,
+   *   inlineImages?: boolean,
+   *   attachmentsAsMarkdown?: boolean,
+   *   sourceLabel?: string,
+   * }} options
    * @returns {Promise<Blob>}
    */
   const build = async (conv, options) => {
@@ -41,11 +46,22 @@
     const entries = {};
 
     let imgCounter = 0;
+    // When images are inlined as base64 in the .md, there is nothing to
+    // reference from disk, so we skip writing /assets/ entries entirely.
+    // The renderer will still receive an empty imagePathByName and fall
+    // back to base64 -- consistent because we pass the same inlineImages
+    // flag through.
+    const inlineImages = options.inlineImages === true;
 
     // 1) Pass over turns: register binaries / images.
     for (const turn of conv.turns) {
       for (const block of turn.blocks) {
-        if (block.kind === 'image' && block.bytes && block.bytes.length > 0) {
+        if (
+          block.kind === 'image' &&
+          block.bytes &&
+          block.bytes.length > 0 &&
+          !inlineImages
+        ) {
           const baseName = block.name || `image-${++imgCounter}${extFromMime(block.mime) || '.bin'}`;
           const finalName = uniqueName(sanitizeFilename(baseName), usedAssets);
           entries[`${ASSETS}/${finalName}`] = block.bytes;
@@ -71,6 +87,7 @@
     const md = ns.markdown.render(conv, {
       mode: 'zip',
       includeReasoning: options.includeReasoning,
+      inlineImages,
       attachmentsAsMarkdown: options.attachmentsAsMarkdown,
       sourceLabel: options.sourceLabel,
       assetsDir: ASSETS,

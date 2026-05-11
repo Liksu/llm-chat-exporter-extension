@@ -4,7 +4,13 @@
  *
  * Schema:
  *   {
- *     global: { mode: 'md'|'zip', includeReasoning: boolean },
+ *     global: {
+ *       mode: 'md'|'zip',
+ *       includeReasoning: boolean,
+ *       inlineImages: boolean,
+ *       inlineTextFiles: boolean,
+ *       attachmentsAsMarkdown: boolean,
+ *     },
  *     perAdapter: { claude: {}, chatgpt: {} }
  *   }
  */
@@ -15,6 +21,11 @@
     global: {
       mode: 'md',
       includeReasoning: false,
+      // ON by default: images are the biggest user-visible delta over a
+      // text-only export, so the expected behavior is "include them". Users
+      // who want a tiny .md (or who don't want to wait on CDN fetches) can
+      // flip this off explicitly.
+      inlineImages: true,
       inlineTextFiles: false,
       attachmentsAsMarkdown: false,
     },
