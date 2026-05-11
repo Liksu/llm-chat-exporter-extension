@@ -42,21 +42,28 @@
   };
 
   /**
-   * Use rendering_mode=messages. Empirically observed behavior of this private
-   * endpoint when called from a content-script (cookies-only auth):
-   *   - WITH rendering_mode=messages: `thinking` stays as a typed block, while
-   *     tool_use/tool_result are collapsed into a text block whose content is
-   *     a fenced "This block is not supported on your current device yet."
-   *     placeholder. We strip those placeholders in normalize.js, so the
-   *     export comes out clean.
-   *   - WITHOUT the flag: thinking ALSO collapses, but into a text block whose
-   *     content is the literal thinking text, which is indistinguishable from
-   *     a regular assistant message and therefore impossible to filter when
-   *     `Include reasoning` is off.
-   * So `messages` is the lesser of two evils for our use case.
+   * Fetch the conversation tree with three URL params that, combined, give us
+   * fully structured content:
+   *
+   *   - `tree=True`               — return parent/child relationships so we
+   *                                  can walk the active branch.
+   *   - `rendering_mode=messages` — keep `thinking` as a typed block (with
+   *                                  the flag absent it collapses into a
+   *                                  plain text block indistinguishable from
+   *                                  a regular assistant message, which makes
+   *                                  the "include reasoning" toggle useless).
+   *   - `render_all_tools=true`  — keep `tool_use` / `tool_result` as typed
+   *                                  blocks. Without this flag they collapse
+   *                                  into a fenced placeholder ("This block
+   *                                  is not supported on your current device
+   *                                  yet.") and we lose the entire payload —
+   *                                  e.g. `create_file` outputs from Claude's
+   *                                  sandbox tool are completely gone.
+   *
+   * Claude.ai's own UI uses exactly this combination.
    */
   const fetchConversation = (orgId, convId) =>
-    getJson(`/organizations/${orgId}/chat_conversations/${convId}?tree=True&rendering_mode=messages`);
+    getJson(`/organizations/${orgId}/chat_conversations/${convId}?tree=True&rendering_mode=messages&render_all_tools=true`);
 
   /**
    * Download a file from a conversation. The exact endpoint is not officially

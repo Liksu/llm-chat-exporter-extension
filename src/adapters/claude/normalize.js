@@ -8,13 +8,18 @@
  *     `id` (or `version_uuid`/`identifier`) into a final Artifact. Place an
  *     `artifact_ref` block at the *create* site only; subsequent edits are
  *     not surfaced in the body of the conversation.
+ *   - tool_use with name='create_file' (sandbox file-write tool, payload
+ *     `{path, file_text}`): treated like an artifact — claude.ai surfaces
+ *     these as downloadable files in the chat, so they're model-generated
+ *     deliverables conceptually identical to `artifacts` outputs. Keyed by
+ *     full path so re-writes collapse to the latest version.
  *   - attachments[] → Attachment{category:'text'}
  *   - files[] → Attachment{category:'binary'}, with bytes fetched on demand
  *     by the caller (we record file_uuid for that).
  */
 (function () {
   const ns = (self.__exporter = self.__exporter || {});
-  const { sanitizeFilename, extFromArtifactKind, safeStringify, isTextLikeMime } = ns.utils;
+  const { sanitizeFilename, extFromArtifactKind, safeStringify, isTextLikeMime, log } = ns.utils;
 
   /** Walk from current leaf upward; return root → leaf order. */
   const orderMessages = (raw) => {
@@ -153,6 +158,63 @@
     String(text || '').replace(PLACEHOLDER_RE, '\n').replace(/\n{3,}/g, '\n\n');
 
   /**
+   * Apply a `create_file` tool_use call (Claude's sandbox file-write tool;
+   * payload is `{path, file_text, description?}`) to the artifact map.
+   *
+   * Why this is treated as an artifact: claude.ai surfaces these as
+   * downloadable files in the conversation (the user clicks a link and gets
+   * the file). They're conceptually the same as `artifacts`-tool outputs —
+   * model-generated deliverables the user is meant to keep — just produced
+   * through the sandbox-tool API. Without this handler they'd fall through
+   * to the generic `tool_call` branch and be hidden whenever reasoning is
+   * off, which silently drops a file the user explicitly asked Claude to
+   * write.
+   *
+   * Returns the artifact id touched (or null if the call was unusable).
+   */
+  const applyCreateFileCall = (raw, artifactMap) => {
+    const input = raw && raw.input;
+    if (!isObject(input)) return null;
+    const path = pick(input, ['path']);
+    const text = typeof input.file_text === 'string' ? input.file_text : '';
+    if (!path || !text) return null;
+
+    // Key by full path so successive writes to the same file (regenerations)
+    // collapse to a single artifact whose content reflects the latest call.
+    const id = `create_file:${path}`;
+    const basename = String(path).split('/').pop() || 'file';
+    const fileName = sanitizeFilename(basename);
+    const dot = fileName.lastIndexOf('.');
+    const ext = dot >= 0 ? fileName.slice(dot + 1).toLowerCase() : '';
+    const langByExt = {
+      md: 'markdown', markdown: 'markdown',
+      txt: '', text: '',
+      json: 'json', yml: 'yaml', yaml: 'yaml',
+      js: 'javascript', mjs: 'javascript', cjs: 'javascript',
+      ts: 'typescript', tsx: 'typescript', jsx: 'javascript',
+      py: 'python', rb: 'ruby', go: 'go', rs: 'rust',
+      java: 'java', kt: 'kotlin', swift: 'swift',
+      html: 'html', htm: 'html', css: 'css', scss: 'scss',
+      sh: 'bash', bash: 'bash', zsh: 'bash',
+      sql: 'sql', xml: 'xml', toml: 'toml', ini: 'ini',
+      c: 'c', h: 'c', cpp: 'cpp', hpp: 'cpp',
+    };
+    const language = Object.prototype.hasOwnProperty.call(langByExt, ext)
+      ? langByExt[ext]
+      : ext;
+    const title = dot >= 0 ? fileName.slice(0, dot) : fileName;
+    artifactMap.set(id, {
+      id,
+      title,
+      language,
+      mime: undefined,
+      content: text,
+      fileName,
+    });
+    return id;
+  };
+
+  /**
    * Apply an artifacts tool_use call to the artifact map.
    * Returns the artifact id touched (or null if input was unusable).
    */
@@ -242,6 +304,11 @@
         if (id && command === 'create') {
           return [{ block: { kind: 'artifact_ref', artifactId: id } }];
         }
+        return [];
+      }
+      if (name === 'create_file') {
+        const id = applyCreateFileCall(raw, artifactMap);
+        if (id) return [{ block: { kind: 'artifact_ref', artifactId: id } }];
         return [];
       }
       return [
@@ -509,6 +576,9 @@
       turns,
       artifacts: Array.from(artifactMap.values()),
     };
+
+    log.debug('claude normalize done:',
+      { turns: turns.length, artifacts: conversation.artifacts.length });
 
     return { conversation, imageRefs, binaryAttachmentRefs, textFileRefs };
   };
