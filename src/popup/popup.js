@@ -220,7 +220,10 @@
       if (!resp.ok) throw new Error(resp.error || 'Export failed.');
       lastFilename = resp.filename || '';
       setView('success');
-      successTimer = setTimeout(() => setView('idle'), 2500);
+      // Brief "Saved" flash so the user sees confirmation, then close the
+      // popup. Browser usually closes it anyway when focus shifts to the
+      // download bar, but doing it explicitly keeps the behavior consistent.
+      successTimer = setTimeout(() => window.close(), 2500);
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       setView('error');
