@@ -215,6 +215,79 @@
   };
 
   /**
+   * Format the body of a "content widget" tool call -- a tool_use whose
+   * input field IS the user-facing assistant content (not a backend
+   * operation). Currently:
+   *
+   *   message_compose_v1 — multi-variant message drafts. Claude offers the
+   *                        user a tabbed picker; we emit each variant in
+   *                        sequence with its label as a subheading.
+   *   ask_user_input_v0  — questionnaire widget. Renders as a numbered
+   *                        list of questions with their options.
+   *
+   * These belong in the conversation body regardless of includeReasoning,
+   * because for the reader they ARE the assistant's reply. The matching
+   * tool_result that follows ("Generated widget") stays reasoning-only.
+   *
+   * Returns the markdown string, or null if the name isn't a known widget
+   * or the input doesn't have the expected shape.
+   */
+  const formatMessageComposeV1 = (input) => {
+    if (!isObject(input)) return null;
+    const variants = Array.isArray(input.variants) ? input.variants : [];
+    if (variants.length === 0) return null;
+    const title =
+      typeof input.summary_title === 'string' && input.summary_title.trim()
+        ? input.summary_title.trim()
+        : 'Message draft';
+    const kind = typeof input.kind === 'string' ? input.kind : '';
+    const out = [`**${title}**`];
+    variants.forEach((v, i) => {
+      if (!isObject(v)) return;
+      const label =
+        typeof v.label === 'string' && v.label.trim()
+          ? v.label.trim()
+          : `Variant ${String.fromCharCode(65 + i)}`;
+      out.push('');
+      out.push(`**${label}**`);
+      if (kind === 'email' && typeof v.subject === 'string' && v.subject.trim()) {
+        out.push('');
+        out.push(`_Subject:_ ${v.subject.trim()}`);
+      }
+      if (typeof v.body === 'string' && v.body.trim()) {
+        out.push('');
+        out.push(v.body);
+      }
+    });
+    return out.join('\n');
+  };
+
+  const formatAskUserInputV0 = (input) => {
+    if (!isObject(input)) return null;
+    const questions = Array.isArray(input.questions) ? input.questions : [];
+    if (questions.length === 0) return null;
+    const out = ['**Questions**'];
+    questions.forEach((q, i) => {
+      if (!isObject(q)) return;
+      const qText = typeof q.question === 'string' ? q.question.trim() : '';
+      if (!qText) return;
+      out.push('');
+      out.push(`${i + 1}. ${qText}`);
+      const options = Array.isArray(q.options) ? q.options : [];
+      for (const opt of options) {
+        if (typeof opt === 'string' && opt.trim()) out.push(`   - ${opt.trim()}`);
+      }
+    });
+    return out.join('\n');
+  };
+
+  const formatContentWidget = (name, input) => {
+    if (name === 'message_compose_v1') return formatMessageComposeV1(input);
+    if (name === 'ask_user_input_v0') return formatAskUserInputV0(input);
+    return null;
+  };
+
+  /**
    * Apply an artifacts tool_use call to the artifact map.
    * Returns the artifact id touched (or null if input was unusable).
    */
@@ -310,6 +383,13 @@
         const id = applyCreateFileCall(raw, artifactMap);
         if (id) return [{ block: { kind: 'artifact_ref', artifactId: id } }];
         return [];
+      }
+      // Content-bearing widgets (message drafts, questionnaires) surface
+      // their input as regular text -- it IS the assistant's content, the
+      // tool call is just delivery mechanism.
+      const widgetText = formatContentWidget(name, raw.input);
+      if (widgetText) {
+        return [{ block: { kind: 'text', text: widgetText } }];
       }
       return [
         {

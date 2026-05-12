@@ -1,10 +1,12 @@
 ﻿# LLM Chat Exporter — Release Log
 
-## v0.7.22 — 2026-05-11
+## v0.7.26 — 2026-05-11
 
 Options page now lets you set per-LLM defaults
 Added 'Inline images' toggle in the popup - turn it off to skip image downloads and get a fast, text-only export
-Fixed Claude artifacts in exports. Also fixed some other reasoning items
+ChatGPT voice-mode messages now export with the transcribed text
+Added support for message dates
+Fixed Claude artifacts, text blocks and multi-choice questions in exports. Also fixed some other reasoning items
 
 ## v0.7.15 — 2026-05-10
 
