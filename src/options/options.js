@@ -5,6 +5,8 @@
   const saveBtn = document.getElementById('saveBtn');
   const savedMsg = document.getElementById('savedMsg');
   const includeReasoningEl = document.getElementById('includeReasoning');
+  const includeDatesEl = document.getElementById('includeDates');
+  const dateFormatEl = document.getElementById('dateFormat');
   const inlineImagesEl = document.getElementById('inlineImages');
   const inlineTextFilesEl = document.getElementById('inlineTextFiles');
   const attachmentsAsMarkdownEl = document.getElementById('attachmentsAsMarkdown');
@@ -28,6 +30,11 @@
     {
       key: 'includeReasoning',
       label: 'Include reasoning',
+      kind: 'bool',
+    },
+    {
+      key: 'includeDates',
+      label: 'Include timestamps',
       kind: 'bool',
     },
     {
@@ -184,15 +191,39 @@
   };
 
   // -- Init / Save ---------------------------------------------------------
+  /** Stamp the dateFormat dropdown options with live "now" examples so the
+   *  difference between locale, local-ISO, and UTC-ISO is obvious at a
+   *  glance (especially the local vs UTC distinction, which is otherwise
+   *  invisible if your timezone happens to be UTC+0 or if both labels show
+   *  the same time of day). */
+  const refreshDateFormatExamples = () => {
+    const now = new Date();
+    const fmt = ns.utils.formatTurnDate;
+    const LABELS = {
+      'locale': 'Locale',
+      'iso': 'ISO, local time',
+      'iso-offset': 'Local time with GMT offset',
+      'iso-utc': 'ISO, UTC',
+    };
+    for (const opt of dateFormatEl.options) {
+      const label = LABELS[opt.value] || opt.value;
+      opt.textContent = `${label} (e.g. ${fmt(now, opt.value)})`;
+    }
+  };
+
   const init = async () => {
     // 1) Build per-adapter sections first so they exist when we populate.
     for (const adapter of ADAPTERS) buildAdapterSection(adapter);
+
+    refreshDateFormatExamples();
 
     const settings = await ns.settings.load();
 
     // 2) Populate global section.
     setRadio('mode', settings.global.mode);
     includeReasoningEl.checked = settings.global.includeReasoning;
+    includeDatesEl.checked = !!settings.global.includeDates;
+    dateFormatEl.value = settings.global.dateFormat || 'locale';
     inlineImagesEl.checked = settings.global.inlineImages !== false;
     inlineTextFilesEl.checked = !!settings.global.inlineTextFiles;
     attachmentsAsMarkdownEl.checked = !!settings.global.attachmentsAsMarkdown;
@@ -220,6 +251,8 @@
     // Global.
     settings.global.mode = getRadio('mode') || 'md';
     settings.global.includeReasoning = !!includeReasoningEl.checked;
+    settings.global.includeDates = !!includeDatesEl.checked;
+    settings.global.dateFormat = dateFormatEl.value || 'locale';
     settings.global.inlineImages = !!inlineImagesEl.checked;
     settings.global.inlineTextFiles = !!inlineTextFilesEl.checked;
     settings.global.attachmentsAsMarkdown = !!attachmentsAsMarkdownEl.checked;

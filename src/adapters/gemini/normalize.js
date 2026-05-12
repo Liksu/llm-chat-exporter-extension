@@ -118,6 +118,45 @@
     node[0][1].startsWith('r_');
 
   /**
+   * Pull the round's completion timestamp out of its tuple. Gemini buries
+   * a protobuf-style [unix_seconds, nanos] pair somewhere in the round's
+   * trailing metadata (attached to whichever model variant served the
+   * round). The exact position drifts across model families, so instead of
+   * hard-coding an index we walk the tree and pick the LARGEST plausible
+   * Unix-epoch value -- file-upload timestamps embedded inside the user
+   * message attachments are always earlier than the round's own completion
+   * time, so "max wins" reliably picks the right one.
+   *
+   * Range guard: 2020-01-01 .. 2040-01-01 in seconds. Returns ISO string
+   * or undefined if nothing matched.
+   */
+  const TS_MIN = 1577836800; // 2020-01-01 UTC
+  const TS_MAX = 2208988800; // 2040-01-01 UTC
+  const extractRoundTimestamp = (roundNode) => {
+    let bestSecs = 0;
+    const visit = (n, depth) => {
+      if (depth > 12) return;
+      if (!Array.isArray(n)) return;
+      // [secs, nanos] tuple — accept and stop descending into it.
+      if (
+        n.length === 2 &&
+        typeof n[0] === 'number' &&
+        typeof n[1] === 'number' &&
+        n[0] >= TS_MIN &&
+        n[0] <= TS_MAX &&
+        n[1] >= 0 &&
+        n[1] < 1e9
+      ) {
+        if (n[0] > bestSecs) bestSecs = n[0];
+        return;
+      }
+      for (const c of n) visit(c, depth + 1);
+    };
+    visit(roundNode, 0);
+    return bestSecs > 0 ? new Date(bestSecs * 1000).toISOString() : undefined;
+  };
+
+  /**
    * DFS the parsed payload and collect every round-shaped node we find,
    * deduped by request id. We don't try to follow a fixed linked-list
    * pattern: in practice Google has wrapped prior rounds with anywhere
@@ -153,6 +192,7 @@
             prevPointer: node[1],
             userMsg: node[2],
             candidates: node[3],
+            createdAt: extractRoundTimestamp(node),
           });
         }
         // Don't return — prior rounds are nested INSIDE this one, so we
@@ -464,6 +504,10 @@
       if (userBlocks.length > 0 || userTurnAttachments.length > 0) {
         turns.push({
           role: 'human',
+          // Both turns in a round share the round's completion timestamp --
+          // Gemini's payload doesn't separate "user sent at" from "assistant
+          // replied at", and the difference is rarely interesting anyway.
+          createdAt: round.createdAt,
           blocks: userBlocks,
           attachments: userTurnAttachments,
         });
@@ -507,6 +551,7 @@
       if (aBlocks.length > 0) {
         turns.push({
           role: 'assistant',
+          createdAt: round.createdAt,
           blocks: aBlocks,
           attachments: [],
         });

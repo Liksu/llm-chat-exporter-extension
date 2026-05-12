@@ -12,7 +12,7 @@
   const { chatgptApi, chatgptNormalize, markdown, zip, download, utils } = ns;
   const { sanitizeFilename, todayStamp, utf8ToBytes, log } = utils;
 
-  const handleExport = async ({ mode, includeReasoning, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
+  const handleExport = async ({ mode, includeReasoning, includeDates, dateFormat, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
     const convId = chatgptApi.parseConvIdFromUrl(location.href);
     if (!convId) {
       return { ok: false, error: 'Not on a chatgpt.com conversation page.' };
@@ -89,6 +89,8 @@
     if (mode === 'zip') {
       const blob = await zip.build(conversation, {
         includeReasoning,
+        includeDates,
+        dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'ChatGPT',
@@ -98,6 +100,8 @@
       const md = markdown.render(conversation, {
         mode: 'md',
         includeReasoning,
+        includeDates,
+        dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'ChatGPT',
@@ -114,6 +118,8 @@
     handleExport({
       mode: msg.mode === 'zip' ? 'zip' : 'md',
       includeReasoning: !!msg.includeReasoning,
+      includeDates: !!msg.includeDates,
+      dateFormat: msg.dateFormat || 'locale',
       inlineImages: msg.inlineImages !== false,
       inlineTextFiles: !!msg.inlineTextFiles,
       attachmentsAsMarkdown: !!msg.attachmentsAsMarkdown,

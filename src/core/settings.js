@@ -24,6 +24,15 @@
     global: {
       mode: 'md',
       includeReasoning: false,
+      includeDates: false,
+      // How per-message timestamps are rendered when includeDates is on:
+      //   'locale'     — toLocaleString in the exporting machine's locale
+      //   'iso'        — YYYY-MM-DD HH:MM in local time (sortable, no TZ)
+      //   'iso-offset' — YYYY-MM-DD HH:MM GMT±N (local + GMT offset)
+      //   'iso-utc'    — YYYY-MM-DD HH:MM UTC (timezone-independent)
+      // Global-only -- not in OVERRIDABLE_KEYS, since this is a presentation
+      // choice users want consistent across all their exports.
+      dateFormat: 'locale',
       // ON by default: images are the biggest user-visible delta over a
       // text-only export, so the expected behavior is "include them". Users
       // who want a tiny .md (or who don't want to wait on CDN fetches) can
@@ -40,6 +49,7 @@
   const OVERRIDABLE_KEYS = [
     'mode',
     'includeReasoning',
+    'includeDates',
     'inlineImages',
     'inlineTextFiles',
     'attachmentsAsMarkdown',

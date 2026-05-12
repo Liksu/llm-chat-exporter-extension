@@ -308,12 +308,61 @@
     return candidate;
   };
 
+  /**
+   * Format a per-turn timestamp for display. Lives in utils so the options
+   * page can preview each format with live values.
+   *
+   *   'locale'     → toLocaleString (browser locale, friendly reading)
+   *   'iso'        → YYYY-MM-DD HH:MM in local time (sortable, no TZ marker)
+   *   'iso-offset' → YYYY-MM-DD HH:MM GMT±N[:MM] (local + GMT offset, e.g.
+   *                  "GMT+3", "GMT-3:30"; fully unambiguous, stays in
+   *                  user's wall-clock time)
+   *   'iso-utc'    → YYYY-MM-DD HH:MM UTC (timezone-independent)
+   *
+   * Accepts either an ISO string (from normalizer createdAt fields) or a
+   * Date instance (handy in the options preview). Returns the raw input
+   * back if parsing fails.
+   */
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const formatTurnDate = (input, mode) => {
+    const d = input instanceof Date ? input : new Date(input);
+    if (isNaN(d.getTime())) return typeof input === 'string' ? input : '';
+
+    if (mode === 'iso-utc') {
+      const iso = d.toISOString();
+      const m = iso.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+      return m ? `${m[1]} ${m[2]} UTC` : iso;
+    }
+    if (mode === 'iso' || mode === 'iso-offset') {
+      const localStamp =
+        `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ` +
+        `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+      if (mode === 'iso') return localStamp;
+      // 'iso-offset': append GMT±N (or GMT±N:MM for fractional offsets like
+      // India's +5:30 or Newfoundland's -3:30). Date.getTimezoneOffset()
+      // returns minutes WEST of UTC -- negate to get the conventional sign.
+      const off = -d.getTimezoneOffset();
+      const sign = off >= 0 ? '+' : '-';
+      const abs = Math.abs(off);
+      const hours = Math.floor(abs / 60);
+      const minutes = abs % 60;
+      const offsetStr = minutes === 0 ? `GMT${sign}${hours}` : `GMT${sign}${hours}:${pad2(minutes)}`;
+      return `${localStamp} ${offsetStr}`;
+    }
+    try {
+      return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    } catch {
+      return d.toLocaleString();
+    }
+  };
+
   ns.utils = {
     log,
     VERSION,
     escapeHtml,
     escapeMdInline,
     formatBytes,
+    formatTurnDate,
     isTextLikeMime,
     fenceFor,
     sanitizeFilename,

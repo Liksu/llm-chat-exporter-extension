@@ -176,6 +176,23 @@
     </label>
 
     <label style="margin-top: 8px">
+      <input type="checkbox" id="includeDates" />
+      Include per-message timestamps by default
+    </label>
+
+    <label style="margin-top: 8px; display: flex; align-items: center; gap: 8px">
+      <span>Timestamp format:</span>
+      <select id="dateFormat" style="font: inherit; padding: 3px 6px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff;">
+        <!-- Option labels are filled in at runtime with live "now" examples
+             so the difference between local time and UTC is obvious. -->
+        <option value="locale">Locale</option>
+        <option value="iso">ISO, local time</option>
+        <option value="iso-offset">Local time with GMT offset</option>
+        <option value="iso-utc">ISO, UTC</option>
+      </select>
+    </label>
+
+    <label style="margin-top: 8px">
       <input type="checkbox" id="inlineImages" />
       Embed images in the export by default
     </label>
@@ -200,6 +217,7 @@
     <button id="saveBtn">Save</button>
     <span id="savedMsg" hidden>Saved.</span>
 
+    <script src="../core/utils.js"></script>
     <script src="../core/settings.js"></script>
     <script src="options.js"></script>
   </body>

@@ -7,6 +7,7 @@
   const segments = Array.from(document.querySelectorAll('.segment'));
   const helperText = document.getElementById('helperText');
   const includeReasoningEl = document.getElementById('includeReasoning');
+  const includeDatesEl = document.getElementById('includeDates');
   const inlineImagesEl = document.getElementById('inlineImages');
   const inlineTextFilesEl = document.getElementById('inlineTextFiles');
   const attachmentsAsMarkdownEl = document.getElementById('attachmentsAsMarkdown');
@@ -25,6 +26,11 @@
   let lastError = '';
   let lastFilename = '';
   let successTimer = null;
+  // Effective settings (global merged with per-adapter overrides for the
+  // detected adapter). Kept in scope because the popup needs values for
+  // export-message fields that aren't exposed in the UI -- right now just
+  // `dateFormat`, which is options-page-only.
+  let effectiveSettings = null;
 
   // -- Inline SVGs (keep markup in popup.html minimal) -----------------------
   const SVG = {
@@ -162,16 +168,17 @@
 
     // Pre-fill from per-adapter overrides if we have a matching adapter,
     // otherwise fall back to plain global defaults.
-    const effective = activeAdapter
+    effectiveSettings = activeAdapter
       ? self.__exporter.settings.resolveFor(settings, activeAdapter.id)
       : settings.global;
-    setMode(effective.mode);
-    includeReasoningEl.checked = !!effective.includeReasoning;
+    setMode(effectiveSettings.mode);
+    includeReasoningEl.checked = !!effectiveSettings.includeReasoning;
+    includeDatesEl.checked = !!effectiveSettings.includeDates;
     // inlineImages is ON by default — treat anything that isn't explicit
     // false as enabled (covers pre-0.7.21 settings records).
-    inlineImagesEl.checked = effective.inlineImages !== false;
-    inlineTextFilesEl.checked = !!effective.inlineTextFiles;
-    attachmentsAsMarkdownEl.checked = !!effective.attachmentsAsMarkdown;
+    inlineImagesEl.checked = effectiveSettings.inlineImages !== false;
+    inlineTextFilesEl.checked = !!effectiveSettings.inlineTextFiles;
+    attachmentsAsMarkdownEl.checked = !!effectiveSettings.attachmentsAsMarkdown;
 
     segments.forEach((s) => {
       s.addEventListener('click', () => {
@@ -212,6 +219,10 @@
         kind: 'export',
         mode,
         includeReasoning: !!includeReasoningEl.checked,
+        includeDates: !!includeDatesEl.checked,
+        // dateFormat lives in options only -- pull it from the loaded
+        // settings rather than any UI element.
+        dateFormat: (effectiveSettings && effectiveSettings.dateFormat) || 'locale',
         inlineImages: !!inlineImagesEl.checked,
         inlineTextFiles: !!inlineTextFilesEl.checked,
         attachmentsAsMarkdown: !!attachmentsAsMarkdownEl.checked,

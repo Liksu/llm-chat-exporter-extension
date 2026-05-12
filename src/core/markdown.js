@@ -22,6 +22,7 @@
     uint8ToBase64,
     escapeMdInline,
     formatBytes,
+    formatTurnDate,
   } = ns.utils;
 
   /**
@@ -67,6 +68,13 @@
 
     for (const turn of conv.turns) {
       out.push(turn.role === 'human' ? '## Human' : '## Assistant');
+      if (opts.includeDates && turn.createdAt) {
+        const stamp = formatTurnDate(turn.createdAt, opts.dateFormat || 'locale');
+        if (stamp) {
+          out.push('');
+          out.push(`_${stamp}_`);
+        }
+      }
       out.push('');
       for (const block of turn.blocks) {
         const rendered = renderBlock(block, conv, opts);

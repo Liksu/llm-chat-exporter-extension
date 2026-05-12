@@ -21,6 +21,8 @@
    * @param {import('./utils.js').NormalizedConversation} conv
    * @param {{
    *   includeReasoning: boolean,
+   *   includeDates?: boolean,
+   *   dateFormat?: 'locale'|'iso'|'iso-offset'|'iso-utc',
    *   inlineImages?: boolean,
    *   attachmentsAsMarkdown?: boolean,
    *   sourceLabel?: string,
@@ -87,6 +89,8 @@
     const md = ns.markdown.render(conv, {
       mode: 'zip',
       includeReasoning: options.includeReasoning,
+      includeDates: options.includeDates,
+      dateFormat: options.dateFormat,
       inlineImages,
       attachmentsAsMarkdown: options.attachmentsAsMarkdown,
       sourceLabel: options.sourceLabel,

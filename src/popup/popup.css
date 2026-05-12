@@ -254,6 +254,66 @@ input[type='checkbox']:focus-visible ~ .switch {
   font-size: 11px;
 }
 
+/* "Tag chip" row for additive opt-ins (dates, reasoning). No border, no
+   background by default -- the +/✓ glyph in front of the label carries the
+   on/off signal. Hover adds a subtle background so it reads as clickable.
+   Native checkbox is hidden via .visually-hidden; ::before pseudo provides
+   the icon. A fixed-width icon slot prevents text shift when state flips. */
+.extras-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.extras-prefix {
+  font-size: 12px;
+  color: var(--ink-500);
+  margin-right: 2px;
+}
+.extras-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--ink-400);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.extras-toggle::before {
+  content: '+';
+  display: inline-block;
+  width: 10px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1;
+}
+.extras-toggle:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+.extras-toggle:has(input:checked) {
+  color: var(--purple-500);
+}
+.extras-toggle:has(input:checked)::before {
+  content: '✓';
+}
+.extras-toggle:has(input:checked):hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+/* Show the focus ring only on keyboard navigation (Tab), not after a
+   mouse click. `:focus-within` triggers on click-focus too, leaving a
+   stuck outline; `:has(input:focus-visible)` is the right primitive. */
+.extras-toggle:has(input:focus-visible) {
+  outline: 2px solid var(--purple-500);
+  outline-offset: 1px;
+}
+
 /* ==========================================================================
    Action button
    ========================================================================== */

@@ -14,7 +14,7 @@
   const { claudeApi, claudeNormalize, markdown, zip, download, utils } = ns;
   const { sanitizeFilename, todayStamp, utf8ToBytes, log } = utils;
 
-  const handleExport = async ({ mode, includeReasoning, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
+  const handleExport = async ({ mode, includeReasoning, includeDates, dateFormat, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
     const convId = claudeApi.parseConvIdFromUrl(location.href);
     if (!convId) {
       return { ok: false, error: 'Not on a claude.ai conversation page.' };
@@ -116,6 +116,8 @@
     if (mode === 'zip') {
       const blob = await zip.build(conversation, {
         includeReasoning,
+        includeDates,
+        dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'Claude',
@@ -125,6 +127,8 @@
       const md = markdown.render(conversation, {
         mode: 'md',
         includeReasoning,
+        includeDates,
+        dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'Claude',
@@ -141,6 +145,8 @@
     handleExport({
       mode: msg.mode === 'zip' ? 'zip' : 'md',
       includeReasoning: !!msg.includeReasoning,
+      includeDates: !!msg.includeDates,
+      dateFormat: msg.dateFormat || 'locale',
       // Default to true so an older popup (or a programmatic caller that
       // forgets the field) still inlines images, matching the new default.
       inlineImages: msg.inlineImages !== false,

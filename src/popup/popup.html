@@ -39,11 +39,6 @@
 
       <div class="toggles">
         <label class="toggle-row">
-          <input id="includeReasoning" type="checkbox" class="visually-hidden" />
-          <span class="switch" aria-hidden="true"><span class="thumb"></span></span>
-          <span class="toggle-label">Include reasoning<span class="toggle-hint"> · thinking + tool calls</span></span>
-        </label>
-        <label class="toggle-row">
           <input id="inlineImages" type="checkbox" class="visually-hidden" />
           <span class="switch" aria-hidden="true"><span class="thumb"></span></span>
           <span class="toggle-label">Inline images<span class="toggle-hint"> · embed in export</span></span>
@@ -56,7 +51,24 @@
         <label class="toggle-row">
           <input id="attachmentsAsMarkdown" type="checkbox" class="visually-hidden" />
           <span class="switch" aria-hidden="true"><span class="thumb"></span></span>
-          <span class="toggle-label">Markdown attachments<span class="toggle-hint"> · render inline, not as code</span></span>
+          <span class="toggle-label">Inline attachments<span class="toggle-hint"> · render as text, not as code</span></span>
+        </label>
+      </div>
+
+      <!-- Secondary "additive" toggles: low-frequency things the user opts
+           IN to (extra content in the export), rendered as Notion/Linear-style
+           tag chips. The "Include:" prefix tells the reader what the +/✓
+           glyph means; without it the bare "+" reads as algebra rather than
+           "add this to the export". -->
+      <div class="extras-row" aria-label="Extras">
+        <span class="extras-prefix">Include:</span>
+        <label class="extras-toggle">
+          <input id="includeDates" type="checkbox" class="visually-hidden" />
+          <span>dates</span>
+        </label>
+        <label class="extras-toggle">
+          <input id="includeReasoning" type="checkbox" class="visually-hidden" />
+          <span>reasoning</span>
         </label>
       </div>
     </div>
