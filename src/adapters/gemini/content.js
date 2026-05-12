@@ -117,7 +117,8 @@
 
     const baseName = sanitizeFilename(conversation.title || 'gemini-conversation');
     const stamp = todayStamp();
-    const filename = `${baseName}-${stamp}.${mode === 'zip' ? 'zip' : 'md'}`;
+    const innerBase = `${baseName}-${stamp}`;
+    const filename = `${innerBase}.${mode === 'zip' ? 'zip' : 'md'}`;
 
     if (mode === 'zip') {
       const blob = await zip.build(conversation, {
@@ -127,6 +128,7 @@
         inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'Gemini',
+        innerName: innerBase,
       });
       download.triggerDownload(blob, filename);
     } else {

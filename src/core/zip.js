@@ -1,12 +1,12 @@
 /**
  * Build a ZIP Blob from a NormalizedConversation.
  *
- * Layout:
- *   conversation.md
+ * Layout (where <name> mirrors the zip's own filename minus extension):
+ *   <name>.md           main conversation (was conversation.md pre-0.7.30)
  *   metadata.json
- *   assets/      images (from message images + image files[])
- *   files/       non-image binaries (from files[])
- *   artifacts/   final artifact contents
+ *   assets/             images (from message images + image files[])
+ *   files/              non-image binaries (from files[])
+ *   artifacts/          final artifact contents
  *
  * The walk is two-pass:
  *   1) decide on-disk paths (with collision resolution) and populate a path map
@@ -26,6 +26,9 @@
    *   inlineImages?: boolean,
    *   attachmentsAsMarkdown?: boolean,
    *   sourceLabel?: string,
+   *   innerName?: string,    name (no extension) for the .md inside the zip;
+   *                          defaults to "conversation" for backward compat
+   *                          when called without an explicit name.
    * }} options
    * @returns {Promise<Blob>}
    */
@@ -101,7 +104,13 @@
       filePathByName,
       artifactFileById,
     });
-    entries['conversation.md'] = utf8ToBytes(md);
+    // Inner markdown filename mirrors the zip name (sans .zip) so the
+    // extracted .md is self-identifying on its own. Defensive: strip any
+    // .md/.zip the caller accidentally left on, then re-add .md.
+    const innerBase = sanitizeFilename(
+      (options.innerName || 'conversation').replace(/\.(md|zip)$/i, '')
+    ) || 'conversation';
+    entries[`${innerBase}.md`] = utf8ToBytes(md);
 
     const meta = {
       title: conv.title,

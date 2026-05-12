@@ -112,7 +112,8 @@
 
     const baseName = sanitizeFilename(conversation.title || 'conversation');
     const stamp = todayStamp();
-    const filename = `${baseName}-${stamp}.${mode === 'zip' ? 'zip' : 'md'}`;
+    const innerBase = `${baseName}-${stamp}`;
+    const filename = `${innerBase}.${mode === 'zip' ? 'zip' : 'md'}`;
 
     if (mode === 'zip') {
       const blob = await zip.build(conversation, {
@@ -122,6 +123,7 @@
         inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'Claude',
+        innerName: innerBase,
       });
       download.triggerDownload(blob, filename);
     } else {

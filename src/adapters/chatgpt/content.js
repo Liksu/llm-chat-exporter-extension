@@ -88,7 +88,8 @@
 
     const baseName = sanitizeFilename(conversation.title || 'chatgpt-conversation');
     const stamp = todayStamp();
-    const filename = `${baseName}-${stamp}.${mode === 'zip' ? 'zip' : 'md'}`;
+    const innerBase = `${baseName}-${stamp}`;
+    const filename = `${innerBase}.${mode === 'zip' ? 'zip' : 'md'}`;
 
     if (mode === 'zip') {
       const blob = await zip.build(conversation, {
@@ -98,6 +99,7 @@
         inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'ChatGPT',
+        innerName: innerBase,
       });
       download.triggerDownload(blob, filename);
     } else {
