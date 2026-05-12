@@ -62,6 +62,10 @@
           if (r.fileName && !att.fileName) att.fileName = r.fileName;
         } catch (err) {
           log.warn('chatgpt file fetch failed', att.fileName, err);
+          // Mark so markdown renderer can show the file as expired/removed
+          // instead of emitting a dangling link to a file the zip doesn't
+          // contain.
+          att.fetchError = err instanceof Error ? err.message : String(err);
         }
       }
     }

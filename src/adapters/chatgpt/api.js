@@ -144,11 +144,31 @@
     // sometimes hands out a different (working) signed URL when `inline=false`
     // does not. We also try a couple of credential modes in case some signed
     // URLs require origin cookies.
+    // Path order matters — first match wins. As of 2026-05, chatgpt.com
+    // uses two distinct endpoints depending on whether the UI inlines the
+    // file (PDFs, previewable content) or treats it as a plain download
+    // (TXT, MD, DOCX, etc). Both return JSON of shape
+    //   { download_url, mime_type, file_name }
+    // pointing at a signed estuary URL.
+    //
+    // The PDF-style path uses a fresh parameter name —
+    // `check_context_scopes_for_conversation_id` — that replaced the
+    // older `conversation_id` query arg on this endpoint. We try it
+    // first because PDFs are the file type that breaks without it; for
+    // non-PDF files the bare `/files/download/<id>` also works.
+    //
+    // The remaining entries are legacy variants kept as fallbacks for
+    // accounts / chats that might still hand out signed URLs under
+    // older conventions. `/files/<id>/simple` is intentionally NOT here:
+    // it only returns metadata, not a download_url, so it can never
+    // satisfy this cascade.
     const META_PATHS = [
-      `/files/download/${eid}?conversation_id=${cid}&inline=false`,
-      `/files/download/${eid}?conversation_id=${cid}&inline=true`,
-      `/files/download/${eid}?inline=false`,
+      `/files/download/${eid}?inline=true&check_context_scopes_for_conversation_id=${cid}`,
       `/files/download/${eid}`,
+      `/files/download/${eid}?inline=true`,
+      `/files/download/${eid}?inline=false`,
+      `/files/download/${eid}?conversation_id=${cid}&inline=true`,
+      `/files/download/${eid}?conversation_id=${cid}&inline=false`,
       `/files/${eid}/download?conversation_id=${cid}`,
       `/files/${eid}/download`,
       `/files/${eid}`,

@@ -89,6 +89,7 @@
           }
         } catch (err) {
           log.warn('file fetch failed', att.fileName, err);
+          att.fetchError = err instanceof Error ? err.message : String(err);
         }
       }
     }

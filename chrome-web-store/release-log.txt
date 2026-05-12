@@ -1,6 +1,6 @@
 ﻿# LLM Chat Exporter — Release Log
 
-## v0.7.27 — 2026-05-11
+## v0.7.29 — 2026-05-12
 
 Options page now lets you set per-LLM defaults
 Added 'Inline images' toggle in the popup - turn it off to skip image downloads and get a fast, text-only export

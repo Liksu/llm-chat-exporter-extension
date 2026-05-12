@@ -203,6 +203,14 @@
     }
     // binary (non-image): images are handled as image blocks, not attachments
     const anchorId = registry.register(att);
+    // When the provider has expired / removed the underlying file we keep
+    // the attachment marker in the export (so the user sees what was
+    // referenced in the conversation) but make it visually obvious that
+    // the bytes aren't recoverable. Strikethrough + a parenthetical note,
+    // no link to a non-existent path.
+    if (att.fetchError) {
+      return `📎 ~~${escapeMdInline(att.fileName)}~~ _(no longer available)_`;
+    }
     if (opts.mode === 'zip') {
       const path = opts.filePathByName.get(att.fileName) ?? `${opts.filesDir}/${att.fileName}`;
       return `📎 [${escapeMdInline(att.fileName)}](${path})`;
