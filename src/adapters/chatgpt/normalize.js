@@ -164,7 +164,19 @@
 
     if (ct === 'text') {
       const text = partsToText(content.parts);
-      if (text) out.push({ block: { kind: 'text', text } });
+      if (!text) return out;
+      // Assistant -> tool dispatch: the message has content_type "text" but
+      // recipient is a specific tool id (e.g. image-gen's "t2uay3k.sj1i4kz"
+      // or "file_search.msearch"), and the body is the JSON/text payload
+      // being sent to that tool. Not user-visible content. Surface as a
+      // tool_call so it's hidden unless reasoning is on. Mirrors the same
+      // recipient check that already exists in the `code` branch below.
+      const recipient = typeof m.recipient === 'string' ? m.recipient : '';
+      if (role === 'assistant' && recipient && recipient !== 'all') {
+        out.push({ block: { kind: 'tool_call', name: recipient, input: text } });
+      } else {
+        out.push({ block: { kind: 'text', text } });
+      }
       return out;
     }
 
