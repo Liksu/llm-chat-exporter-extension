@@ -67,7 +67,13 @@
     out.push('');
 
     for (const turn of conv.turns) {
-      out.push(turn.role === 'human' ? '## Human' : '## Assistant');
+      // Voice-mode turns get a 🎙️ marker after the role so the reader knows
+      // the body is a speech transcription -- handy when interpreting
+      // disfluencies or recognition errors. Adapter sets `turn.isVoice` when
+      // the source platform exposes that signal (ChatGPT does; others
+      // currently don't).
+      const roleLabel = turn.role === 'human' ? '## Human' : '## Assistant';
+      out.push(turn.isVoice ? `${roleLabel} (🎙️)` : roleLabel);
       if (opts.includeDates && turn.createdAt) {
         const stamp = formatTurnDate(turn.createdAt, opts.dateFormat || 'locale');
         if (stamp) {

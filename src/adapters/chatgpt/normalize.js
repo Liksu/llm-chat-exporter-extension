@@ -170,12 +170,28 @@
 
     if (ct === 'multimodal_text') {
       const parts = Array.isArray(content.parts) ? content.parts : [];
+      // Voice-mode messages carry BOTH an audio_transcription part (the
+      // recognized text) AND an audio asset pointer (the raw wav). If we
+      // have the transcription, the audio pointer becomes noise — the user
+      // already sees the spoken content as text. Pre-scan so the loop below
+      // can suppress the placeholder when a transcription is present.
+      const hasTranscription = parts.some(
+        (p) => isObject(p) && p.content_type === 'audio_transcription' && typeof p.text === 'string' && p.text.trim()
+      );
       for (const p of parts) {
         if (typeof p === 'string') {
           if (p.trim()) out.push({ block: { kind: 'text', text: p } });
           continue;
         }
         if (!isObject(p)) continue;
+        if (p.content_type === 'audio_transcription' && typeof p.text === 'string') {
+          // Voice message recognized text. Both user (direction:'in') and
+          // assistant (direction:'out') speak through this content type;
+          // we surface both as plain text blocks within their existing turn.
+          const text = p.text.trim();
+          if (text) out.push({ block: { kind: 'text', text } });
+          continue;
+        }
         if (p.content_type === 'image_asset_pointer' && typeof p.asset_pointer === 'string') {
           const fileId = p.asset_pointer.replace(/^sediment:\/\//, '');
           if (!fileId) continue;
@@ -192,10 +208,11 @@
           continue;
         }
         if (p.content_type === 'audio_asset_pointer' || p.content_type === 'real_time_user_audio_video_asset_pointer') {
-          // Audio/video asset pointers — not embeddable inline. Surface as a
-          // text marker; ZIP mode could in theory fetch + place under files/,
-          // but the bytes are routinely huge and the markdown can't render
-          // them anyway, so we keep it simple for v1.
+          // Audio/video asset pointers — not embeddable inline. When a sibling
+          // audio_transcription already gave us the text, drop the placeholder
+          // entirely. Otherwise surface a marker so the user knows an audio
+          // attachment existed.
+          if (hasTranscription) continue;
           out.push({ block: { kind: 'text', text: `_[${p.content_type.replace(/_asset_pointer$/, '')} attachment]_` } });
           continue;
         }
@@ -397,12 +414,18 @@
     let currentBlocks = null;
     let currentAttachments = null;
     let currentCreatedAt = undefined;
+    // Voice flag: true once any message in the current turn was sent via
+    // voice mode. Used by markdown.js to append a 🎙️ marker to the role
+    // heading so the transcribed text is contextualized (helps a reader
+    // make sense of disfluencies and recognition errors).
+    let currentIsVoice = false;
 
     const flush = () => {
       if (!currentRole) return;
       turns.push({
         role: currentRole,
         createdAt: currentCreatedAt,
+        isVoice: currentIsVoice,
         blocks: currentBlocks,
         attachments: currentAttachments,
       });
@@ -410,6 +433,7 @@
       currentBlocks = null;
       currentAttachments = null;
       currentCreatedAt = undefined;
+      currentIsVoice = false;
     };
 
     for (const node of ordered) {
@@ -427,6 +451,22 @@
       }
 
       const ti = turns.length; // future turn index after flush
+
+      // OR-merge per-message voice signals into the turn. We check both the
+      // explicit `voice_mode_message` flag and fall back to "has any
+      // audio_transcription part" -- the flag is the canonical signal, the
+      // fallback catches edge cases where the message metadata is missing
+      // but the content is clearly transcribed audio.
+      if (m.metadata && m.metadata.voice_mode_message === true) {
+        currentIsVoice = true;
+      } else if (m.content && Array.isArray(m.content.parts)) {
+        for (const p of m.content.parts) {
+          if (isObject(p) && p.content_type === 'audio_transcription') {
+            currentIsVoice = true;
+            break;
+          }
+        }
+      }
 
       // Build content blocks first so we know which file ids are already
       // surfaced inline as images (image_asset_pointer in multimodal_text).

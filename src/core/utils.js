@@ -15,6 +15,10 @@
  * @typedef {Object} Turn
  * @property {'human'|'assistant'} role
  * @property {string} [createdAt]
+ * @property {boolean} [isVoice]  True if any message in this turn came from
+ *                                voice mode (markdown.js adds a 🎙️ marker
+ *                                after the role heading). Set by adapters
+ *                                that expose the signal (currently ChatGPT).
  * @property {Block[]} blocks
  * @property {Attachment[]} attachments
  *
