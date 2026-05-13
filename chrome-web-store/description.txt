@@ -1,55 +1,94 @@
-Your AI conversations, saved as files you actually own.
+Save chats from Claude, ChatGPT, and Gemini as Markdown or ZIP files.
 
-You wrap up a useful conversation with Claude, ChatGPT, or Gemini — full of decisions, code, half-finished docs, that one diagram you'll want to look at again next week. Then the tab closes, the chat scrolls off, and you're hunting for a screenshot of something the model said three days ago.
+Some conversations are worth keeping: a useful coding session, research notes, a draft, a decision log, an explanation you want to read again, or context you may want to give to another AI later.
 
-LLM Chat Exporter turns whatever chat you're on into a clean Markdown file (or a ZIP) — in one click, locally, without uploading anything anywhere.
+LLM Chat Exporter saves the conversation you are currently viewing to your computer. Everything happens locally in your browser, nothing leaves your machine.
 
-━━━ WHAT YOU GET ━━━
+WHAT GETS SAVED
 
-• Everything in the chat, not just the text. Inline images, file uploads, pasted snippets, Claude artifacts, ChatGPT canvas docs, Gemini-generated pictures (Nano Banana / Imagen) — all captured. The model's thinking and tool calls too, if you want them.
+The export includes the conversation in order – your messages and the AI responses, plus:
 
-• Two output formats, both ready to use:
-  – Markdown — a single .md file with images embedded as base64. Drop it straight into Obsidian, Notion, your repo, or any Markdown editor. Looks right immediately.
-  – ZIP — a tidy folder with images in /assets, uploads in /files, artifacts in /artifacts, and the .md linking to them. Better for big chats with lots of attachments.
+- Images you uploaded and images generated in the chat
+- Files you uploaded
+- Long text pasted into the chat
+- Code blocks and formatting
+- Claude artifacts and ChatGPT canvas documents
+- ChatGPT voice-mode messages as transcribed text
+- The model's thinking/reasoning and tool calls, when you enable that option
 
-• Ready to feed back into another LLM. The .md is plain, well-structured text — paste it into a new Claude / ChatGPT / Gemini conversation as context, or hand it to a local model. Nothing proprietary, nothing locked.
+WHERE IT WORKS
 
-━━━ WORKS WITH ━━━
+- claude.ai
+- chatgpt.com
+- gemini.google.com
 
-• Claude.ai — text, images, file uploads, artifacts (including files written by the create_file tool), thinking blocks, tool calls.
-• ChatGPT.com — text, images, file uploads, reasoning. Handles file-search and image-generation messages cleanly, with no leaked tool boilerplate.
-• Gemini.google.com — text, images, file uploads, thinking, and AI-generated images.
-
-━━━ OPTIONS ━━━
-
-A few toggles in the popup (and an Options page for defaults):
-• Include reasoning — thinking blocks + tool calls, off by default.
-• Inline text uploads — paste .md / .txt / .json files directly into the body instead of keeping them as separate attachments.
-• Markdown attachments — render .md uploads and artifacts as actual markdown, not wrapped in a code block.
-
-━━━ PRIVACY ━━━
-
-Reads the active tab, only when you click Export. No accounts, no analytics, no telemetry, no remote server. The only thing stored is your default-format preferences (in chrome.storage.sync).
-
-For Gemini, the extension fetches attached and inline images from Google's asset CDNs (the same ones the page already loads them from) so they can be embedded into the export. Those bytes never leave your browser.
-
-━━━ PERMISSIONS ━━━
-
-• activeTab — read the chat tab when you trigger an export.
-• storage — remember your option toggles.
-• declarativeNetRequestWithHostAccess — rewrite CORS response headers from Google's image CDNs so Gemini images can be embedded. Scoped to those CDN hosts only.
-• Host access to claude.ai, chatgpt.com, gemini.google.com — run the extraction scripts.
-• Host access to *.googleusercontent.com, *.usercontent.google.com, and lh1.google.com–lh7.google.com — fetch Gemini-uploaded files and inline / generated images.
-
-━━━ HOW TO USE ━━━
+HOW TO USE
 
 1. Open a conversation on claude.ai, chatgpt.com, or gemini.google.com.
-2. Click the LLM Chat Exporter icon.
-3. Pick Markdown or ZIP, set your toggles, hit Export.
-4. The file lands in your normal downloads folder.
+2. Click the LLM Chat Exporter icon in your browser toolbar.
+3. Choose Markdown or ZIP, set the toggles, and click Export.
+4. The file is saved through your browser's normal download flow.
 
-Defaults configurable on the Options page (gear icon in the popup).
 
-━━━ FEEDBACK ━━━
+TWO EXPORT FORMATS
 
-Bug reports and feature requests welcome on the GitHub repo.
+Both formats include a plain, readable Markdown export, so you can paste the conversation into Claude, ChatGPT, Gemini, or a local LLM as context for a new conversation.
+
+Markdown (.md)
+
+A single Markdown file with the conversation in order.
+
+Images can be embedded directly into the file when "Inline images" option is enabled. Text uploads such as .md, .txt, .json, and similar files can also be included directly in the conversation when "Inline text uploads" is enabled.
+
+Non-text attachments such as PDF, DOCX, XLSX, and other binary files cannot be stored inside a single Markdown file. In Markdown mode, they are listed as attachment references with filename, size, and type.
+
+Markdown is the simplest option when you want one readable file for notes, search, archiving, or pasting back into another AI chat.
+
+ZIP
+
+A ZIP archive with the conversation as Markdown, plus separate files when they are not embedded directly into the Markdown.
+
+Depending on your export options and the chat content, the ZIP may include:
+
+- /assets for images
+- /files for uploaded files
+- /artifacts for artifacts and canvas documents
+
+ZIP is better for long conversations, image-heavy chats, or chats with uploaded files, because it can preserve files alongside the Markdown export instead of forcing everything into one document.
+
+OPTIONS
+
+A few toggles are available in the popup:
+
+- Inline images – embed images directly into the Markdown. When disabled, ZIP exports save images in /assets; Markdown-only exports keep the conversation as a single .md file and use image placeholders.
+
+- Inline text uploads – include supported text uploads such as .md, .txt, .json, .csv, and similar files directly in the conversation body. When disabled, these files are treated as attachments.
+
+- Inline attachments – render inlined text content as readable text/Markdown instead of wrapping it in code blocks. Useful for .md notes and documents; the code-block version is usually better for .json, .csv, logs, and other structured formats.
+
+- Include dates – add message dates to the export.
+
+- Include reasoning – include thinking blocks and tool calls when available. Off by default.
+
+Defaults are configurable on the Options page, available from the gear icon in the popup. You can set different defaults for Claude, ChatGPT, and Gemini, and choose how message dates are formatted.
+
+PRIVACY
+
+- No uploads. Export happens locally in your browser.
+- No accounts, no analytics, no telemetry, no tracking.
+- The extension reads the current chat page only when you click Export.
+- The only thing stored between sessions is your export preferences.
+
+When images or uploaded files need to be included in the export, the extension fetches them directly in your browser from the same services the chat page already uses. They are embedded into the Markdown file or included in the ZIP archive. Nothing is sent to any remote server.
+
+PERMISSIONS
+
+- activeTab – read the current chat when you click Export.
+- storage – remember your export preferences.
+- declarativeNetRequestWithHostAccess – adjust CORS headers from Google's image CDNs so Gemini images and attached files can be embedded or saved. Scoped to those hosts only.
+- Host access to claude.ai, chatgpt.com, and gemini.google.com – run the script that extracts the conversation.
+- Host access to *.googleusercontent.com, *.usercontent.google.com, and lh1.google.com–lh7.google.com – fetch Gemini images and uploaded files.
+
+FEEDBACK
+
+Bug reports and feature requests are welcome on the GitHub repo.
