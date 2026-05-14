@@ -94,10 +94,39 @@
     return role === 'user' ? 'human' : 'assistant';
   };
 
+  /**
+   * Strip ChatGPT's citation markers from a text string.
+   *
+   * The SPA wraps citation tokens (`filecite…`, `webcite…`, etc.) in a pair
+   * of Private Use Area Unicode chars (U+E000–U+F8FF) and renders them as
+   * file/source preview chips in the UI. The DOM never shows the raw
+   * `fileciteturn0file0` text — only the chip. Our export pulls the
+   * conversation tree directly, so these markers leak through and look
+   * like garbage in the .md.
+   *
+   * We strip them entirely rather than try to reconstruct the chip
+   * (matched file name lives in `metadata.content_references`, but the
+   * inline reference is rarely useful in a read-back export). Cleans up
+   * the residue too: double spaces collapse, space-before-punctuation
+   * collapses, and per-line trailing whitespace gets trimmed.
+   */
+  const CITE_MARKER_RE = /[\uE000-\uF8FF][^\uE000-\uF8FF]*[\uE000-\uF8FF]/g;
+  const stripCiteMarkers = (text) => {
+    if (typeof text !== 'string' || !text) return text;
+    let out = text.replace(CITE_MARKER_RE, '');
+    if (out === text) return text;
+    out = out.replace(/ {2,}/g, ' ');
+    out = out.replace(/ +([.,;:!?])/g, '$1');
+    out = out.replace(/[ \t]+$/gm, '');
+    return out;
+  };
+
   /** Pull plain text out of a `parts` array, ignoring non-string entries. */
   const partsToText = (parts) => {
     if (!Array.isArray(parts)) return '';
-    return parts.filter((p) => typeof p === 'string').join('\n\n').trim();
+    return stripCiteMarkers(
+      parts.filter((p) => typeof p === 'string').join('\n\n').trim()
+    );
   };
 
   /**
@@ -141,8 +170,128 @@
   };
 
   /**
+   * ChatGPT "canvas" textdocs — the model writes structured documents (HTML,
+   * Python, Markdown…) into a side panel via tool calls. Two relevant
+   * recipients on assistant messages:
+   *
+   *   canmore.create_textdoc   { name, type, content }
+   *   canmore.update_textdoc   { updates: [{ pattern, replacement, multiple? }] }
+   *
+   * These map cleanly onto our existing `artifact` concept (Claude artifacts
+   * use the same shape). We parse the tool-call JSON, register the document
+   * as an artifact, and emit an `artifact_ref` block at the call site.
+   * Updates apply regex pattern→replacement edits to the most recently
+   * created canvas. Tool responses are dropped — the artifact replaces them.
+   */
+  const parseCanmoreCreate = (jsonText) => {
+    try {
+      const obj = JSON.parse(jsonText);
+      if (!isObject(obj)) return null;
+      const name = typeof obj.name === 'string' ? obj.name.trim() : '';
+      const type = typeof obj.type === 'string' ? obj.type.trim() : '';
+      const cnt = typeof obj.content === 'string' ? obj.content : '';
+      if (!cnt) return null;
+      return { name, type, content: cnt };
+    } catch {
+      return null;
+    }
+  };
+
+  const parseCanmoreUpdate = (jsonText) => {
+    try {
+      const obj = JSON.parse(jsonText);
+      if (!isObject(obj) || !Array.isArray(obj.updates)) return null;
+      const updates = [];
+      for (const u of obj.updates) {
+        if (!isObject(u)) continue;
+        if (typeof u.pattern !== 'string' || typeof u.replacement !== 'string') continue;
+        updates.push({
+          pattern: u.pattern,
+          replacement: u.replacement,
+          multiple: u.multiple === true,
+        });
+      }
+      return updates.length ? { updates } : null;
+    } catch {
+      return null;
+    }
+  };
+
+  /**
+   * Apply a sequence of canmore pattern/replacement edits to a string.
+   * Canvas uses dotall semantics: `.` matches across newlines. The
+   * `multiple` flag controls global vs. single replacement. Bad regexes
+   * are silently skipped — an unparseable model-emitted pattern should
+   * not crash the export, and keeping stale content beats losing the
+   * whole artifact.
+   */
+  const applyCanvasUpdates = (content, updates) => {
+    let out = content;
+    for (const u of updates) {
+      try {
+        const flags = u.multiple ? 'gs' : 's';
+        const re = new RegExp(u.pattern, flags);
+        out = out.replace(re, u.replacement);
+      } catch {
+        /* leave content unchanged for this update */
+      }
+    }
+    return out;
+  };
+
+  /**
+   * Decide markdown language + filename for a canvas document.
+   *
+   * `type` shapes observed on chatgpt.com:
+   *   code/<lang>     fenced under <lang>; extension derived from LANG_TO_EXT
+   *   document, ""    treat as markdown doc (.md)
+   *
+   * If `name` already has an extension, we honor it. Otherwise we tack one
+   * on so the artifact lands as `artifacts/<sensible name>.<ext>` in zip
+   * mode.
+   */
+  const LANG_TO_EXT = {
+    javascript: 'js',
+    typescript: 'ts',
+    python: 'py',
+    markdown: 'md',
+    html: 'html',
+    css: 'css',
+    json: 'json',
+    yaml: 'yaml',
+    bash: 'sh',
+    shell: 'sh',
+  };
+  const deriveCanvasMeta = (name, type) => {
+    let language = '';
+    let extFallback = '';
+    if (typeof type === 'string' && type.startsWith('code/')) {
+      language = type.slice(5).toLowerCase();
+      extFallback = '.' + (LANG_TO_EXT[language] || language || 'txt');
+    } else {
+      // `document`, empty, or anything we don't recognize → markdown doc.
+      language = 'markdown';
+      extFallback = '.md';
+    }
+    let fileName = (name || 'canvas-document').trim();
+    fileName = fileName.replace(/^[\\\/]+/, ''); // strip any leading slashes
+    if (!/\.[a-z0-9]+$/i.test(fileName) && extFallback) fileName += extFallback;
+    return { language, fileName };
+  };
+
+  /**
    * Transform one chatgpt message's content into normalized blocks.
-   * Returns Array<{block, _imageRef?}>.
+   * Returns Array<{
+   *   block?: NormalizedBlock,
+   *   _imageRef?: {fileId},
+   *   _canvasCreate?: {name, type, content},
+   *   _canvasUpdate?: {updates},
+   *   _canvasResponse?: {tool, textdoc_id, title}
+   * }>.
+   *
+   * The `_canvas*` markers are consumed in normalize()'s main loop, where
+   * we have the conversation-wide artifact state. Items with only a
+   * marker (no `block`) contribute nothing to the visible turn body.
    *
    * `imageRef` = { fileId } — content.js will resolve to bytes via
    * chatgptApi.fetchFile(fileId, convId, token).
@@ -156,6 +305,51 @@
     const out = [];
 
     if (!content) return out;
+
+    // Canvas (side-panel docs). Intercept canmore.* create/update tool calls
+    // and their matching tool responses BEFORE the generic tool/code handlers
+    // below so we can surface the document as an artifact rather than as a
+    // pile of tool_call JSON dumps.
+    if (role === 'assistant' && ct === 'code') {
+      const recipient = typeof m.recipient === 'string' ? m.recipient : '';
+      const codeText = typeof content.text === 'string' ? content.text : '';
+      if (recipient === 'canmore.create_textdoc') {
+        const parsed = parseCanmoreCreate(codeText);
+        if (parsed) {
+          out.push({ _canvasCreate: parsed });
+          return out;
+        }
+        // unparseable → fall through to generic code handling below (don't lose data)
+      } else if (recipient === 'canmore.update_textdoc') {
+        const parsed = parseCanmoreUpdate(codeText);
+        if (parsed) {
+          out.push({ _canvasUpdate: parsed });
+          return out;
+        }
+      }
+    }
+    if (role === 'tool' && ct === 'text') {
+      const toolName = m.author && m.author.name;
+      if (toolName === 'canmore.create_textdoc' || toolName === 'canmore.update_textdoc') {
+        // The textual body is just "Successfully created/updated text document
+        // 'X' with textdoc_id 'Y'" — noise once the artifact itself is
+        // surfaced. We still capture textdoc_id and the human-readable title
+        // from metadata.canvas so the main normalize loop can bind them.
+        const canvasMeta = isObject(meta.canvas) ? meta.canvas : null;
+        out.push({
+          _canvasResponse: {
+            tool: toolName,
+            textdoc_id:
+              canvasMeta && typeof canvasMeta.textdoc_id === 'string'
+                ? canvasMeta.textdoc_id
+                : '',
+            title:
+              canvasMeta && typeof canvasMeta.title === 'string' ? canvasMeta.title : '',
+          },
+        });
+        return out;
+      }
+    }
 
     // Tool-role text payloads are NEVER user-visible content. file_search,
     // web.run, container.exec and friends emit `content_type:"text"` /
@@ -251,7 +445,8 @@
       );
       for (const p of parts) {
         if (typeof p === 'string') {
-          if (p.trim()) out.push({ block: { kind: 'text', text: p } });
+          const cleaned = stripCiteMarkers(p);
+          if (cleaned.trim()) out.push({ block: { kind: 'text', text: cleaned } });
           continue;
         }
         if (!isObject(p)) continue;
@@ -259,7 +454,7 @@
           // Voice message recognized text. Both user (direction:'in') and
           // assistant (direction:'out') speak through this content type;
           // we surface both as plain text blocks within their existing turn.
-          const text = p.text.trim();
+          const text = stripCiteMarkers(p.text).trim();
           if (text) out.push({ block: { kind: 'text', text } });
           continue;
         }
@@ -302,8 +497,8 @@
       const text = arr
         .map((t) => {
           if (!isObject(t)) return '';
-          const summary = typeof t.summary === 'string' ? t.summary.trim() : '';
-          const body = typeof t.content === 'string' ? t.content.trim() : '';
+          const summary = typeof t.summary === 'string' ? stripCiteMarkers(t.summary).trim() : '';
+          const body = typeof t.content === 'string' ? stripCiteMarkers(t.content).trim() : '';
           if (summary && body) return `**${summary}**\n\n${body}`;
           return summary || body;
         })
@@ -314,7 +509,7 @@
     }
 
     if (ct === 'reasoning_recap') {
-      const text = typeof content.content === 'string' ? content.content.trim() : '';
+      const text = typeof content.content === 'string' ? stripCiteMarkers(content.content).trim() : '';
       if (text) out.push({ block: { kind: 'thinking', text } });
       return out;
     }
@@ -501,6 +696,13 @@
     // multiple messages — we register the synthetic attachment exactly
     // once, on the first turn where it appears.
     const sandboxPathsSeen = new Set();
+    // Canvas (canmore) state. `artifacts` accumulates the conversation-wide
+    // list (mirrors Claude's artifact array). `currentArtifact` points at
+    // the last create so subsequent update_textdoc edits apply to the right
+    // document — ChatGPT lets only one canvas be "active" at a time, and
+    // update calls don't carry textdoc_id, so most-recent-create wins.
+    const artifacts = [];
+    let currentArtifact = null;
 
     const flush = () => {
       if (!currentRole) return;
@@ -563,6 +765,46 @@
         }
       }
       for (const item of blocks) {
+        // Canvas markers (consumed here; never make it to currentBlocks
+        // except via the artifact_ref we push for `create`).
+        if (item._canvasCreate) {
+          const { name, type, content: artContent } = item._canvasCreate;
+          const cmeta = deriveCanvasMeta(name, type);
+          const artifact = {
+            id: `canvas-${artifacts.length}`,
+            title: name || cmeta.fileName,
+            fileName: cmeta.fileName,
+            language: cmeta.language,
+            content: artContent,
+          };
+          artifacts.push(artifact);
+          currentArtifact = artifact;
+          currentBlocks.push({ kind: 'artifact_ref', artifactId: artifact.id });
+          continue;
+        }
+        if (item._canvasUpdate) {
+          if (currentArtifact) {
+            currentArtifact.content = applyCanvasUpdates(
+              currentArtifact.content,
+              item._canvasUpdate.updates
+            );
+          }
+          continue;
+        }
+        if (item._canvasResponse) {
+          // Bind the prettier title from the tool response if we have one.
+          // textdoc_id is currently informational only — we key artifacts by
+          // our own `canvas-N` id since update_textdoc doesn't carry an id.
+          if (
+            currentArtifact &&
+            item._canvasResponse.tool === 'canmore.create_textdoc' &&
+            item._canvasResponse.title
+          ) {
+            currentArtifact.title = item._canvasResponse.title;
+          }
+          continue;
+        }
+        if (!item.block) continue;
         const blockIndex = currentBlocks.length;
         currentBlocks.push(item.block);
         if (item._imageRef) {
@@ -596,7 +838,9 @@
         m.id
       ) {
         for (const item of blocks) {
-          if (item.block.kind !== 'text' || typeof item.block.text !== 'string') continue;
+          if (!item.block || item.block.kind !== 'text' || typeof item.block.text !== 'string') {
+            continue;
+          }
           const refs = extractSandboxLinks(item.block.text);
           for (const ref of refs) {
             if (sandboxPathsSeen.has(ref.sandboxPath)) continue;
@@ -660,7 +904,7 @@
       createdAt: meta.createdAt,
       updatedAt: meta.updatedAt,
       turns: filteredTurns,
-      artifacts: [], // ChatGPT has no canvas/artifact concept in this normalization
+      artifacts, // canvas (canmore) textdocs surfaced as Claude-style artifacts
     };
 
     return {
