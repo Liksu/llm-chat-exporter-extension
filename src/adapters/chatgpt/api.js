@@ -118,6 +118,85 @@
   const fetchConversation = (convId, token) =>
     authedJson(`/conversation/${convId}`, token);
 
+  // Signed URL fetch modes. Order matters — the cascade stops at the first
+  // 2xx, so we want the most-likely-to-succeed mode FIRST to avoid
+  // noisy 403s in DevTools (Chrome logs every failed network request).
+  //
+  // For chatgpt.com signed URLs (current /backend-api/estuary/content?…sig=…),
+  // session cookies are what authorises the request — `credentials:'include'`
+  // succeeds, `omit` always 403s. We used to try cookie-less modes first as
+  // a defensive measure for hypothetical external CDN signed URLs, but
+  // empirically every signed URL OpenAI hands out today is on chatgpt.com,
+  // so cookies-included is the right starting point.
+  //
+  // The `auth:true` modes add `Authorization: Bearer <token>` for cases
+  // where OpenAI tightens the auth requirement on signed endpoints. We
+  // never send Bearer to non-chatgpt.com hosts (would leak the token to a
+  // CDN that can't use it).
+  //
+  // The cookie-less modes are kept as last-resort fallbacks in case some
+  // future CDN signed URL truly needs them.
+  const SIGNED_MODES = [
+    { credentials: 'include', referrerPolicy: 'origin', auth: false },
+    { credentials: 'include', referrerPolicy: 'origin', auth: true },
+    { credentials: 'omit', referrerPolicy: 'no-referrer', auth: false },
+    { credentials: 'omit', referrerPolicy: 'origin', auth: false },
+    { credentials: 'omit', referrerPolicy: 'no-referrer', auth: true },
+  ];
+
+  const isChatgptHost = (url) => {
+    try {
+      return new URL(url).hostname.endsWith('chatgpt.com');
+    } catch {
+      return false;
+    }
+  };
+
+  /**
+   * Fetch a signed download URL into bytes. Used by both regular file
+   * downloads and sandbox/interpreter downloads — anything where a
+   * meta endpoint hands us back a single-use signed URL.
+   *
+   * Pushes diagnostic strings into `attemptLog` for each tried mode,
+   * so the caller can surface a useful error message if every variant
+   * fails.
+   *
+   * @param {string} url    the signed download URL returned by the meta endpoint
+   * @param {string} token  Bearer token (only sent to chatgpt.com hosts)
+   * @param {string} [mime] expected MIME from the meta response
+   * @param {string[]} attemptLog
+   * @returns {Promise<{bytes: Uint8Array, mime: string} | null>}
+   */
+  const trySigned = async (url, token, mime, attemptLog) => {
+    const sameHost = isChatgptHost(url);
+    for (const mode of SIGNED_MODES) {
+      if (mode.auth && !sameHost) continue; // never leak bearer to a CDN
+      try {
+        const headers = { accept: '*/*' };
+        if (mode.auth) headers.authorization = `Bearer ${token}`;
+        const r = await fetch(url, {
+          credentials: mode.credentials,
+          referrerPolicy: mode.referrerPolicy,
+          headers,
+        });
+        if (!r.ok) {
+          attemptLog.push(
+            `signed[${mode.credentials}/${mode.referrerPolicy}${mode.auth ? '/auth' : ''}] → ${r.status}`
+          );
+          continue;
+        }
+        const ct = (r.headers.get('content-type') || mime || '').split(';')[0].trim();
+        const buf = await r.arrayBuffer();
+        return { bytes: new Uint8Array(buf), mime: ct || 'application/octet-stream' };
+      } catch (err) {
+        attemptLog.push(
+          `signed[${mode.credentials}/${mode.referrerPolicy}${mode.auth ? '/auth' : ''}] → ${err && err.message ? err.message : 'fetch-error'}`
+        );
+      }
+    }
+    return null;
+  };
+
   /**
    * Two-step download for sediment://file_... references:
    *   1. resolve a signed download URL via one of several candidate endpoints
@@ -173,71 +252,8 @@
       `/files/${eid}/download`,
       `/files/${eid}`,
     ];
-    // Signed URL fetch modes. Order matters — the cascade stops at the first
-    // 2xx, so we want the most-likely-to-succeed mode FIRST to avoid
-    // noisy 403s in DevTools (Chrome logs every failed network request).
-    //
-    // For chatgpt.com signed URLs (current /backend-api/estuary/content?…sig=…),
-    // session cookies are what authorises the request — `credentials:'include'`
-    // succeeds, `omit` always 403s. We used to try cookie-less modes first as
-    // a defensive measure for hypothetical external CDN signed URLs, but
-    // empirically every signed URL OpenAI hands out today is on chatgpt.com,
-    // so cookies-included is the right starting point.
-    //
-    // The `auth:true` modes add `Authorization: Bearer <token>` for cases
-    // where OpenAI tightens the auth requirement on signed endpoints. We
-    // never send Bearer to non-chatgpt.com hosts (would leak the token to a
-    // CDN that can't use it).
-    //
-    // The cookie-less modes are kept as last-resort fallbacks in case some
-    // future CDN signed URL truly needs them.
-    const SIGNED_MODES = [
-      { credentials: 'include', referrerPolicy: 'origin', auth: false },
-      { credentials: 'include', referrerPolicy: 'origin', auth: true },
-      { credentials: 'omit', referrerPolicy: 'no-referrer', auth: false },
-      { credentials: 'omit', referrerPolicy: 'origin', auth: false },
-      { credentials: 'omit', referrerPolicy: 'no-referrer', auth: true },
-    ];
-
-    const isChatgptHost = (url) => {
-      try {
-        return new URL(url).hostname.endsWith('chatgpt.com');
-      } catch {
-        return false;
-      }
-    };
 
     const attemptLog = [];
-
-    const trySigned = async (url, mime) => {
-      const sameHost = isChatgptHost(url);
-      for (const mode of SIGNED_MODES) {
-        if (mode.auth && !sameHost) continue; // never leak bearer to a CDN
-        try {
-          const headers = { accept: '*/*' };
-          if (mode.auth) headers.authorization = `Bearer ${token}`;
-          const r = await fetch(url, {
-            credentials: mode.credentials,
-            referrerPolicy: mode.referrerPolicy,
-            headers,
-          });
-          if (!r.ok) {
-            attemptLog.push(
-              `signed[${mode.credentials}/${mode.referrerPolicy}${mode.auth ? '/auth' : ''}] → ${r.status}`
-            );
-            continue;
-          }
-          const ct = (r.headers.get('content-type') || mime || '').split(';')[0].trim();
-          const buf = await r.arrayBuffer();
-          return { bytes: new Uint8Array(buf), mime: ct || 'application/octet-stream' };
-        } catch (err) {
-          attemptLog.push(
-            `signed[${mode.credentials}/${mode.referrerPolicy}${mode.auth ? '/auth' : ''}] → ${err && err.message ? err.message : 'fetch-error'}`
-          );
-        }
-      }
-      return null;
-    };
 
     for (const path of META_PATHS) {
       let body;
@@ -256,7 +272,7 @@
         attemptLog.push(`${path} → ${body && body.status ? body.status : 'no-download_url'}`);
         continue;
       }
-      const got = await trySigned(body.download_url, body.mime_type);
+      const got = await trySigned(body.download_url, token, body.mime_type, attemptLog);
       if (got) {
         log.debug('chatgpt fetchFile', id, path, got.mime, got.bytes.byteLength, 'bytes');
         return {
@@ -274,11 +290,87 @@
     );
   };
 
+  /**
+   * Download a file the model generated inside its sandbox / code-interpreter
+   * environment. These are referenced from assistant text as
+   * `[label](sandbox:/mnt/data/<name>)` and DO NOT have a `sediment://file_…`
+   * pointer in the conversation tree — the only way to retrieve them is via
+   * the interpreter download endpoint, which returns a signed estuary URL
+   * just like /files/download/<id> does for uploaded files.
+   *
+   * Endpoint shape (observed 2026-05):
+   *   GET /conversation/<convId>/interpreter/download
+   *       ?message_id=<msgId>
+   *       &sandbox_path=<encoded sandbox path>
+   *
+   * Response: { status: "success", download_url: "https://chatgpt.com/backend-api/estuary/content?…" }
+   *
+   * @param {string} convId
+   * @param {string} messageId   id of the assistant message that referenced the sandbox file
+   * @param {string} sandboxPath e.g. "/mnt/data/foo.md"
+   * @param {string} token
+   */
+  const fetchSandboxFile = async (convId, messageId, sandboxPath, token) => {
+    const path =
+      `/conversation/${encodeURIComponent(convId)}/interpreter/download` +
+      `?message_id=${encodeURIComponent(messageId)}` +
+      `&sandbox_path=${encodeURIComponent(sandboxPath)}`;
+
+    const attemptLog = [];
+
+    let body;
+    try {
+      const res = await authedFetch(path, token);
+      if (!res.ok) {
+        throw new ApiError(
+          `chatgpt fetchSandboxFile(${sandboxPath}) meta → ${res.status} ${res.statusText}`,
+          res.status
+        );
+      }
+      body = await res.json();
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError(
+        `chatgpt fetchSandboxFile(${sandboxPath}) meta → ${err && err.message ? err.message : 'fetch-error'}`,
+        0
+      );
+    }
+
+    if (!body || typeof body.download_url !== 'string' || !body.download_url) {
+      throw new ApiError(
+        `chatgpt fetchSandboxFile(${sandboxPath}) → no download_url (status=${body && body.status ? body.status : 'unknown'})`,
+        0
+      );
+    }
+
+    const got = await trySigned(body.download_url, token, body.mime_type, attemptLog);
+    if (!got) {
+      throw new ApiError(
+        `chatgpt fetchSandboxFile(${sandboxPath}) signed-get failed: ${attemptLog.join('; ')}`,
+        0
+      );
+    }
+
+    log.debug(
+      'chatgpt fetchSandboxFile',
+      sandboxPath,
+      got.mime,
+      got.bytes.byteLength,
+      'bytes'
+    );
+    return {
+      bytes: got.bytes,
+      mime: got.mime || body.mime_type || 'application/octet-stream',
+      fileName: body.file_name || '',
+    };
+  };
+
   ns.chatgptApi = {
     parseConvIdFromUrl,
     getAccessToken,
     fetchConversation,
     fetchFile,
+    fetchSandboxFile,
     ApiError,
   };
 })();

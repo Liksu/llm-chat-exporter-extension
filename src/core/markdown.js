@@ -48,6 +48,7 @@
       imagePathByName: new Map(),
       filePathByName: new Map(),
       artifactFileById: new Map(),
+      sandboxRewriteMap: new Map(),
       sourceLabel: conv.sourceLLM || 'LLM',
       ...options,
     };
@@ -117,11 +118,29 @@
     return out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
   };
 
+  /**
+   * Rewrite `[label](sandbox:/path)` references in assistant text to point
+   * at the on-disk file we wrote into the zip. Only zip mode populates
+   * `sandboxRewriteMap`; in md mode the map is empty and the sandbox link
+   * survives unchanged (there's nowhere to point to).
+   *
+   * Match shape mirrors normalize.js's SANDBOX_LINK_RE — keep both regexes
+   * in sync.
+   */
+  const SANDBOX_LINK_RE = /(\]\()sandbox:([^)\s]+)(\))/g;
+  const rewriteSandboxLinks = (text, map) => {
+    if (!map || map.size === 0 || typeof text !== 'string' || !text) return text;
+    return text.replace(SANDBOX_LINK_RE, (full, open, path, close) => {
+      const dest = map.get(path);
+      return dest ? `${open}${dest}${close}` : full;
+    });
+  };
+
   /** Returns markdown chunk or null if block is filtered out. */
   const renderBlock = (block, conv, opts) => {
     switch (block.kind) {
       case 'text':
-        return softBreaks(block.text);
+        return softBreaks(rewriteSandboxLinks(block.text, opts.sandboxRewriteMap));
 
       case 'thinking':
         if (!opts.includeReasoning) return null;
@@ -176,6 +195,20 @@
   };
 
   const renderAttachment = (att, opts, registry) => {
+    // Inline-link attachments (currently: ChatGPT sandbox files) already
+    // appear in the body text as `[label](files/<name>)` after sandbox link
+    // rewriting. Skipping the registry + bottom listing avoids a duplicate
+    // mention. In md mode the inline link stays as `sandbox:/path` — still
+    // visible to the reader, but unfetchable, which is honest.
+    if (att.fromInlineLink) {
+      // Surface fetch failures only — if we couldn't grab the bytes, the
+      // inline link now points nowhere; warn the reader at the bottom so
+      // they don't quietly click a dangling reference.
+      if (att.fetchError) {
+        return `📎 ~~${escapeMdInline(att.fileName)}~~ _(no longer available)_`;
+      }
+      return null;
+    }
     if (att.category === 'text') {
       // Both pastes (from attachments[]) and inlined text files (from files[]
       // with inlineTextFiles=true) render here. The label distinguishes

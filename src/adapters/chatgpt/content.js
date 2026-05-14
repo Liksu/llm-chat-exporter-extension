@@ -50,11 +50,22 @@
     }
 
     // Non-image binaries: only fetched in zip mode (md mode shows file name).
+    // Two flavors share this loop:
+    //   - regular uploads     → fetchFile(fileUuid, convId, token)
+    //   - sandbox/interpreter → fetchSandboxFile(convId, msgId, path, token)
+    // The latter is identified by `att.isSandbox` set during normalize.
     if (mode === 'zip') {
       for (const { turnIndex, attIndex } of binaryAttachmentRefs) {
         const att = conversation.turns[turnIndex].attachments[attIndex];
         try {
-          const r = await chatgptApi.fetchFile(att.fileUuid, convId, token);
+          const r = att.isSandbox
+            ? await chatgptApi.fetchSandboxFile(
+                convId,
+                att.sandboxMessageId,
+                att.sandboxPath,
+                token
+              )
+            : await chatgptApi.fetchFile(att.fileUuid, convId, token);
           att.bytes = r.bytes;
           if (r.mime && (!att.mime || att.mime === 'application/octet-stream')) {
             att.mime = r.mime;

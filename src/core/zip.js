@@ -46,6 +46,11 @@
     const imagePathByName = new Map();
     const filePathByName = new Map();
     const artifactFileById = new Map();
+    // Sandbox/interpreter files are referenced from assistant text as
+    // `[label](sandbox:/path)`. After we write the fetched bytes into
+    // /files/, we hand markdown.render this map so it can rewrite those
+    // inline links to point at the on-disk filename instead.
+    const sandboxRewriteMap = new Map();
 
     /** @type {Record<string, Uint8Array>} */
     const entries = {};
@@ -78,6 +83,11 @@
         const finalName = uniqueName(sanitizeFilename(att.fileName || 'file.bin'), usedFiles);
         entries[`${FILES}/${finalName}`] = att.bytes;
         filePathByName.set(att.fileName, `${FILES}/${finalName}`);
+        // Sandbox files double-register: the inline `sandbox:/path` link
+        // also needs to resolve to the same `files/<name>` entry.
+        if (att.isSandbox && att.sandboxPath) {
+          sandboxRewriteMap.set(att.sandboxPath, `${FILES}/${finalName}`);
+        }
       }
     }
 
@@ -103,6 +113,7 @@
       imagePathByName,
       filePathByName,
       artifactFileById,
+      sandboxRewriteMap,
     });
     // Inner markdown filename mirrors the zip name (sans .zip) so the
     // extracted .md is self-identifying on its own. Defensive: strip any

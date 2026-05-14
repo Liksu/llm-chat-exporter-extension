@@ -101,6 +101,46 @@
   };
 
   /**
+   * Scan an assistant text block for `[label](sandbox:/path)` references —
+   * pointers to files the model produced inside its python/interpreter
+   * sandbox. These files don't exist in the conversation tree as
+   * `sediment://file_…` ids; the only way to retrieve their bytes is via the
+   * `/conversation/<id>/interpreter/download` endpoint, keyed by the
+   * referencing message's id + sandbox path.
+   *
+   * The label inside the markdown link is what the user sees ("Download the
+   * report"); the path's basename is the actual filename on disk. We use
+   * the basename as the attachment fileName so zip output is sensible
+   * (`files/report.md` rather than `files/Download the report`).
+   *
+   * Returns Array<{sandboxPath, fileName}>. Duplicate paths inside the same
+   * text block are collapsed; cross-block / cross-turn dedup happens in
+   * the main normalize() loop.
+   */
+  const SANDBOX_LINK_RE = /\[[^\]\n]*\]\(sandbox:([^)\s]+)\)/g;
+  const extractSandboxLinks = (text) => {
+    const refs = [];
+    if (typeof text !== 'string' || !text) return refs;
+    const seen = new Set();
+    SANDBOX_LINK_RE.lastIndex = 0;
+    let m;
+    while ((m = SANDBOX_LINK_RE.exec(text)) !== null) {
+      const sandboxPath = m[1].trim();
+      if (!sandboxPath || seen.has(sandboxPath)) continue;
+      seen.add(sandboxPath);
+      // basename, with URL decoding if the model emitted percent-escapes
+      let tail = sandboxPath.split('/').pop() || sandboxPath;
+      try {
+        tail = decodeURIComponent(tail);
+      } catch {
+        /* leave as-is */
+      }
+      refs.push({ sandboxPath, fileName: tail });
+    }
+    return refs;
+  };
+
+  /**
    * Transform one chatgpt message's content into normalized blocks.
    * Returns Array<{block, _imageRef?}>.
    *
@@ -137,10 +177,29 @@
     }
     if (role === 'tool' && ct === 'multimodal_text') {
       const parts = Array.isArray(content.parts) ? content.parts : [];
-      const hasImage = parts.some(
-        (p) => isObject(p) && p.content_type === 'image_asset_pointer'
+      // The exception (fall-through to image rendering) only applies to
+      // genuine image-generation output. file_search ALSO emits
+      // image_asset_pointer parts for PDF page thumbnails it uses
+      // internally for visual grounding — those have asset pointers like
+      // `sediment://<hash>#file_<id>#p_<N>.<hash>.jpg` (note the `#`
+      // separators) and are NOT user-visible images.
+      //
+      // Distinguish by asset_pointer shape: image-gen output is always
+      // `sediment://file_<hex>` with nothing after the file id. Anything
+      // with `#` segments is internal tool plumbing and must NOT leak
+      // into the conversation.
+      const CLEAN_POINTER_RE = /^sediment:\/\/file_[a-f0-9]+$/i;
+      const hasRealImage = parts.some(
+        (p) =>
+          isObject(p) &&
+          p.content_type === 'image_asset_pointer' &&
+          typeof p.asset_pointer === 'string' &&
+          CLEAN_POINTER_RE.test(p.asset_pointer)
       );
-      if (!hasImage) {
+      if (!hasRealImage) {
+        // file_search, web.run, container.exec results all land here.
+        // Keep string parts (the human-readable tool output); drop
+        // asset_pointer thumbnails entirely. Hidden behind reasoning toggle.
         const text = parts
           .filter((p) => typeof p === 'string')
           .join('\n\n')
@@ -148,7 +207,7 @@
         if (text) out.push({ block: { kind: 'tool_result', text, isError: false } });
         return out;
       }
-      // else: image-gen output, fall through to the multimodal_text handler.
+      // else: real image-gen output, fall through to the multimodal_text handler.
     }
 
     // Assistant "commentary" messages are pre-tool-call thinking preambles
@@ -205,6 +264,12 @@
           continue;
         }
         if (p.content_type === 'image_asset_pointer' && typeof p.asset_pointer === 'string') {
+          // Defensive: only accept asset pointers in the canonical
+          // `sediment://file_<hex>` shape. Anything containing `#` is a
+          // file_search-style thumbnail (PDF page snapshot etc.) that
+          // can't actually be fetched and shouldn't render as a broken
+          // image placeholder in the export.
+          if (!/^sediment:\/\/file_[a-f0-9]+$/i.test(p.asset_pointer)) continue;
           const fileId = p.asset_pointer.replace(/^sediment:\/\//, '');
           if (!fileId) continue;
           const mime = typeof p.metadata?.mime_type === 'string' ? p.metadata.mime_type : 'image/png';
@@ -431,6 +496,11 @@
     // heading so the transcribed text is contextualized (helps a reader
     // make sense of disfluencies and recognition errors).
     let currentIsVoice = false;
+    // Sandbox files referenced in assistant text. Tracked at conversation
+    // scope (not per-turn) because the same file is often mentioned in
+    // multiple messages — we register the synthetic attachment exactly
+    // once, on the first turn where it appears.
+    const sandboxPathsSeen = new Set();
 
     const flush = () => {
       if (!currentRole) return;
@@ -511,6 +581,38 @@
           binaryAttachmentRefs.push({ turnIndex: ti, attIndex });
         } else if (a.category === 'text' && a.needsContentFetch && a.fileUuid) {
           textFileRefs.push({ turnIndex: ti, attIndex });
+        }
+      }
+
+      // Sandbox/interpreter file references — only assistant messages emit
+      // these. Each unique sandbox path produces one synthetic binary
+      // attachment, registered on the first turn it's mentioned. The
+      // markdown layer rewrites `(sandbox:/path)` links inline to point at
+      // the resulting `files/<name>`; the `fromInlineLink` flag suppresses
+      // a duplicate entry in the bottom Attachments section.
+      if (
+        currentRole === 'assistant' &&
+        typeof m.id === 'string' &&
+        m.id
+      ) {
+        for (const item of blocks) {
+          if (item.block.kind !== 'text' || typeof item.block.text !== 'string') continue;
+          const refs = extractSandboxLinks(item.block.text);
+          for (const ref of refs) {
+            if (sandboxPathsSeen.has(ref.sandboxPath)) continue;
+            sandboxPathsSeen.add(ref.sandboxPath);
+            const attIndex = currentAttachments.length;
+            currentAttachments.push({
+              category: 'binary',
+              fileName: ref.fileName,
+              mime: 'application/octet-stream',
+              isSandbox: true,
+              sandboxPath: ref.sandboxPath,
+              sandboxMessageId: m.id,
+              fromInlineLink: true,
+            });
+            binaryAttachmentRefs.push({ turnIndex: ti, attIndex });
+          }
         }
       }
     }
