@@ -1,0 +1,10 @@
+{
+  "name": "llm-chat-exporter-extension",
+  "private": true,
+  "description": "Chrome extension that exports LLM chat conversations to Markdown/ZIP.",
+  "scripts": {
+    "test": "node --test --test-reporter=spec tests/test.js",
+    "test:update": "node --test --test-reporter=spec tests/test.js",
+    "_comment_test_update": "test:update is intended to be run as: UPDATE_GOLDEN=1 npm run test:update (Linux/macOS) or set UPDATE_GOLDEN=1&& npm run test:update (Windows cmd) or $env:UPDATE_GOLDEN=1; npm run test:update (PowerShell)"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "title": "Hello World",
+  "create_time": 1747188000,
+  "update_time": 1747188060,
+  "default_model_slug": "gpt-5",
+  "current_node": "msg-2",
+  "mapping": {
+    "root": {
+      "id": "root",
+      "message": null,
+      "parent": null,
+      "children": ["msg-1"]
+    },
+    "msg-1": {
+      "id": "msg-1",
+      "message": {
+        "id": "msg-1",
+        "author": { "role": "user", "name": null, "metadata": {} },
+        "create_time": 1747188000,
+        "content": {
+          "content_type": "text",
+          "parts": ["Hi! Briefly explain what a markdown export is."]
+        },
+        "status": "finished_successfully",
+        "end_turn": null,
+        "weight": 1,
+        "metadata": {},
+        "recipient": "all",
+        "channel": null
+      },
+      "parent": "root",
+      "children": ["msg-2"]
+    },
+    "msg-2": {
+      "id": "msg-2",
+      "message": {
+        "id": "msg-2",
+        "author": { "role": "assistant", "name": null, "metadata": {} },
+        "create_time": 1747188060,
+        "content": {
+          "content_type": "text",
+          "parts": ["A markdown export saves a chat conversation as a `.md` file so you can read or paste it elsewhere later."]
+        },
+        "status": "finished_successfully",
+        "end_turn": true,
+        "weight": 1,
+        "metadata": { "model_slug": "gpt-5" },
+        "recipient": "all",
+        "channel": "final"
+      },
+      "parent": "msg-1",
+      "children": []
+    }
+  }
+}

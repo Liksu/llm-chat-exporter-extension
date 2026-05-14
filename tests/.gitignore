@@ -1,0 +1,4 @@
+# Local-only scenarios: real conversations dumped from your own ChatGPT/Claude/Gemini
+# accounts. Not committed — would leak persona data + chat content into a public repo.
+# Run `npm test` and any scenarios you put here are picked up just like examples.
+scenarios/local/

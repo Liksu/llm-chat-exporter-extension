@@ -1,0 +1,62 @@
+{
+  "name": "chatgpt-basic-text",
+  "adapter": "chatgpt",
+  "location": "https://chatgpt.com/c/00000000-0000-0000-0000-000000000001",
+  "fakeDate": "2026-05-14T12:00:00Z",
+  "host": "https://chatgpt.com",
+  "auth": { "chatgpt-token": "mock-token" },
+  "mocks": [
+    {
+      "method": "GET",
+      "path": "/backend-api/conversation/00000000-0000-0000-0000-000000000001",
+      "file": "conversation.json"
+    }
+  ],
+  "exports": [
+    {
+      "name": "md-default",
+      "message": {
+        "kind": "export",
+        "mode": "md",
+        "includeReasoning": false,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": true,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "Hello World-2026-05-14.md",
+      "expectedContent": "expected/md-default.md"
+    },
+    {
+      "name": "md-with-reasoning",
+      "message": {
+        "kind": "export",
+        "mode": "md",
+        "includeReasoning": true,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": true,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "Hello World-2026-05-14.md",
+      "expectedContent": "expected/md-with-reasoning.md"
+    },
+    {
+      "name": "zip-default",
+      "message": {
+        "kind": "export",
+        "mode": "zip",
+        "includeReasoning": false,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": false,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "Hello World-2026-05-14.zip",
+      "expectedContent": "expected/zip-default"
+    }
+  ]
+}
