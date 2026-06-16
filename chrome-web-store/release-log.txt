@@ -1,5 +1,9 @@
 ﻿# LLM Chat Exporter — Release Log
 
+## v0.7.36 — 2026-06-15
+
+ChatGPT Deep Research and other Apps SDK reports are now included in exports
+
 ## v0.7.34 — 2026-06-12
 
 ChatGPT canvas and sandbox-generated files are now included in exports

@@ -50,7 +50,7 @@
  */
 (function () {
   const ns = (self.__exporter = self.__exporter || {});
-  const { safeStringify, isTextLikeMime } = ns.utils;
+  const { safeStringify, isTextLikeMime, sanitizeFilename } = ns.utils;
 
   const isObject = (v) => v !== null && typeof v === 'object';
 
@@ -97,20 +97,29 @@
   /**
    * Strip ChatGPT's citation markers from a text string.
    *
-   * The SPA wraps citation tokens (`filecite…`, `webcite…`, etc.) in a pair
-   * of Private Use Area Unicode chars (U+E000–U+F8FF) and renders them as
-   * file/source preview chips in the UI. The DOM never shows the raw
-   * `fileciteturn0file0` text — only the chip. Our export pulls the
-   * conversation tree directly, so these markers leak through and look
-   * like garbage in the .md.
+   * The SPA wraps citation tokens (`filecite…`, `webcite…`, etc.) in Private
+   * Use Area Unicode chars and renders them as file/source preview chips in
+   * the UI. The DOM never shows the raw `fileciteturn0file0` text — only the
+   * chip. Our export pulls the conversation tree directly, so these markers
+   * leak through and look like garbage in the .md.
    *
-   * We strip them entirely rather than try to reconstruct the chip
+   * Real-world structure of one marker (observed in Deep Research output):
+   *
+   *   U+E200 cite U+E202 turn21view7 U+E202 turn25view2 U+E202 … U+E201
+   *
+   * — opening char U+E200, then the citation type (`cite`, `webcite`, …),
+   * then U+E202 separators between each ref id, and a closing U+E201. The
+   * older "any-PUA-pair" regex only ate the first U+E200…U+E202 pair and
+   * left the ref names and inner separators visible. Lazy-matching from
+   * U+E200 to U+E201 sweeps the whole token in one go.
+   *
+   * We strip the entire marker rather than try to reconstruct the chip
    * (matched file name lives in `metadata.content_references`, but the
    * inline reference is rarely useful in a read-back export). Cleans up
    * the residue too: double spaces collapse, space-before-punctuation
    * collapses, and per-line trailing whitespace gets trimmed.
    */
-  const CITE_MARKER_RE = /[\uE000-\uF8FF][^\uE000-\uF8FF]*[\uE000-\uF8FF]/g;
+  const CITE_MARKER_RE = /\uE200[\s\S]*?\uE201/g;
   const stripCiteMarkers = (text) => {
     if (typeof text !== 'string' || !text) return text;
     let out = text.replace(CITE_MARKER_RE, '');
@@ -280,13 +289,102 @@
   };
 
   /**
+   * ChatGPT Apps SDK reports — Deep Research, custom connectors that render
+   * inside the chat as an embedded widget. The visible assistant message has
+   * `chatgpt_sdk_suppressed_response: true` with empty parts (because the UI
+   * paints the report from the widget, not from the assistant text). The
+   * actual report text lives buried in the matching tool response under
+   * `metadata.chatgpt_sdk.widget_state` — a STRINGIFIED JSON containing the
+   * widget's full state, including a `report_message` once the run is done.
+   *
+   * We extract the report and route it through the existing artifact pipeline
+   * so it lands as `🧩 [Title.md](…)` inline + a separate file in `/artifacts/`
+   * in zip mode, or as a "## Artifacts" section in md mode.
+   *
+   * Returns null when there's no widget_state, it can't be parsed, the run
+   * isn't yet complete (status !== "completed"), or no report_message has
+   * been produced. Intermediate plan states (status:
+   * waiting_for_user_response_on_plan, in_progress, …) are ignored so the
+   * same widget appearing across multiple tool turns only surfaces once.
+   */
+  const parseAppsSdkReport = (m) => {
+    const meta = isObject(m.metadata) ? m.metadata : null;
+    if (!meta) return null;
+    const sdk = isObject(meta.chatgpt_sdk) ? meta.chatgpt_sdk : null;
+    if (!sdk) return null;
+
+    const widgetStateRaw = typeof sdk.widget_state === 'string' ? sdk.widget_state : '';
+    if (!widgetStateRaw) return null;
+
+    let widgetState;
+    try {
+      widgetState = JSON.parse(widgetStateRaw);
+    } catch {
+      return null;
+    }
+    if (!isObject(widgetState)) return null;
+    if (widgetState.status !== 'completed') return null;
+
+    const reportMsg = widgetState.report_message;
+    if (!isObject(reportMsg) || !isObject(reportMsg.content)) return null;
+    if (reportMsg.content.content_type !== 'text') return null;
+
+    const parts = Array.isArray(reportMsg.content.parts) ? reportMsg.content.parts : [];
+    const text = parts.filter((p) => typeof p === 'string').join('\n\n').trim();
+    if (!text) return null;
+
+    const cleaned = stripCiteMarkers(text);
+
+    // Title preference: plan title (set when the deep-research planner ran),
+    // then the report's first H1, then a generic fallback.
+    let title = '';
+    if (
+      isObject(widgetState.plan) &&
+      typeof widgetState.plan.title === 'string' &&
+      widgetState.plan.title.trim()
+    ) {
+      title = widgetState.plan.title.trim();
+    }
+    if (!title) {
+      const h1 = cleaned.match(/^\s*#\s+(.+?)\s*$/m);
+      if (h1) title = h1[1].trim();
+    }
+    if (!title) title = 'Deep Research Report';
+
+    // Session id used by the main loop to dedupe across the multiple tool
+    // turns the same widget produces while updating its state. We prefer the
+    // ChatGPT widget session id; the conversation-level session id is a
+    // weaker fallback.
+    const sessionId =
+      (typeof sdk.widget_session_id === 'string' && sdk.widget_session_id) ||
+      (typeof sdk.async_task_conversation_id === 'string' && sdk.async_task_conversation_id) ||
+      '';
+
+    // Friendly source label — `app_name` is the human-readable connector
+    // name when present (eg "Deep Research App"). Used to caption the
+    // artifact_ref in the conversation body. Strip a trailing " App" so
+    // "Result of Deep Research" reads cleaner than "Result of Deep
+    // Research App".
+    let source =
+      (isObject(meta.invoked_resource) && typeof meta.invoked_resource.app_name === 'string'
+        ? meta.invoked_resource.app_name
+        : '') ||
+      (typeof sdk.app_name === 'string' ? sdk.app_name : '') ||
+      'Apps SDK';
+    source = source.replace(/\s+App$/i, '').trim() || 'Apps SDK';
+
+    return { title, content: cleaned, sessionId, source };
+  };
+
+  /**
    * Transform one chatgpt message's content into normalized blocks.
    * Returns Array<{
    *   block?: NormalizedBlock,
    *   _imageRef?: {fileId},
    *   _canvasCreate?: {name, type, content},
    *   _canvasUpdate?: {updates},
-   *   _canvasResponse?: {tool, textdoc_id, title}
+   *   _canvasResponse?: {tool, textdoc_id, title},
+   *   _appsSdkReport?: {title, content, sessionId, source}
    * }>.
    *
    * The `_canvas*` markers are consumed in normalize()'s main loop, where
@@ -305,6 +403,51 @@
     const out = [];
 
     if (!content) return out;
+
+    // Apps SDK (Deep Research and other ChatGPT connectors that render an
+    // embedded widget) — three distinct messages to handle BEFORE everything
+    // else, all related to a single widget invocation:
+    //
+    //   1. Assistant `code` with recipient `api_tool.call_tool` — the request
+    //      that opens the widget. The args.user_query just repeats what the
+    //      user already asked one turn earlier, so the tool_call dump is pure
+    //      duplication. Drop.
+    //
+    //   2. Tool messages from `api_tool*` — intermediate plan states
+    //      (waiting_for_user_response_on_plan, in_progress) AND the final
+    //      one with the completed report. parseAppsSdkReport returns the
+    //      report only when status==='completed' with a report_message; we
+    //      emit an `_appsSdkReport` marker the main loop turns into an
+    //      artifact. Other intermediate states are dropped silently so they
+    //      don't surface as noisy tool_result dumps.
+    //
+    //   3. Assistant `text` with `chatgpt_sdk_suppressed_response: true` and
+    //      empty parts — the SPA paints the report from the widget, so the
+    //      "real" assistant text is intentionally blank. Drop or we'd emit
+    //      an empty `## Assistant` heading right after the artifact link.
+    if (
+      role === 'assistant' &&
+      ct === 'code' &&
+      typeof m.recipient === 'string' &&
+      m.recipient === 'api_tool.call_tool'
+    ) {
+      return out;
+    }
+    if (role === 'tool' && typeof m.author?.name === 'string' && m.author.name.startsWith('api_tool')) {
+      const report = parseAppsSdkReport(m);
+      if (report) {
+        out.push({ _appsSdkReport: report });
+      }
+      return out;
+    }
+    if (
+      role === 'assistant' &&
+      ct === 'text' &&
+      meta.chatgpt_sdk_suppressed_response === true &&
+      !partsToText(content.parts)
+    ) {
+      return out;
+    }
 
     // Canvas (side-panel docs). Intercept canmore.* create/update tool calls
     // and their matching tool responses BEFORE the generic tool/code handlers
@@ -703,6 +846,13 @@
     // update calls don't carry textdoc_id, so most-recent-create wins.
     const artifacts = [];
     let currentArtifact = null;
+    // Apps SDK reports (Deep Research and similar embedded widgets) are
+    // surfaced as artifacts too. `appsSdkArtifactBySession` maps the
+    // widget's session id → the artifact we already created, so subsequent
+    // tool turns for the same widget refresh content/title in place instead
+    // of producing duplicates. We register the artifact_ref block ONLY on
+    // first sighting; later updates just mutate the existing artifact.
+    const appsSdkArtifactBySession = new Map();
 
     const flush = () => {
       if (!currentRole) return;
@@ -802,6 +952,37 @@
           ) {
             currentArtifact.title = item._canvasResponse.title;
           }
+          continue;
+        }
+        if (item._appsSdkReport) {
+          const report = item._appsSdkReport;
+          const sessionKey = report.sessionId || `apps-sdk-${artifacts.length}`;
+          const existing = appsSdkArtifactBySession.get(sessionKey);
+          if (existing) {
+            // Same widget reappeared in a later tool turn (refreshed widget_state).
+            // Update content/title in place; no second artifact_ref.
+            existing.content = report.content;
+            if (report.title) existing.title = report.title;
+            continue;
+          }
+          // First sighting — create artifact and insert the inline ref.
+          const safeTitle = sanitizeFilename(report.title) || 'deep-research-report';
+          const fileName = `${safeTitle}.md`;
+          const artifact = {
+            id: `apps-sdk-${artifacts.length}`,
+            title: report.title,
+            fileName,
+            language: 'markdown',
+            content: report.content,
+            // `source` is rendered as `**Result of {source}:**` above the
+            // artifact link by markdown.js. Set ONLY for Apps SDK reports
+            // — Claude and canvas artifacts leave it undefined and keep
+            // the bare `🧩 [name]` form.
+            source: report.source,
+          };
+          artifacts.push(artifact);
+          appsSdkArtifactBySession.set(sessionKey, artifact);
+          currentBlocks.push({ kind: 'artifact_ref', artifactId: artifact.id });
           continue;
         }
         if (!item.block) continue;

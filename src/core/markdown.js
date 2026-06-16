@@ -183,12 +183,18 @@
       case 'artifact_ref': {
         const art = conv.artifacts.find((a) => a.id === block.artifactId);
         if (!art) return null;
+        // Apps SDK reports (Deep Research etc) carry a `source` label so the
+        // ref reads as `**Result of Deep Research:**` above the link — they
+        // ARE the assistant's answer for that turn, not a side-document.
+        // Claude / canvas artifacts leave `source` undefined and keep the
+        // bare `🧩 [name]` form.
+        const caption = art.source ? `**Result of ${art.source}:**\n\n` : '';
         if (opts.mode === 'zip') {
           const path =
             opts.artifactFileById.get(art.id) ?? `${opts.artifactsDir}/${art.fileName}`;
-          return `🧩 [${art.fileName}](${path})`;
+          return `${caption}🧩 [${art.fileName}](${path})`;
         }
-        return `🧩 [${art.fileName}](#artifact-${slugifyAnchor(art.id)})`;
+        return `${caption}🧩 [${art.fileName}](#artifact-${slugifyAnchor(art.id)})`;
       }
     }
     return null;
