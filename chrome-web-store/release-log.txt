@@ -1,5 +1,9 @@
 ﻿# LLM Chat Exporter — Release Log
 
+## v0.7.37 — 2026-08-03
+
+Add support for the Claude Cowork
+
 ## v0.7.36 — 2026-06-15
 
 ChatGPT Deep Research and other Apps SDK reports are now included in exports
