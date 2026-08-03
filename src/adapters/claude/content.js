@@ -8,13 +8,87 @@
  *   5. Render markdown / build zip.
  *   6. Trigger download from the page (popups can't trigger downloads with
  *      large blobs reliably).
+ *
+ * claude.ai hosts two different products on one origin, so this entry also
+ * dispatches: `/cowork/cse_…` pages are agent sessions with a separate API
+ * and data model, handled by the cowork adapter (see adapters/cowork/).
  */
 (function () {
   const ns = (self.__exporter = self.__exporter || {});
   const { claudeApi, claudeNormalize, markdown, zip, download, utils } = ns;
   const { sanitizeFilename, todayStamp, utf8ToBytes, log } = utils;
 
+  /**
+   * Cowork sessions: fetch the event log, normalize, render. No binary
+   * fetching pass — cowork's documents arrive inline as artifacts and the
+   * sandbox file endpoints reject its non-UUID session id.
+   */
+  const handleCoworkExport = async ({ mode, includeReasoning, includeDates, dateFormat, inlineImages, attachmentsAsMarkdown }) => {
+    const { coworkApi, coworkNormalize } = ns;
+    const sessionId = coworkApi.parseSessionIdFromUrl(location.href);
+    if (!sessionId) {
+      return { ok: false, error: 'Not on a cowork session page.' };
+    }
+
+    // Org id is only used for a request header; a failure to resolve it
+    // shouldn't block the export.
+    let orgId = null;
+    try {
+      orgId = await claudeApi.getOrgId();
+    } catch (err) {
+      log.debug('cowork: could not resolve org id, continuing without it', err);
+    }
+
+    const session = await coworkApi.fetchSession(sessionId, orgId);
+    const events = await coworkApi.fetchAllEvents(sessionId, orgId, (n) =>
+      log.debug('cowork: loaded', n, 'events')
+    );
+    const { conversation } = coworkNormalize.normalize(session, events, {});
+
+    const baseName = sanitizeFilename(conversation.title || 'cowork-session');
+    const innerBase = `${baseName}-${todayStamp()}`;
+    const filename = `${innerBase}.${mode === 'zip' ? 'zip' : 'md'}`;
+
+    if (mode === 'zip') {
+      const blob = await zip.build(conversation, {
+        includeReasoning,
+        includeDates,
+        dateFormat,
+        inlineImages,
+        attachmentsAsMarkdown,
+        sourceLabel: 'Claude Cowork',
+        innerName: innerBase,
+      });
+      download.triggerDownload(blob, filename);
+    } else {
+      const md = markdown.render(conversation, {
+        mode: 'md',
+        includeReasoning,
+        includeDates,
+        dateFormat,
+        inlineImages,
+        attachmentsAsMarkdown,
+        sourceLabel: 'Claude Cowork',
+      });
+      const blob = new Blob([utf8ToBytes(md)], { type: 'text/markdown;charset=utf-8' });
+      download.triggerDownload(blob, filename);
+    }
+
+    return { ok: true, filename };
+  };
+
   const handleExport = async ({ mode, includeReasoning, includeDates, dateFormat, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
+    if (ns.coworkApi && ns.coworkApi.isCoworkUrl(location.href)) {
+      return handleCoworkExport({
+        mode,
+        includeReasoning,
+        includeDates,
+        dateFormat,
+        inlineImages,
+        attachmentsAsMarkdown,
+      });
+    }
+
     const convId = claudeApi.parseConvIdFromUrl(location.href);
     if (!convId) {
       return { ok: false, error: 'Not on a claude.ai conversation page.' };

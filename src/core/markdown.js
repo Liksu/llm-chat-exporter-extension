@@ -73,6 +73,25 @@
       // disfluencies or recognition errors. Adapter sets `turn.isVoice` when
       // the source platform exposes that signal (ChatGPT does; others
       // currently don't).
+      // Render the body first: a turn whose every block is filtered out
+      // (e.g. an assistant turn that only issued a tool call, with
+      // "include reasoning" off) must not leave a bare `## Assistant`
+      // heading followed by a separator.
+      const body = [];
+      for (const block of turn.blocks) {
+        const rendered = renderBlock(block, conv, opts);
+        if (rendered === null) continue;
+        body.push(rendered);
+        body.push('');
+      }
+      for (const att of turn.attachments) {
+        const rendered = renderAttachment(att, opts, registry);
+        if (rendered === null) continue;
+        body.push(rendered);
+        body.push('');
+      }
+      if (!body.length) continue;
+
       const roleLabel = turn.role === 'human' ? '## Human' : '## Assistant';
       out.push(turn.isVoice ? `${roleLabel} (🎙️)` : roleLabel);
       if (opts.includeDates && turn.createdAt) {
@@ -83,18 +102,7 @@
         }
       }
       out.push('');
-      for (const block of turn.blocks) {
-        const rendered = renderBlock(block, conv, opts);
-        if (rendered === null) continue;
-        out.push(rendered);
-        out.push('');
-      }
-      for (const att of turn.attachments) {
-        const rendered = renderAttachment(att, opts, registry);
-        if (rendered === null) continue;
-        out.push(rendered);
-        out.push('');
-      }
+      out.push(...body);
       out.push('---');
       out.push('');
     }
