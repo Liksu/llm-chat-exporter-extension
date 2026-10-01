@@ -25,10 +25,28 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 
 const { findScenarios, runExport } = require('./scaffolding/run-scenario');
+const { audit, loadDir, loadMd } = require('../tools/audit-export');
 
 const SCENARIOS_DIR = path.join(__dirname, 'scenarios');
 
 const scenarios = findScenarios(SCENARIOS_DIR);
+
+/**
+ * Goldens are whatever the exporter produced when they were recorded, so a
+ * bug present at recording time (eg. a duplicated image) gets locked in as
+ * "expected". Run the golden-free auditor over them to catch that.
+ */
+const assertAuditClean = (expectedPath) => {
+  if (!fs.existsSync(expectedPath)) return;
+  const exp = fs.statSync(expectedPath).isDirectory() ? loadDir(expectedPath) : loadMd(expectedPath);
+  const errors = audit(exp).filter((f) => f.severity === 'error');
+  if (errors.length) {
+    throw new Error(
+      `audit-export found problems in ${expectedPath}:\n` +
+        errors.map((f) => `  ${f.code}${f.line ? `:${f.line}` : ''}  ${f.message}`).join('\n')
+    );
+  }
+};
 
 if (scenarios.length === 0) {
   // Still emit one test so `npm test` doesn't silently report "0 passing".
@@ -52,6 +70,7 @@ if (scenarios.length === 0) {
         const expLabel = exp.name || JSON.stringify(exp.message);
         await t.test(expLabel, async () => {
           await runExport(dir, scenario, exp);
+          assertAuditClean(path.join(dir, exp.expectedContent));
         });
       }
     });

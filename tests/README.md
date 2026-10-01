@@ -412,6 +412,49 @@ If timestamps in metadata.json or message dates look wrong:
    override can clobber it.
 3. Confirm `dateFormat` is `iso-utc` in the export options.
 
+### "audit-export found problems in …/expected/…"
+
+The golden itself contains a symptom the auditor treats as a bug (see
+below). Fix the exporter and regenerate, rather than accepting the golden.
+
+## Auditing real exports
+
+Goldens only replay recorded API responses, so they can't notice a
+provider changing its API shape. `tools/audit-export.js` checks real
+exports for symptoms that are wrong no matter what the chat contained:
+
+```bash
+npm run audit -- <export.zip | export.md | unzipped-dir | any-dir>... [--quiet] [--json]
+```
+
+A plain directory is scanned recursively for things this extension
+produced (`_Source:` header or a `metadata.json` with `sourceLLM`). Exit
+code is 1 when anything at `ERROR` level is found.
+
+| Code | Level | Meaning |
+|------|-------|---------|
+| `duplicate-image` | error | Same image bytes rendered twice in one message |
+| `repeated-image` | warn | Same image in several messages (may be a re-upload) |
+| `broken-link` / `broken-anchor` | error | Link to a file or `#anchor` that isn't in the export |
+| `sandbox-link` | error (zip) / warn (md) | `sandbox:/…` link left unresolved |
+| `not-an-image` / `html-instead-of-file` | error | Saved bytes aren't what the name claims (viewer/error page) |
+| `ext-mismatch` / `no-extension` | warn | File extension missing or not matching the bytes |
+| `duplicate-file` | warn | Identical bytes stored under several names |
+| `unreferenced-file` | warn | File in the export that the .md never links to |
+| `unknown-block` | error | `Tool call: unknown:<type>` — normalizer met a block type it doesn't handle (visible only with "Include reasoning") |
+| `private-use-chars` | error | Provider markup leaked (eg. ChatGPT `cite…` citations) |
+| `unsupported-placeholder` | error | claude.ai "not supported on your device" text leaked |
+| `image-not-loaded` | error | Image download failed |
+| `image-placeholder` | warn | `_[image: …]_` — fine with "Inline images" off, otherwise a silent failure |
+| `content-placeholder` | warn | Other `_[…]_` placeholder — content kind exported only as a stub |
+| `file-unavailable` | warn | Attachment the provider no longer serves |
+| `empty-turn` | warn | Role heading with nothing under it |
+| `metadata-count` | warn/error | `metadata.json` counts disagree with the archive |
+| `object-object` / `mojibake` | error / warn | Stringified object or double-encoded UTF-8 |
+
+`npm test` also runs the auditor over every scenario's goldens, so a bug
+present at recording time can't be locked in as "expected".
+
 ## Privacy
 
 Anything under `tests/scenarios/local/` is gitignored. That's the only safe
