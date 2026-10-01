@@ -1,0 +1,14 @@
+{
+  "title": "Uploaded images",
+  "sourceLLM": "claude",
+  "model": "claude-opus-5-5",
+  "createdAt": "2026-10-01T05:47:15Z",
+  "updatedAt": "2026-10-01T05:48:00Z",
+  "exportedAt": "2026-10-01T12:00:00.000Z",
+  "counts": {
+    "turns": 2,
+    "artifacts": 0,
+    "assets": 1,
+    "files": 0
+  }
+}

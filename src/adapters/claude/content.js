@@ -126,12 +126,15 @@
             bytes = r.bytes;
             if (r.mime) mime = r.mime;
           }
-          if (bytes) {
+          if (bytes && bytes.length > 0) {
             block.bytes = bytes;
             block.mime = mime;
+          } else {
+            block.fetchError = ref.url || ref.fileUuid ? 'empty response' : 'no download reference';
           }
         } catch (err) {
           log.warn('image fetch failed', ref, err);
+          block.fetchError = err instanceof Error ? err.message : String(err);
         }
       }
     }

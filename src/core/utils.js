@@ -223,6 +223,22 @@
     return map[m] || '';
   };
 
+  /**
+   * Image mime from magic bytes; '' when unrecognized. Content-Type is not
+   * always trustworthy (or present), and providers may serve a transcoded
+   * preview under the original upload's name.
+   */
+  const sniffImageMime = (b) => {
+    if (!b || b.length < 4) return '';
+    if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+    if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+    if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return 'image/gif';
+    if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+        b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+    if (b[0] === 0x42 && b[1] === 0x4d) return 'image/bmp';
+    return '';
+  };
+
   /** Map artifact `language`/`type` → file extension. */
   const extFromArtifactKind = (language, mime) => {
     const lang = String(language || '').toLowerCase();
@@ -374,6 +390,7 @@
     slugifyAnchor,
     langFromMime,
     extFromMime,
+    sniffImageMime,
     extFromArtifactKind,
     safeStringify,
     uint8ToBase64,

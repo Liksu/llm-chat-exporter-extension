@@ -35,11 +35,12 @@ const scenarios = findScenarios(SCENARIOS_DIR);
  * Goldens are whatever the exporter produced when they were recorded, so a
  * bug present at recording time (eg. a duplicated image) gets locked in as
  * "expected". Run the golden-free auditor over them to catch that.
+ * `scenario.auditAllow` lists finding codes the scenario produces on purpose.
  */
-const assertAuditClean = (expectedPath) => {
+const assertAuditClean = (expectedPath, allow = []) => {
   if (!fs.existsSync(expectedPath)) return;
   const exp = fs.statSync(expectedPath).isDirectory() ? loadDir(expectedPath) : loadMd(expectedPath);
-  const errors = audit(exp).filter((f) => f.severity === 'error');
+  const errors = audit(exp).filter((f) => f.severity === 'error' && !allow.includes(f.code));
   if (errors.length) {
     throw new Error(
       `audit-export found problems in ${expectedPath}:\n` +
@@ -70,7 +71,7 @@ if (scenarios.length === 0) {
         const expLabel = exp.name || JSON.stringify(exp.message);
         await t.test(expLabel, async () => {
           await runExport(dir, scenario, exp);
-          assertAuditClean(path.join(dir, exp.expectedContent));
+          assertAuditClean(path.join(dir, exp.expectedContent), scenario.auditAllow);
         });
       }
     });

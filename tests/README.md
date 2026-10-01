@@ -313,6 +313,7 @@ include scenarios under `examples/`.
 | `auth`          | no       | Pre-seeded credentials (see below). |
 | `mocks`         | yes      | Array of fetch routes (see below). |
 | `exports`       | yes      | Array of export variants (see below). |
+| `auditAllow`    | no       | Audit finding codes this scenario produces on purpose (eg. `["image-not-loaded"]` for a scenario testing a failed download). See [Auditing real exports](#auditing-real-exports). |
 
 ### Auth seeding
 

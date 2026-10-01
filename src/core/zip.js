@@ -14,8 +14,14 @@
  */
 (function () {
   const ns = (self.__exporter = self.__exporter || {});
-  const { uniqueName, utf8ToBytes, sanitizeFilename, extFromMime } = ns.utils;
+  const { uniqueName, utf8ToBytes, sanitizeFilename, extFromMime, sniffImageMime } = ns.utils;
   const fflate = self.fflate;
+
+  const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'jpe', 'gif', 'webp', 'bmp']);
+  const normImageExt = (ext) => {
+    const e = ext.toLowerCase();
+    return `.${e === 'jpeg' || e === 'jpe' ? 'jpg' : e}`;
+  };
 
   /**
    * @param {import('./utils.js').NormalizedConversation} conv
@@ -73,8 +79,16 @@
           !inlineImages
         ) {
           let baseName = block.name || `image-${++imgCounter}${extFromMime(block.mime) || '.bin'}`;
-          // Names derived from ids (e.g. a bare file_uuid) carry no extension.
-          if (!/\.[a-z0-9]{1,5}$/i.test(baseName)) baseName += extFromMime(block.mime);
+          // Name the file after what the bytes are: ids (a bare file_uuid)
+          // carry no extension, and claude.ai serves uploaded .jpg as WebP.
+          const actualExt = extFromMime(sniffImageMime(block.bytes) || block.mime);
+          const extMatch = /\.([a-z0-9]{1,5})$/i.exec(baseName);
+          if (!extMatch) {
+            baseName += actualExt;
+          } else if (actualExt && IMAGE_EXTS.has(extMatch[1].toLowerCase()) &&
+                     normImageExt(extMatch[1]) !== actualExt) {
+            baseName = baseName.slice(0, -extMatch[0].length) + actualExt;
+          }
           const finalName = uniqueName(sanitizeFilename(baseName), usedAssets);
           entries[`${ASSETS}/${finalName}`] = block.bytes;
           imagePathByName.set(block.name || finalName, `${ASSETS}/${finalName}`);

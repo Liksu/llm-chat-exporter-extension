@@ -1,0 +1,66 @@
+{
+  "name": "claude-uploaded-images",
+  "adapter": "claude",
+  "location": "https://claude.ai/chat/00000000-0000-0000-0000-000000000002",
+  "fakeDate": "2026-10-01T12:00:00Z",
+  "host": "https://claude.ai",
+  "auditAllow": [
+    "image-not-loaded"
+  ],
+  "mocks": [
+    {
+      "method": "GET",
+      "path": "/api/organizations",
+      "file": "organizations.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/organizations/00000000-0000-0000-0000-0000000000aa/chat_conversations/00000000-0000-0000-0000-000000000002",
+      "file": "conversation.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/c0000000-0000-0000-0000-0000000000cc/files/00000000-0000-0000-0000-0000000000f1/preview",
+      "file": "photo-preview.webp",
+      "contentType": "image/webp"
+    },
+    {
+      "method": "GET",
+      "pathRegex": "^/api/(c0000000-0000-0000-0000-0000000000cc|organizations/[^/]+)/files/00000000-0000-0000-0000-0000000000f2(/.*)?$",
+      "file": "not-found.json",
+      "status": 404
+    }
+  ],
+  "exports": [
+    {
+      "name": "md-default",
+      "message": {
+        "kind": "export",
+        "mode": "md",
+        "includeReasoning": false,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": true,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "Uploaded images-2026-10-01.md",
+      "expectedContent": "expected/md-default.md"
+    },
+    {
+      "name": "zip-default",
+      "message": {
+        "kind": "export",
+        "mode": "zip",
+        "includeReasoning": false,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": false,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "Uploaded images-2026-10-01.zip",
+      "expectedContent": "expected/zip-default"
+    }
+  ]
+}
