@@ -605,10 +605,12 @@
       // Files[] images render inline at the top of the message (matches the
       // way claude.ai displays uploaded/pasted images above the user's text).
       const filesResult = transformFiles(m.files, opts, viewHarvest);
+      const fileImageUuids = new Set();
       for (const item of filesResult.imageItems) {
         const blockIndex = blocks.length;
         blocks.push(item.block);
         imageRefs.push({ turnIndex: ti, blockIndex, ref: item.ref });
+        if (item.ref.fileUuid) fileImageUuids.add(item.ref.fileUuid);
       }
 
       const contentArr = Array.isArray(m.content) ? m.content : [];
@@ -618,6 +620,13 @@
         for (const c of contentArr) {
           const produced = transformBlock(c, artifactMap);
           for (const item of produced) {
+            // claude.ai also lists uploaded images as `image` content blocks
+            // pointing at the same file_uuid as files[] -- already emitted
+            // above with the real file name, so skip the duplicate.
+            if (item._imageRef && item._imageRef.fileUuid &&
+                fileImageUuids.has(item._imageRef.fileUuid)) {
+              continue;
+            }
             const blockIndex = blocks.length;
             blocks.push(item.block);
             if (item._imageRef) {

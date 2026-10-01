@@ -72,7 +72,9 @@
           block.bytes.length > 0 &&
           !inlineImages
         ) {
-          const baseName = block.name || `image-${++imgCounter}${extFromMime(block.mime) || '.bin'}`;
+          let baseName = block.name || `image-${++imgCounter}${extFromMime(block.mime) || '.bin'}`;
+          // Names derived from ids (e.g. a bare file_uuid) carry no extension.
+          if (!/\.[a-z0-9]{1,5}$/i.test(baseName)) baseName += extFromMime(block.mime);
           const finalName = uniqueName(sanitizeFilename(baseName), usedAssets);
           entries[`${ASSETS}/${finalName}`] = block.bytes;
           imagePathByName.set(block.name || finalName, `${ASSETS}/${finalName}`);
