@@ -220,24 +220,5 @@
     return { ok: true, filename };
   };
 
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (!msg || msg.kind !== 'export') return false;
-    handleExport({
-      mode: msg.mode === 'zip' ? 'zip' : 'md',
-      includeReasoning: !!msg.includeReasoning,
-      includeDates: !!msg.includeDates,
-      dateFormat: msg.dateFormat || 'locale',
-      // Default to true so an older popup (or a programmatic caller that
-      // forgets the field) still inlines images, matching the new default.
-      inlineImages: msg.inlineImages !== false,
-      inlineTextFiles: !!msg.inlineTextFiles,
-      attachmentsAsMarkdown: !!msg.attachmentsAsMarkdown,
-    })
-      .then(sendResponse)
-      .catch((err) => {
-        log.error('export failed', err);
-        sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) });
-      });
-    return true; // async response
-  });
+  ns.exportEntry.register('claude', handleExport);
 })();

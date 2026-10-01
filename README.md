@@ -41,7 +41,7 @@ The extension auto-detects which platform you're on. Defaults can be changed on 
 
 ## Privacy
 
-The extension reads conversation data **only on the active tab** and **only when you click Export**. Nothing is sent anywhere — there is no analytics, no telemetry, no remote server. The only storage used is `chrome.storage.sync` for your option preferences.
+The extension reads conversation data **only on the active tab** and **only when you click Export** (or, if you enable the developer option *Allow exports triggered from the page*, when a script on the chat page asks for an export). Nothing is sent anywhere — there is no analytics, no telemetry, no remote server. The only storage used is `chrome.storage.sync` for your option preferences.
 
 Required permissions:
 

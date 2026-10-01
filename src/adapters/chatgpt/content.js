@@ -130,22 +130,5 @@
     return { ok: true, filename };
   };
 
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (!msg || msg.kind !== 'export') return false;
-    handleExport({
-      mode: msg.mode === 'zip' ? 'zip' : 'md',
-      includeReasoning: !!msg.includeReasoning,
-      includeDates: !!msg.includeDates,
-      dateFormat: msg.dateFormat || 'locale',
-      inlineImages: msg.inlineImages !== false,
-      inlineTextFiles: !!msg.inlineTextFiles,
-      attachmentsAsMarkdown: !!msg.attachmentsAsMarkdown,
-    })
-      .then(sendResponse)
-      .catch((err) => {
-        log.error('chatgpt export failed', err);
-        sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) });
-      });
-    return true; // async response
-  });
+  ns.exportEntry.register('chatgpt', handleExport);
 })();

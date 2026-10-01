@@ -76,7 +76,9 @@ Skipped intentionally:
 - **popup.js / options.js** — UI layer, no business logic worth golden-testing
 - **hook-iso.js / hook-main.js** — page-world token capture; tests pre-seed
   the token instead of running the real handshake
-- **service-worker.js** — only declarative net-request rules; nothing to call
+- **service-worker.js** — not loaded. Its `fetch-asset` proxy (Gemini assets)
+  is emulated by the loader from the same `mocks[]`; its declarative
+  net-request rules are enforced by the browser, nothing to call
 
 ## How to add a scenario
 
@@ -455,6 +457,76 @@ code is 1 when anything at `ERROR` level is found.
 
 `npm test` also runs the auditor over every scenario's goldens, so a bug
 present at recording time can't be locked in as "expected".
+
+## Debug data from real exports
+
+Options page → **Developer** → *Save debug data with each export*. Every
+export then also downloads `<name>.debug.har`: each request the export
+made, with full response bodies (request headers/bodies are not recorded
+— they carry auth tokens). It is saved even when the export fails.
+`log._exporter` records the adapter, page URL, options and result.
+
+Turn it into a scenario — no DevTools HAR needed:
+
+```bash
+npm run record -- "<name>.debug.har" tests/scenarios/local/<name>
+```
+
+The recorder takes adapter, location, date and the export options from
+`log._exporter`, so the scenario replays exactly that export
+(`md-recorded` / `zip-recorded`). Only variants that need the same
+requests can replay: an md export without inline images never fetched
+them, so a zip variant would hit unmocked URLs. `npm test` checks that a
+debug HAR replays into a byte-identical export.
+
+## Schema drift
+
+```bash
+npm run drift -- <file.har | scenario-dir | any-dir>... [--update] [--verbose] [--json]
+```
+
+Records the shape of every JSON response — key paths, value types, and
+values of discriminator fields (`type`, `content_type`, `role`, tool
+names, …), never message text — and diffs it against
+`tests/schema-baseline.json`:
+
+```
+CHANGED  GET claude.ai/api/organizations/{id}/chat_conversations/{id}
+  + value  chat_messages[].content[].type = image   (known: text, thinking, tool_use, …)
+  + field  chat_messages[].content[].file_uuid : string
+```
+
+Anything new is either a format change to adapt to (that one caused the
+duplicated-images bug) or a feature the exporter doesn't handle yet.
+Review it, fix or file it, then accept with `--update`. Exit code is 1
+while there is unaccepted drift. The baseline is gitignored: it may
+contain tool names from your own connectors.
+
+First run: there is no baseline, so everything is reported as new. Feed
+it a few debug HARs of ordinary chats and `--update` to start.
+
+## Page-triggered exports (for browser automation)
+
+Options page → **Developer** → *Allow exports triggered from the page*.
+Then a script on the chat page (Claude in Chrome, Playwright) can export
+without the popup:
+
+```js
+const result = new Promise((resolve) =>
+  window.addEventListener('llm-exporter:export-result',
+    (e) => resolve(JSON.parse(e.detail)), { once: true }));
+window.dispatchEvent(new CustomEvent('llm-exporter:export', {
+  detail: JSON.stringify({ mode: 'zip', includeReasoning: true, debugCapture: true }),
+}));
+await result; // { ok: true, filename: '…' } or { ok: false, error: '…' }
+```
+
+`detail` must be a JSON string (objects don't cross from the page into the
+content script). Fields are the same as the popup's export message;
+omitted ones fall back to defaults (md, images inline, no reasoning), not
+to your saved options — except `debugCapture`, which follows the *Save
+debug data* option when omitted. The last result is also left in
+`document.documentElement.dataset.llmExporterResult`.
 
 ## Privacy
 

@@ -10,6 +10,8 @@
   const inlineImagesEl = document.getElementById('inlineImages');
   const inlineTextFilesEl = document.getElementById('inlineTextFiles');
   const attachmentsAsMarkdownEl = document.getElementById('attachmentsAsMarkdown');
+  const debugCaptureEl = document.getElementById('debugCapture');
+  const pageTriggerEl = document.getElementById('pageTrigger');
   const perAdapterContainer = document.getElementById('perAdapterContainer');
 
   // -- Per-adapter section definitions --------------------------------------
@@ -227,6 +229,8 @@
     inlineImagesEl.checked = settings.global.inlineImages !== false;
     inlineTextFilesEl.checked = !!settings.global.inlineTextFiles;
     attachmentsAsMarkdownEl.checked = !!settings.global.attachmentsAsMarkdown;
+    debugCaptureEl.checked = !!settings.global.debugCapture;
+    pageTriggerEl.checked = !!settings.global.pageTrigger;
 
     // 3) Populate per-adapter sections from stored overrides.
     for (const adapter of ADAPTERS) {
@@ -256,6 +260,8 @@
     settings.global.inlineImages = !!inlineImagesEl.checked;
     settings.global.inlineTextFiles = !!inlineTextFilesEl.checked;
     settings.global.attachmentsAsMarkdown = !!attachmentsAsMarkdownEl.checked;
+    settings.global.debugCapture = !!debugCaptureEl.checked;
+    settings.global.pageTrigger = !!pageTriggerEl.checked;
 
     // Per-adapter — rebuild from selects. Keys whose value is "" (Inherit)
     // are omitted; the resulting object may be empty.

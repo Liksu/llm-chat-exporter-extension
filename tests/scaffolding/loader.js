@@ -44,6 +44,8 @@ const SCRIPTS_BY_ADAPTER = {
     'src/core/markdown.js',
     'src/core/zip.js',
     'src/core/download.js',
+    'src/core/debug-capture.js',
+    'src/core/export-entry.js',
     'src/adapters/chatgpt/api.js',
     'src/adapters/chatgpt/normalize.js',
     'src/adapters/chatgpt/content.js',
@@ -55,6 +57,8 @@ const SCRIPTS_BY_ADAPTER = {
     'src/core/markdown.js',
     'src/core/zip.js',
     'src/core/download.js',
+    'src/core/debug-capture.js',
+    'src/core/export-entry.js',
     'src/adapters/claude/api.js',
     'src/adapters/claude/normalize.js',
     'src/adapters/claude/content.js',
@@ -66,6 +70,8 @@ const SCRIPTS_BY_ADAPTER = {
     'src/core/markdown.js',
     'src/core/zip.js',
     'src/core/download.js',
+    'src/core/debug-capture.js',
+    'src/core/export-entry.js',
     'src/adapters/gemini/api.js',
     'src/adapters/gemini/normalize.js',
     'src/adapters/gemini/content.js',
@@ -209,7 +215,9 @@ function makeFrozenDate(frozenIsoString) {
 function createBrowserContext(opts) {
   const { Event, CustomEvent } = makeEventClasses();
   const { chrome, messageListeners } = makeChromeRuntime();
-  const captured = { blob: null, filename: null };
+  // blob/filename: the export itself (first download). downloads: every
+  // download, in order -- debug capture adds a .debug.har after it.
+  const captured = { blob: null, filename: null, downloads: [] };
 
   // Resolve location: URL constructor with no base must get an absolute URL.
   const loc = new URL(opts.location);
@@ -290,6 +298,21 @@ function createBrowserContext(opts) {
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
 
+  // The service worker's asset proxy (Gemini `fetch-asset`): answer it from
+  // the same mocked routes, in the worker's reply format.
+  chrome.runtime.sendMessage = async (msg) => {
+    if (!msg || msg.kind !== 'fetch-asset' || !opts.mockFetch) return undefined;
+    try {
+      const res = await opts.mockFetch(msg.url, { credentials: 'include' });
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status} ${res.statusText}` };
+      const bytes = Buffer.from(await res.arrayBuffer());
+      const mime = (res.headers.get('content-type') || '').split(';')[0].trim();
+      return { ok: true, base64: bytes.toString('base64'), mime, size: bytes.length };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  };
+
   const context = vm.createContext(sandbox);
   return { context, sandbox, messageListeners, captured };
 }
@@ -317,6 +340,8 @@ function installDownloadCapture(sandbox, captured) {
     throw new Error('download module not loaded — call loadScripts first');
   }
   exporter.download.triggerDownload = (blob, filename) => {
+    captured.downloads.push({ blob, filename });
+    if (captured.blob) return;
     captured.blob = blob;
     captured.filename = filename;
   };

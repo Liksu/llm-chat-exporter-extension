@@ -43,6 +43,8 @@
         "src/core/markdown.js",
         "src/core/zip.js",
         "src/core/download.js",
+        "src/core/debug-capture.js",
+        "src/core/export-entry.js",
         "src/adapters/claude/api.js",
         "src/adapters/claude/normalize.js",
         "src/adapters/cowork/api.js",
@@ -71,6 +73,8 @@
         "src/core/markdown.js",
         "src/core/zip.js",
         "src/core/download.js",
+        "src/core/debug-capture.js",
+        "src/core/export-entry.js",
         "src/adapters/chatgpt/api.js",
         "src/adapters/chatgpt/normalize.js",
         "src/adapters/chatgpt/content.js"
@@ -97,6 +101,8 @@
         "src/core/markdown.js",
         "src/core/zip.js",
         "src/core/download.js",
+        "src/core/debug-capture.js",
+        "src/core/export-entry.js",
         "src/adapters/gemini/api.js",
         "src/adapters/gemini/normalize.js",
         "src/adapters/gemini/content.js"

@@ -427,6 +427,11 @@
     } catch (e) {
       throw new Error(`gemini asset (sw): ${e && e.message ? e.message : e}`);
     }
+    if (ns.debugCapture) {
+      ns.debugCapture.noteProxied(reply && reply.ok === true
+        ? { url, ok: true, mime: reply.mime, base64: reply.base64 }
+        : { url, ok: false, error: (reply && reply.error) || 'no response from service worker' });
+    }
     if (!reply || reply.ok !== true) {
       const errMsg = reply && reply.error ? reply.error : 'no response from service worker';
       throw new Error(`gemini asset: ${errMsg}`);

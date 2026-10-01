@@ -141,10 +141,10 @@ function dispatchMessage(messageListeners, message) {
 }
 
 /**
- * Run a single export from a scenario: set up context, fire message,
- * compare against goldens. Throws on failure (test runner catches).
+ * Set up a browser context for the scenario, fire one export message and
+ * return what came out: { response, captured, sandbox }. No assertions.
  */
-async function runExport(scenarioDir, scenario, exp) {
+async function executeExport(scenarioDir, scenario, message) {
   const mockFetch = createMockFetch(scenarioDir, scenario);
 
   const browser = createBrowserContext({
@@ -165,8 +165,17 @@ async function runExport(scenarioDir, scenario, exp) {
   loadScripts(browser.context, scripts);
   installDownloadCapture(browser.sandbox, browser.captured);
 
-  // Fire export.
-  const response = await dispatchMessage(browser.messageListeners, exp.message);
+  const response = await dispatchMessage(browser.messageListeners, message);
+  return { response, captured: browser.captured, sandbox: browser.sandbox };
+}
+
+/**
+ * Run a single export from a scenario: set up context, fire message,
+ * compare against goldens. Throws on failure (test runner catches).
+ */
+async function runExport(scenarioDir, scenario, exp) {
+  const browser = await executeExport(scenarioDir, scenario, exp.message);
+  const { response } = browser;
 
   // The content script may report ok:false legitimately (eg "not on a chat
   // page" or "could not capture token"). If a scenario expects that, surface
@@ -204,4 +213,4 @@ async function runExport(scenarioDir, scenario, exp) {
   }
 }
 
-module.exports = { findScenarios, runExport, TESTS_ROOT, isUpdating };
+module.exports = { findScenarios, runExport, executeExport, unzipBlob, TESTS_ROOT, isUpdating };

@@ -7,6 +7,11 @@
  * in the Network tab context menu) and this script turns it into a
  * test scenario that npm test will pick up.
  *
+ * The extension's own "Save debug data" option (Options → Developer)
+ * writes such a HAR for every export, as <name>.debug.har, plus metadata
+ * (log._exporter) that fills in adapter, location, date and the export
+ * options -- the scenario then replays exactly that export.
+ *
  * Usage:
  *   node tools/record-from-har.js <input.har> <output-scenario-dir> [options]
  *
@@ -266,6 +271,21 @@ function buildRoute(entry, file) {
   return route;
 }
 
+/** exports[] entry replaying the options a debug-capture HAR recorded. */
+function recordedExport(options) {
+  const mode = options.mode === 'zip' ? 'zip' : 'md';
+  return {
+    name: `${mode}-recorded`,
+    message: {
+      kind: 'export',
+      ...options,
+      // Other formats render in the machine's timezone; goldens must not.
+      dateFormat: 'iso-utc',
+    },
+    expectedContent: mode === 'zip' ? 'expected/zip-recorded' : 'expected/md-recorded.md',
+  };
+}
+
 // -- main ---------------------------------------------------------------------
 
 function parseArgs(argv) {
@@ -332,6 +352,10 @@ function main() {
 
   const har = parseHar(harPath);
   const hostMatchers = loadManifestHosts();
+  // Written by the extension's "Save debug data" option
+  // (src/core/debug-capture.js): states what was exported and how, so
+  // nothing below has to be guessed.
+  const meta = har.log._exporter || null;
 
   // -- Filter to extension-relevant entries
   const allEntries = har.log.entries;
@@ -369,7 +393,7 @@ function main() {
 
   // -- Adapter detection
   const presentHosts = new Set(deduped.map((e) => new URL(e.request.url).hostname));
-  const adapter = args.adapter || inferAdapter(presentHosts);
+  const adapter = args.adapter || (meta && meta.adapter) || inferAdapter(presentHosts);
   if (!adapter) {
     console.error(
       'Could not infer adapter from hosts: ' +
@@ -457,7 +481,7 @@ function main() {
   }
 
   // -- fakeDate fallback: first request's startedDateTime, floored to the hour
-  let fakeDate = args.fakeDate;
+  let fakeDate = args.fakeDate || (meta && meta.exportedAt);
   if (!fakeDate && deduped[0] && deduped[0].startedDateTime) {
     const d = new Date(deduped[0].startedDateTime);
     if (!isNaN(d.getTime())) {
@@ -480,17 +504,21 @@ function main() {
   const scenario = {
     name: args.name || path.basename(outDir),
     adapter,
-    location: args.location || inferredLocation || `${primaryHost}/`,
-    documentTitle: inferredTitle,
+    location: args.location || (meta && meta.location) || inferredLocation || `${primaryHost}/`,
+    documentTitle: meta ? meta.documentTitle || '' : inferredTitle,
     fakeDate,
     host: primaryHost,
     auth,
     mocks: routes,
-    // exports[] is a scaffold — one md variant with no expectedFilename
-    // (so UPDATE_GOLDEN works straight away). Add zip / with-reasoning
-    // variants by hand once you've reviewed the first golden, then set
-    // expectedFilename to lock the filename format.
-    exports: [
+    // exports[] is a scaffold — one variant with no expectedFilename
+    // (so UPDATE_GOLDEN works straight away): the options the recorded
+    // export ran with when the HAR says so, else plain md. Add zip /
+    // with-reasoning variants by hand once you've reviewed the first
+    // golden, then set expectedFilename to lock the filename format.
+    // Only variants needing the same requests can replay: md without
+    // inline images never fetched them, so a zip variant would hit
+    // unmocked URLs.
+    exports: meta && meta.options ? [recordedExport(meta.options)] : [
       {
         name: 'md-default',
         message: {

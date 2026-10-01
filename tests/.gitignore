@@ -2,3 +2,7 @@
 # accounts. Not committed — would leak persona data + chat content into a public repo.
 # Run `npm test` and any scenarios you put here are picked up just like examples.
 scenarios/local/
+
+# Schema-drift baseline (tools/schema-drift.js): may contain tool names from
+# your own connectors. Commit it only if you are fine with that.
+schema-baseline.json

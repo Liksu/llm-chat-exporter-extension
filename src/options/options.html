@@ -214,6 +214,27 @@
     </p>
     <div id="perAdapterContainer"></div>
 
+    <h2>Developer</h2>
+    <label>
+      <input type="checkbox" id="debugCapture" />
+      Save debug data with each export
+    </label>
+    <p class="hint">
+      Downloads an extra <code>.debug.har</code> file with the raw responses the
+      export received from the chat service (also when the export fails). It
+      contains the full conversation — keep it private. Auth tokens are not
+      recorded.
+    </p>
+    <label>
+      <input type="checkbox" id="pageTrigger" />
+      Allow exports triggered from the page
+    </label>
+    <p class="hint">
+      Lets scripts on the chat page (e.g. browser automation used for testing)
+      start an export with a <code>llm-exporter:export</code> event, without the
+      popup. Leave off unless you need it.
+    </p>
+
     <button id="saveBtn">Save</button>
     <span id="savedMsg" hidden>Saved.</span>
 

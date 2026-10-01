@@ -5,6 +5,7 @@
 Fixed duplicated images in Claude exports
 Image files in ZIP exports are now named after their actual format (Claude serves uploaded photos as WebP)
 Claude images that fail to download are now marked as such instead of looking like a skipped image
+New developer options: save debug data with each export, and allow exports triggered from the page (for automated testing)
 
 ## v0.7.37 — 2026-08-03
 
