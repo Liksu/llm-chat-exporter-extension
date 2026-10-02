@@ -80,6 +80,18 @@
    * @param {string} [userScopeId]
    * @returns {Promise<{bytes: Uint8Array, mime: string}>}
    */
+  /**
+   * The uploaded file as it was uploaded. For images, /preview (what
+   * preview_url points to) is a downscaled WebP; /contents is the original.
+   */
+  const fetchOriginal = async (orgId, fileUuid) => {
+    const url = `${BASE}/organizations/${orgId}/files/${fileUuid}/contents`;
+    const res = await fetch(url, { credentials: 'include', headers: { accept: '*/*' } });
+    if (!res.ok) throw new ApiError(`fetchOriginal ${fileUuid} → ${res.status}`, res.status);
+    const ct = (res.headers.get('content-type') || '').split(';')[0].trim();
+    return { bytes: new Uint8Array(await res.arrayBuffer()), mime: ct };
+  };
+
   const fetchFile = async (orgId, fileUuid, userScopeId) => {
     const candidates = [];
     if (userScopeId) {
@@ -177,6 +189,7 @@
     getOrgId,
     fetchConversation,
     fetchFile,
+    fetchOriginal,
     fetchFileByPath,
     extractUserScopeId,
     ApiError,

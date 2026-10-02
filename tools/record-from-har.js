@@ -227,6 +227,9 @@ function dedupeEntries(entries) {
 
 // -- route construction -------------------------------------------------------
 
+/** Query params that change on every request and must not be matched on. */
+const VOLATILE_QUERY_PARAMS = new Set(['_reqid']);
+
 /**
  * Build a route entry suitable for scenario.json mocks[].
  *
@@ -245,6 +248,9 @@ function buildRoute(entry, file) {
   const queryMatch = {};
   let hasQuery = false;
   for (const [k, v] of u.searchParams) {
+    // Per-request counters (Gemini batchexecute `_reqid`) differ on every
+    // replay; matching on them would make the route unreachable.
+    if (VOLATILE_QUERY_PARAMS.has(k)) continue;
     queryMatch[k] = v;
     hasQuery = true;
   }
@@ -482,6 +488,11 @@ function main() {
 
   // -- fakeDate fallback: first request's startedDateTime, floored to the hour
   let fakeDate = args.fakeDate || (meta && meta.exportedAt);
+  // Tests run in UTC; filenames carry the exporting machine's local date.
+  // Shift the frozen clock to local wall time so they come out the same.
+  if (!args.fakeDate && meta && meta.exportedAt && Number.isFinite(meta.tzOffsetMinutes)) {
+    fakeDate = new Date(Date.parse(meta.exportedAt) - meta.tzOffsetMinutes * 60000).toISOString();
+  }
   if (!fakeDate && deduped[0] && deduped[0].startedDateTime) {
     const d = new Date(deduped[0].startedDateTime);
     if (!isNaN(d.getTime())) {

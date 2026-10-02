@@ -117,11 +117,24 @@
         try {
           let bytes;
           let mime = ref.mime;
-          if (ref.url) {
+          // ZIP keeps the original upload; md (images inlined as data URLs)
+          // stays on the lighter preview so the file doesn't balloon.
+          if (mode === 'zip' && ref.fileUuid) {
+            try {
+              const r = await claudeApi.fetchOriginal(orgId, ref.fileUuid);
+              if (r.bytes.length) {
+                bytes = r.bytes;
+                mime = utils.sniffImageMime(r.bytes) || r.mime || mime;
+              }
+            } catch (err) {
+              log.debug('original image unavailable, using preview', ref.fileUuid, err);
+            }
+          }
+          if (!bytes && ref.url) {
             const r = await ns.fetchBinary.fetchAsBytes(ref.url);
             bytes = r.bytes;
             if (r.mime) mime = r.mime;
-          } else if (ref.fileUuid) {
+          } else if (!bytes && ref.fileUuid) {
             const r = await claudeApi.fetchFile(orgId, ref.fileUuid, userScopeId);
             bytes = r.bytes;
             if (r.mime) mime = r.mime;

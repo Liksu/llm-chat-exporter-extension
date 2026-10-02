@@ -23,15 +23,16 @@
    * tab title as either:
    *   "<chat title> — Gemini"
    *   "<chat title> - Gemini"
-   *   "Gemini"            (when no title yet)
-   * We strip the trailing " — Gemini"/" - Gemini" suffix; if nothing remains
-   * (empty or just "Gemini"), the caller falls back to a generic name.
+   *   "<chat title> - Google Gemini"   (since 2026-09)
+   *   "Gemini" / "Google Gemini"       (when no title yet)
+   * We strip the trailing suffix; if nothing remains, the caller falls back
+   * to a generic name.
    */
   const titleFromDocument = () => {
     const raw = (document.title || '').trim();
     if (!raw) return '';
-    const cleaned = raw.replace(/\s*[—\-–]\s*Gemini\s*$/i, '').trim();
-    if (!cleaned || /^gemini$/i.test(cleaned)) return '';
+    const cleaned = raw.replace(/\s*[—\-–]\s*(Google\s+)?Gemini\s*$/i, '').trim();
+    if (!cleaned || /^(google\s+)?gemini$/i.test(cleaned)) return '';
     return cleaned;
   };
 

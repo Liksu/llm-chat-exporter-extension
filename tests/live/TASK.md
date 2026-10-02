@@ -96,11 +96,34 @@ is saved inside the project. Then:
    widgets). That is gap-hunting — it matters.
 7. Run the task's export snippet.
 
+### UI notes (learned the hard way)
+
+- Typing right after a navigation in the same batch of browser actions
+  often goes nowhere (the page re-renders). Navigate, then click the
+  composer and type in a separate step; check with a zoomed screenshot
+  that the text is in the box before pressing Enter.
+- After attaching files the composer moves and its element reference may
+  stop working: click the visible placeholder line instead.
+- On a claude.ai project page there are two file inputs: the composer's
+  "Upload files" and the project's Context "Add files". Use only the
+  composer one — the other adds files to the project.
+- Don't change the model, Effort or tool toggles: they are saved
+  preferences. If a feature needs a toggle that is off, note it and skip.
+- To know a reply has finished, look for the absence of a Stop button
+  (`button[aria-label*="Stop" i]`) with short checks.
+
 ### Running the export snippet
 
 Use the JavaScript tool on the chat tab (page context) with the snippet
 from `plan.md` verbatim. It dispatches `llm-exporter:export` and waits up
-to 3 minutes for the result, returned as a JSON string.
+to 30 s for the result, returned as a JSON string. Browser script calls
+are cut off after ~45 s, so a long export returns `PENDING`: then run the
+poll snippet from the top of `plan.md` until it returns the result. Never
+re-run the export snippet for a `PENDING` export (that starts a second
+export).
+
+Don't run long waiting loops in the JavaScript tool either (e.g. waiting
+for a reply to finish): wait with short screenshots / checks instead.
 
 ### Export results
 

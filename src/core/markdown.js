@@ -197,12 +197,14 @@
         // Claude / canvas artifacts leave `source` undefined and keep the
         // bare `🧩 [name]` form.
         const caption = art.source ? `**Result of ${art.source}:**\n\n` : '';
+        // Published artifacts (claude.ai/artifact/…) also live online.
+        const online = art.url ? ` · [online](${art.url})` : '';
         if (opts.mode === 'zip') {
           const path =
             opts.artifactFileById.get(art.id) ?? `${opts.artifactsDir}/${art.fileName}`;
-          return `${caption}🧩 [${art.fileName}](${path})`;
+          return `${caption}🧩 [${art.fileName}](${path})${online}`;
         }
-        return `${caption}🧩 [${art.fileName}](#artifact-${slugifyAnchor(art.id)})`;
+        return `${caption}🧩 [${art.fileName}](#artifact-${slugifyAnchor(art.id)})${online}`;
       }
     }
     return null;

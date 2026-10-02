@@ -70,38 +70,83 @@
     {
       "id": "claude.artifact",
       "provider": "claude",
-      "title": "Artifact (document / code shown in the side panel)",
+      "title": "Artifact (published page: Write + Artifact tools)",
       "support": "supported",
       "prompt": "Create an artifact: a small standalone HTML page with a button that counts clicks.",
-      "expect": { "artifacts": ">=1" }
+      "expect": { "artifacts": ">=1", "mdMatches": ["\\[online\\]\\(https://claude\\.ai/artifact/"] },
+      "notes": "Since 2026-09 artifacts are files written with Write, edited with Edit and published with Artifact (claude.ai/artifact/<id>); the older `artifacts` tool still appears in Research reports."
     },
     {
       "id": "claude.create-file",
       "provider": "claude",
-      "title": "File generated with code execution (downloadable file in the chat)",
+      "title": "File generated for download (Write + SendUserFile)",
       "support": "supported",
-      "setup": "Code execution / file creation must be enabled in claude.ai settings (Capabilities). If it is off, skip this feature and say so.",
       "prompt": "Create a CSV file named fruits.csv with 3 rows (name, color) and give it to me as a downloadable file.",
-      "expect": { "artifacts": ">=1" }
+      "expect": { "outputMatches": ["Apple,Red|name,color"] },
+      "notes": "The file comes via files[] or only via the SendUserFile result; with inlineTextFiles it is inlined, otherwise saved under files/."
+    },
+    {
+      "id": "claude.file-edit",
+      "provider": "claude",
+      "title": "File created, then changed in a follow-up: the export has the final version",
+      "support": "supported",
+      "prompt": "Create a markdown file notes.md with the heading 'Plan for the trip' and 3 bullet points, and give it to me as a file.",
+      "followUps": ["Send: In notes.md, make the heading all uppercase and give me the updated file."],
+      "expect": { "outputMatches": ["PLAN FOR THE TRIP"] },
+      "notes": "Edits (str_replace / Edit) must be applied to the exported file."
     },
     {
       "id": "claude.extended-thinking",
       "provider": "claude",
-      "title": "Extended thinking blocks",
+      "title": "Thinking (claude.ai keeps only summaries)",
       "support": "supported",
-      "setup": "Turn on extended thinking in the composer (the thinking/clock toggle) before sending.",
       "prompt": "Think carefully: how many weekdays are there between 2026-03-01 and 2026-03-31 inclusive? Answer with the number.",
-      "expect": { "reasoning": true }
+      "expect": { "reasoning": true },
+      "notes": "No separate thinking toggle any more; thinking runs at the default Effort. Don't change Effort (it's a saved preference). The API returns thinking: \"\" with summaries[]."
     },
     {
       "id": "claude.web-search",
       "provider": "claude",
       "title": "Web search with cited sources",
-      "support": "unknown",
-      "setup": "Web search must be enabled in the composer's tools menu.",
+      "support": "supported",
       "prompt": "Search the web: what is the latest stable version of Node.js? Cite your source.",
-      "expect": { "mdMatches": ["https?://"] },
-      "notes": "Checks that citations/sources survive in some form."
+      "expect": { "mdMatches": ["\\[\\[\\d+\\]\\]\\(https?://|https?://"] },
+      "notes": "Text blocks carry citations[]; the export adds [n] markers and a Sources list. Don't toggle tools in the composer -- if web search is off, the answer has no sources and that's fine to report."
+    },
+    {
+      "id": "claude.widget",
+      "provider": "claude",
+      "title": "Inline visual widget (SVG / HTML drawn in the chat)",
+      "support": "supported",
+      "prompt": "Draw a simple SVG illustration of a sunset over mountains right here in the chat (not as a file).",
+      "expect": { "artifacts": ">=1" },
+      "notes": "visualize:show_widget {title, widget_code}; saved as an .svg/.html artifact. If Claude makes a file or artifact instead, note that."
+    },
+    {
+      "id": "claude.image-search",
+      "provider": "claude",
+      "title": "Web image search results shown in the chat",
+      "support": "unsupported",
+      "prompt": "Show me a few pictures of the Mitsubishi Outlander PHEV dashboard.",
+      "expect": { "outputMatches": ["!\\[[^\\]]*\\]\\(https?://"] },
+      "notes": "image_search results appear only as a tool call today."
+    },
+    {
+      "id": "claude.places-map",
+      "provider": "claude",
+      "title": "Places search shown on a map",
+      "support": "unsupported",
+      "prompt": "Show me 3 coffee shops near Union Square in San Francisco on a map.",
+      "expect": { "outputMatches": ["\\]\\(https://(www\\.)?google\\.[a-z.]+/maps"] },
+      "notes": "places_search + places_map_display_v0: the map/list widget appears only as tool calls today."
+    },
+    {
+      "id": "claude.voice-input",
+      "provider": "claude",
+      "title": "Dictated (voice) message",
+      "support": "supported",
+      "automation": "manual",
+      "notes": "input_mode: speech_input → 🎙️ marker. Needs a microphone; create by hand once."
     },
     {
       "id": "claude.edited-branch",
@@ -115,14 +160,34 @@
       "expect": { "mdMatches": ["BRANCH-TWO"], "mdNotMatches": ["BRANCH-ONE"] }
     },
     {
+      "id": "claude.mixed",
+      "provider": "claude",
+      "title": "Everything at once: images + PDF + text file, thinking, web search, artifact created then updated, generated file, tricky formatting",
+      "support": "supported",
+      "setup": "Turn on extended thinking and web search in the composer.",
+      "uploads": ["bar-chart.png", "house-photo.jpg", "project-brief.pdf", "meeting-notes.md"],
+      "prompt": "Mixed export test. Using all attached files: describe both images in one line each, give the project codename from the PDF, and list the action items from the notes. Also search the web for the current version of Node.js. In your answer include one sentence in Ukrainian, an emoji, the formula $E=mc^2$, and a markdown code block whose content contains a line with three backticks.",
+      "followUps": [
+        "Send: Now create an artifact: a markdown report that combines all of the above, with a table.",
+        "Send: Update that artifact: add a section called Next steps with 3 bullets.",
+        "Send: Use code execution to create summary.json with the codename and budget, and give it to me as a downloadable file."
+      ],
+      "expect": {
+        "turns": ">=8", "images": "==2", "artifacts": ">=2", "reasoning": true,
+        "mdMatches": ["project-brief\\.pdf", "meeting-notes\\.md", "E ?= ?mc", "https?://"]
+      },
+      "notes": "Catches interactions: uploads next to artifacts, artifact versions, thinking interleaved with tool use, nested code fences, non-Latin text."
+    },
+    {
       "id": "claude.research",
       "provider": "claude",
-      "title": "Research mode report",
-      "support": "unknown",
+      "title": "Research mode report (with its sources)",
+      "support": "supported",
       "cost": "high",
       "setup": "Turn on Research in the composer.",
       "prompt": "Research briefly: compare two popular open-source Markdown editors. Keep the report short.",
-      "expect": { "mdMatches": ["https?://"] }
+      "expect": { "artifacts": ">=1", "outputMatches": ["\\[\\[\\d+\\]\\]\\(https?://", "^## Sources$"] },
+      "notes": "launch_extended_search_task, then an `artifacts` create whose md_citations hold the sources."
     },
 
     {
@@ -206,6 +271,20 @@
       "expect": { "mdMatches": ["BRANCH-TWO"], "mdNotMatches": ["BRANCH-ONE"] }
     },
     {
+      "id": "chatgpt.mixed",
+      "provider": "chatgpt",
+      "title": "Everything at once: images + PDF, web search, Python file, generated image, canvas, tricky formatting",
+      "support": "supported",
+      "uploads": ["bar-chart.png", "house-photo.jpg", "project-brief.pdf"],
+      "prompt": "Mixed export test. Using the attached files: describe both images in one line each and give the project codename from the PDF. Also search the web for the current version of Node.js. In your answer include one sentence in Ukrainian, an emoji, the formula $E=mc^2$, and a markdown code block whose content contains a line with three backticks.",
+      "followUps": [
+        "Send: Use Python to create summary.csv with the codename and budget and give me a download link.",
+        "Send: Generate an image of a red bicycle.",
+        "Send: Open a canvas and write a 3-line summary of this chat in it."
+      ],
+      "expect": { "turns": ">=8", "images": ">=3", "files": ">=1", "artifacts": ">=1", "mdMatches": ["E ?= ?mc", "https?://"] }
+    },
+    {
       "id": "chatgpt.deep-research",
       "provider": "chatgpt",
       "title": "Deep Research report",
@@ -275,6 +354,19 @@
       "setup": "Choose Canvas from the composer tools.",
       "prompt": "In Canvas, write a 5-line poem about autumn.",
       "expect": { "artifacts": ">=1" }
+    },
+    {
+      "id": "gemini.mixed",
+      "provider": "gemini",
+      "title": "Everything at once: images + PDF, generated image, tricky formatting",
+      "support": "supported",
+      "uploads": ["bar-chart.png", "house-photo.jpg", "project-brief.pdf"],
+      "prompt": "Mixed export test. Using the attached files: describe both images in one line each and give the project codename from the PDF. In your answer include one sentence in Ukrainian, an emoji, the formula $E=mc^2$, and a markdown code block whose content contains a line with three backticks.",
+      "followUps": [
+        "Send: Generate an image of a red bicycle.",
+        "Send: Summarize this chat in 3 bullets."
+      ],
+      "expect": { "turns": ">=6", "images": ">=3", "mdMatches": ["project-brief\\.pdf", "E ?= ?mc"] }
     },
     {
       "id": "gemini.notebook-chat",

@@ -1,0 +1,14 @@
+{
+  "title": "New tool shapes",
+  "sourceLLM": "claude",
+  "model": "claude-opus-5-5",
+  "createdAt": "2026-10-01T10:00:00Z",
+  "updatedAt": "2026-10-01T10:00:00Z",
+  "exportedAt": "2026-10-01T12:00:00.000Z",
+  "counts": {
+    "turns": 8,
+    "artifacts": 4,
+    "assets": 0,
+    "files": 1
+  }
+}

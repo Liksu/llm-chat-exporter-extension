@@ -1,0 +1,511 @@
+{
+  "uuid": "00000000-0000-0000-0000-000000000003",
+  "name": "New tool shapes",
+  "model": "claude-opus-5-5",
+  "created_at": "2026-10-01T10:00:00Z",
+  "updated_at": "2026-10-01T10:00:00Z",
+  "current_leaf_message_uuid": "00000000-0000-0000-0000-000000000107",
+  "chat_messages": [
+    {
+      "uuid": "00000000-0000-0000-0000-000000000100",
+      "parent_message_uuid": "00000000-0000-4000-8000-000000000000",
+      "index": 0,
+      "created_at": "2026-10-01T10:00:00Z",
+      "updated_at": "2026-10-01T10:00:00Z",
+      "attachments": [],
+      "files": [],
+      "text": "",
+      "stop_reason": "stop_sequence",
+      "input_mode": "speech_input",
+      "compaction_summary": null,
+      "sender": "human",
+      "content": [
+        {
+          "type": "text",
+          "text": "What is the current Node.js LTS? Draw me a sun too.",
+          "citations": []
+        }
+      ]
+    },
+    {
+      "uuid": "00000000-0000-0000-0000-000000000101",
+      "parent_message_uuid": "00000000-0000-0000-0000-000000000100",
+      "index": 1,
+      "created_at": "2026-10-01T10:00:00Z",
+      "updated_at": "2026-10-01T10:00:00Z",
+      "attachments": [],
+      "files": [],
+      "text": "",
+      "stop_reason": "stop_sequence",
+      "input_mode": "text",
+      "compaction_summary": null,
+      "sender": "assistant",
+      "content": [
+        {
+          "type": "token_budget"
+        },
+        {
+          "type": "thinking",
+          "thinking": "",
+          "summaries": [
+            {
+              "summary": "Checking the Node.js release schedule."
+            }
+          ],
+          "cut_off": false,
+          "truncated": false,
+          "hidden": false,
+          "thinking_hidden": true
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_ws",
+          "name": "web_search",
+          "input": {
+            "query": "node.js lts"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_ws",
+          "name": "web_search",
+          "content": [
+            {
+              "type": "text",
+              "text": "[search results]"
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "text",
+          "text": "Node.js 24 is the current LTS line.",
+          "citations": [
+            {
+              "uuid": "00000000-0000-0000-0000-000000000901",
+              "title": "nodejs.org",
+              "url": "https://nodejs.org/en/about/previous-releases",
+              "metadata": {
+                "type": "webpage_metadata",
+                "preview_title": "Node.js Releases"
+              },
+              "start_index": 0,
+              "end_index": 35
+            }
+          ]
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_vw",
+          "name": "visualize:show_widget",
+          "input": {
+            "title": "sun",
+            "loading_messages": [
+              "Drawing"
+            ],
+            "widget_code": "<svg viewBox=\"0 0 10 10\"><circle cx=\"5\" cy=\"5\" r=\"4\" fill=\"orange\"/></svg>"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_vw",
+          "name": "visualize:show_widget",
+          "content": [
+            {
+              "type": "text",
+              "text": "Widget rendered"
+            }
+          ],
+          "is_error": false
+        }
+      ]
+    },
+    {
+      "uuid": "00000000-0000-0000-0000-000000000102",
+      "parent_message_uuid": "00000000-0000-0000-0000-000000000101",
+      "index": 2,
+      "created_at": "2026-10-01T10:00:00Z",
+      "updated_at": "2026-10-01T10:00:00Z",
+      "attachments": [],
+      "files": [],
+      "text": "",
+      "stop_reason": "stop_sequence",
+      "input_mode": "text",
+      "compaction_summary": null,
+      "sender": "human",
+      "content": [
+        {
+          "type": "text",
+          "text": "Make a trip report page, then add day two.",
+          "citations": []
+        }
+      ]
+    },
+    {
+      "uuid": "00000000-0000-0000-0000-000000000103",
+      "parent_message_uuid": "00000000-0000-0000-0000-000000000102",
+      "index": 3,
+      "created_at": "2026-10-01T10:00:00Z",
+      "updated_at": "2026-10-01T10:00:00Z",
+      "attachments": [],
+      "files": [],
+      "text": "",
+      "stop_reason": "stop_sequence",
+      "input_mode": "text",
+      "compaction_summary": null,
+      "sender": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_w1",
+          "name": "Write",
+          "input": {
+            "file_path": "/tmp/scratch/trip.html",
+            "content": "<title>Trip Report</title>\n<h1>Trip</h1>\n<p>Day one.</p>\n"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_w1",
+          "name": "Write",
+          "content": [
+            {
+              "type": "text",
+              "text": "File created successfully at: /tmp/scratch/trip.html"
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_a1",
+          "name": "Artifact",
+          "input": {
+            "file_path": "/tmp/scratch/trip.html",
+            "description": "Trip report",
+            "icon": "map"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_a1",
+          "name": "Artifact",
+          "content": [
+            {
+              "type": "text",
+              "text": "Published /tmp/scratch/trip.html at https://claude.ai/artifact/AbCdEf123 (Version 1, version id 1-x) Icon: \"map\"."
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_e1",
+          "name": "Edit",
+          "input": {
+            "file_path": "/tmp/scratch/trip.html",
+            "old_string": "<p>Day one.</p>",
+            "new_string": "<p>Day one.</p>\n<p>Day two.</p>"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_e1",
+          "name": "Edit",
+          "content": [
+            {
+              "type": "text",
+              "text": "The file /tmp/scratch/trip.html has been updated successfully."
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_a2",
+          "name": "Artifact",
+          "input": {
+            "file_path": "/tmp/scratch/trip.html"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_a2",
+          "name": "Artifact",
+          "content": [
+            {
+              "type": "text",
+              "text": "Published /tmp/scratch/trip.html at https://claude.ai/artifact/AbCdEf123 (Version 2, version id 2-x)"
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "text",
+          "text": "Published the report with both days.",
+          "citations": []
+        }
+      ]
+    },
+    {
+      "uuid": "00000000-0000-0000-0000-000000000104",
+      "parent_message_uuid": "00000000-0000-0000-0000-000000000103",
+      "index": 4,
+      "created_at": "2026-10-01T10:00:00Z",
+      "updated_at": "2026-10-01T10:00:00Z",
+      "attachments": [],
+      "files": [],
+      "text": "",
+      "stop_reason": "stop_sequence",
+      "input_mode": "text",
+      "compaction_summary": null,
+      "sender": "human",
+      "content": [
+        {
+          "type": "text",
+          "text": "Write a script, fix it, and send me a JSON summary file.",
+          "citations": []
+        }
+      ]
+    },
+    {
+      "uuid": "00000000-0000-0000-0000-000000000105",
+      "parent_message_uuid": "00000000-0000-0000-0000-000000000104",
+      "index": 5,
+      "created_at": "2026-10-01T10:00:00Z",
+      "updated_at": "2026-10-01T10:00:00Z",
+      "attachments": [],
+      "files": [],
+      "text": "",
+      "stop_reason": "stop_sequence",
+      "input_mode": "text",
+      "compaction_summary": [
+        {
+          "type": "text",
+          "text": "[NOTE: This conversation was compacted. Earlier: the user planned a trip.]"
+        }
+      ],
+      "sender": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_c1",
+          "name": "create_file",
+          "input": {
+            "path": "/mnt/user-data/outputs/hello.py",
+            "file_text": "print(\"helo\")\n",
+            "description": "script"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_c1",
+          "name": "create_file",
+          "content": [
+            {
+              "type": "text",
+              "text": "File created"
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_s1",
+          "name": "str_replace",
+          "input": {
+            "path": "/mnt/user-data/outputs/hello.py",
+            "old_str": "helo",
+            "new_str": "hello",
+            "description": "typo"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_s1",
+          "name": "str_replace",
+          "content": [
+            {
+              "type": "text",
+              "text": "Successfully replaced string"
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_b1",
+          "name": "Bash",
+          "input": {
+            "command": "python3 make_summary.py"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_b1",
+          "name": "Bash",
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"ok\": true}"
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_f1",
+          "name": "SendUserFile",
+          "input": {
+            "files": [
+              "/mnt/user-data/outputs/summary.json"
+            ],
+            "status": "normal",
+            "display": "attach"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_f1",
+          "name": "SendUserFile",
+          "content": [
+            {
+              "type": "text",
+              "text": "1 file delivered to user.\n  /mnt/user-data/outputs/summary.json → file_uuid: 00000000-0000-0000-0000-000000000777\nEach file shows as a card."
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "text",
+          "text": "Done: hello.py is fixed and summary.json is attached.",
+          "citations": []
+        }
+      ]
+    },
+    {
+      "uuid": "00000000-0000-0000-0000-000000000106",
+      "parent_message_uuid": "00000000-0000-0000-0000-000000000105",
+      "index": 6,
+      "created_at": "2026-10-01T10:00:00Z",
+      "updated_at": "2026-10-01T10:00:00Z",
+      "attachments": [],
+      "files": [],
+      "text": "",
+      "stop_reason": "stop_sequence",
+      "input_mode": "text",
+      "compaction_summary": null,
+      "sender": "human",
+      "content": [
+        {
+          "type": "text",
+          "text": "I feel awful today. Also research rainfall trends.",
+          "citations": []
+        }
+      ]
+    },
+    {
+      "uuid": "00000000-0000-0000-0000-000000000107",
+      "parent_message_uuid": "00000000-0000-0000-0000-000000000106",
+      "index": 7,
+      "created_at": "2026-10-01T10:00:00Z",
+      "updated_at": "2026-10-01T10:00:00Z",
+      "attachments": [],
+      "files": [],
+      "text": "",
+      "stop_reason": "stop_sequence",
+      "input_mode": "text",
+      "compaction_summary": null,
+      "sender": "assistant",
+      "content": [
+        {
+          "type": "flag",
+          "flag": "self_harm_risk",
+          "helpline": {
+            "id": "x",
+            "name": "Example Crisis Line",
+            "phone_number": "000",
+            "sms_number": "000",
+            "web_chat_url": "https://example.org/chat"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_r1",
+          "name": "launch_extended_search_task",
+          "input": {
+            "command": "rainfall trends"
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_r1",
+          "name": "launch_extended_search_task",
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"task_id\":\"wf-1\"}"
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_r2",
+          "name": "artifacts",
+          "input": {
+            "command": "create",
+            "id": "compass_artifact_wf-1_text/markdown",
+            "title": "Rainfall report",
+            "type": "text/markdown",
+            "language": "",
+            "content": "Rainfall rose in 2025. Sea levels too.",
+            "md_citations": [
+              {
+                "uuid": "00000000-0000-0000-0000-000000000902",
+                "title": "example",
+                "url": "https://example.org/rain",
+                "metadata": {
+                  "type": "generic_metadata",
+                  "preview_title": "Rain data"
+                },
+                "start_index": 0,
+                "end_index": 22,
+                "sources": []
+              },
+              {
+                "uuid": "00000000-0000-0000-0000-000000000903",
+                "title": "example",
+                "url": "https://example.org/sea",
+                "metadata": {
+                  "type": "generic_metadata",
+                  "preview_title": "Sea data"
+                },
+                "start_index": 23,
+                "end_index": 38,
+                "sources": []
+              }
+            ]
+          }
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_r2",
+          "name": "artifacts",
+          "content": [
+            {
+              "type": "text",
+              "text": "OK"
+            }
+          ],
+          "is_error": false
+        },
+        {
+          "type": "text",
+          "text": "I'm sorry you're feeling this way. The rainfall report is ready.",
+          "citations": []
+        }
+      ]
+    }
+  ]
+}

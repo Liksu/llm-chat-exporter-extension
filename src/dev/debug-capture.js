@@ -181,6 +181,9 @@
             location: location.href,
             documentTitle: document.title || '',
             exportedAt: new Date().toISOString(),
+            // Filenames carry the local date; replays run in UTC and shift
+            // their clock by this to land on the same date.
+            tzOffsetMinutes: new Date().getTimezoneOffset(),
             options: meta.options,
             tag: meta.tag || null,
             result: outcome || null,

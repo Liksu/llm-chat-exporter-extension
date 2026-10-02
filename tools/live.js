@@ -76,16 +76,30 @@ const exportDetail = (catalog, feature) => ({
   tag: feature.id,
 });
 
-/** JS to run on the chat page (page world): export + wait for the result. */
+/**
+ * JS to run on the chat page (page world): start the export, then wait up
+ * to 30 s for the result. Browser tools cut scripts off after ~45 s and a
+ * big chat can take longer to export, so on 'PENDING' run POLL_SNIPPET
+ * until it returns the result.
+ */
 const snippetFor = (detail) => `(async () => {
   const el = document.documentElement;
   delete el.dataset.llmExporterResult;
   window.dispatchEvent(new CustomEvent('llm-exporter:export', { detail: ${JSON.stringify(JSON.stringify(detail))} }));
-  for (let i = 0; i < 360; i++) {
+  for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 500));
     if (el.dataset.llmExporterResult) return el.dataset.llmExporterResult;
   }
-  return 'TIMEOUT: no result after 180 s';
+  return 'PENDING: export still running -- run the poll snippet';
+})()`;
+
+const POLL_SNIPPET = `(async () => {
+  const el = document.documentElement;
+  for (let i = 0; i < 60; i++) {
+    if (el.dataset.llmExporterResult) return el.dataset.llmExporterResult;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return 'PENDING: still running -- poll again';
 })()`;
 
 /**
@@ -167,7 +181,9 @@ const renderPlan = (plan) => {
   const out = [];
   out.push(`# Live test run — ${plan.createdAt.slice(0, 10)}`, '');
   out.push(`Created ${plan.createdAt}. Follow tests/live/TASK.md; this file lists the tasks.`, '');
-  out.push('Every task ends with the export snippet: run it **on the chat page** (javascript tool) and note the result.', '');
+  out.push('Every task ends with the export snippet: run it **on the chat page** (javascript tool) and note the result.');
+  out.push('If it returns `PENDING`, the export is still running: run this poll snippet until it returns the result (each call stays under the ~45 s script limit):', '');
+  out.push('```js', POLL_SNIPPET, '```', '');
   plan.tasks.forEach((t, i) => {
     out.push(`## ${i + 1}. ${t.featureId} — ${t.action === 'create' ? 'CREATE a new chat' : 're-export'}`, '');
     out.push(`_${t.title}_`, '');
@@ -287,6 +303,11 @@ const checkExpectations = (feature, exp) => {
     results.push({ check: 'reasoning present', ok: /<details><summary>Thinking<\/summary>/.test(md) });
   }
   for (const re of e.mdMatches || []) results.push({ check: `matches /${re}/`, ok: new RegExp(re, 'm').test(md) });
+  if (e.outputMatches) {
+    // Everything the export holds as text: the .md plus artifacts/ and files/.
+    const all = [md, ...[...exp.files.entries()].filter(([k]) => /^(artifacts|files)\//.test(k)).map(([, b]) => b.toString('utf8'))].join('\n');
+    for (const re of e.outputMatches) results.push({ check: `output matches /${re}/`, ok: new RegExp(re, 'm').test(all) });
+  }
   for (const re of e.mdNotMatches || []) results.push({ check: `does not match /${re}/`, ok: !new RegExp(re, 'm').test(md) });
   return { counts: count, results };
 };
@@ -305,7 +326,15 @@ const recordScenario = async (featureId, harPath, auditErrorCodes) => {
   writeJson(scenarioPath, scenario);
 
   const exp = scenario.exports[0];
-  const r = await executeExport(dir, scenario, exp.message);
+  // The extension logs every fetch; keep the report readable.
+  const quiet = ['log', 'warn', 'debug', 'info'].map((k) => [k, console[k]]);
+  for (const [k] of quiet) console[k] = () => {};
+  let r;
+  try {
+    r = await executeExport(dir, scenario, exp.message);
+  } finally {
+    for (const [k, fn] of quiet) console[k] = fn;
+  }
   if (!r.response || !r.response.ok) {
     return { dir, error: `replay failed: ${r.response ? r.response.error : 'no response'}` };
   }
@@ -330,6 +359,8 @@ const recordScenario = async (featureId, harPath, auditErrorCodes) => {
 const replayMatches = (recorded, exportPath) => {
   if (!recorded.output || !exportPath) return null;
   const { loadZip } = require('./audit-export');
+  // metadata.exportedAt is "now" at export time -- never the same twice.
+  const withoutExportedAt = (buf) => Buffer.from(String(buf).replace(/"exportedAt": "[^"]*"/, '"exportedAt": ""'));
   if (recorded.mode === 'zip') {
     const original = loadZip(exportPath);
     const replayed = recorded.output;
@@ -337,8 +368,13 @@ const replayMatches = (recorded, exportPath) => {
     const replayNames = Object.keys(replayed);
     if (names.size !== replayNames.length) return false;
     for (const n of replayNames) {
-      const a = n === original.mdName ? Buffer.from(original.md, 'utf8') : original.files.get(n);
-      if (!a || !a.equals(Buffer.from(replayed[n]))) return false;
+      let a = n === original.mdName ? Buffer.from(original.md, 'utf8') : original.files.get(n);
+      let b = Buffer.from(replayed[n]);
+      if (n === 'metadata.json' && a) {
+        a = withoutExportedAt(a);
+        b = withoutExportedAt(b);
+      }
+      if (!a || !a.equals(b)) return false;
     }
     return true;
   }

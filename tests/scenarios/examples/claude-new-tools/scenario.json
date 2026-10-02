@@ -1,0 +1,72 @@
+{
+  "name": "claude-new-tools",
+  "adapter": "claude",
+  "location": "https://claude.ai/chat/00000000-0000-0000-0000-000000000003",
+  "fakeDate": "2026-10-01T12:00:00Z",
+  "host": "https://claude.ai",
+  "mocks": [
+    {
+      "method": "GET",
+      "path": "/api/organizations",
+      "file": "organizations.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/organizations/00000000-0000-0000-0000-0000000000aa/chat_conversations/00000000-0000-0000-0000-000000000003",
+      "file": "conversation.json"
+    },
+    {
+      "method": "GET",
+      "pathRegex": "^/api/(organizations/00000000-0000-0000-0000-0000000000aa|00000000-0000-0000-0000-0000000000aa)/files/00000000-0000-0000-0000-000000000777/(contents|preview)$",
+      "file": "summary.json",
+      "contentType": "application/json"
+    }
+  ],
+  "exports": [
+    {
+      "name": "md-default",
+      "message": {
+        "kind": "export",
+        "mode": "md",
+        "includeReasoning": false,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": true,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "New tool shapes-2026-10-01.md",
+      "expectedContent": "expected/md-default.md"
+    },
+    {
+      "name": "md-with-reasoning",
+      "message": {
+        "kind": "export",
+        "mode": "md",
+        "includeReasoning": true,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": true,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "New tool shapes-2026-10-01.md",
+      "expectedContent": "expected/md-with-reasoning.md"
+    },
+    {
+      "name": "zip-default",
+      "message": {
+        "kind": "export",
+        "mode": "zip",
+        "includeReasoning": false,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": false,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "New tool shapes-2026-10-01.zip",
+      "expectedContent": "expected/zip-default"
+    }
+  ]
+}

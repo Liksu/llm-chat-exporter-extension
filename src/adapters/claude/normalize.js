@@ -182,27 +182,7 @@
     // Key by full path so successive writes to the same file (regenerations)
     // collapse to a single artifact whose content reflects the latest call.
     const id = `create_file:${path}`;
-    const basename = String(path).split('/').pop() || 'file';
-    const fileName = sanitizeFilename(basename);
-    const dot = fileName.lastIndexOf('.');
-    const ext = dot >= 0 ? fileName.slice(dot + 1).toLowerCase() : '';
-    const langByExt = {
-      md: 'markdown', markdown: 'markdown',
-      txt: '', text: '',
-      json: 'json', yml: 'yaml', yaml: 'yaml',
-      js: 'javascript', mjs: 'javascript', cjs: 'javascript',
-      ts: 'typescript', tsx: 'typescript', jsx: 'javascript',
-      py: 'python', rb: 'ruby', go: 'go', rs: 'rust',
-      java: 'java', kt: 'kotlin', swift: 'swift',
-      html: 'html', htm: 'html', css: 'css', scss: 'scss',
-      sh: 'bash', bash: 'bash', zsh: 'bash',
-      sql: 'sql', xml: 'xml', toml: 'toml', ini: 'ini',
-      c: 'c', h: 'c', cpp: 'cpp', hpp: 'cpp',
-    };
-    const language = Object.prototype.hasOwnProperty.call(langByExt, ext)
-      ? langByExt[ext]
-      : ext;
-    const title = dot >= 0 ? fileName.slice(0, dot) : fileName;
+    const { fileName, title, language } = describeFile(path);
     artifactMap.set(id, {
       id,
       title,
@@ -212,6 +192,95 @@
       fileName,
     });
     return id;
+  };
+
+  const LANG_BY_EXT = {
+    md: 'markdown', markdown: 'markdown',
+    txt: '', text: '',
+    json: 'json', yml: 'yaml', yaml: 'yaml',
+    js: 'javascript', mjs: 'javascript', cjs: 'javascript',
+    ts: 'typescript', tsx: 'typescript', jsx: 'javascript',
+    py: 'python', rb: 'ruby', go: 'go', rs: 'rust',
+    java: 'java', kt: 'kotlin', swift: 'swift',
+    html: 'html', htm: 'html', css: 'css', scss: 'scss',
+    sh: 'bash', bash: 'bash', zsh: 'bash',
+    sql: 'sql', xml: 'xml', toml: 'toml', ini: 'ini',
+    c: 'c', h: 'c', cpp: 'cpp', hpp: 'cpp', svg: 'xml',
+  };
+
+  /** File name, title (name sans extension) and code language for a path. */
+  const describeFile = (path) => {
+    const basename = String(path).split('/').pop() || 'file';
+    const fileName = sanitizeFilename(basename);
+    const dot = fileName.lastIndexOf('.');
+    const ext = dot >= 0 ? fileName.slice(dot + 1).toLowerCase() : '';
+    const language = Object.prototype.hasOwnProperty.call(LANG_BY_EXT, ext) ? LANG_BY_EXT[ext] : ext;
+    return { fileName, title: dot >= 0 ? fileName.slice(0, dot) : fileName, language };
+  };
+
+  /**
+   * Apply one textual edit -- `str_replace` ({path, old_str, new_str}) of
+   * the create_file era, `Edit` ({file_path, old_string, new_string,
+   * replace_all}) of the Write era. Returns the new content, or the old one
+   * when old text isn't found.
+   */
+  const applyTextEdit = (content, oldStr, newStr, all) => {
+    if (typeof content !== 'string' || typeof oldStr !== 'string' || !oldStr) return content;
+    if (!content.includes(oldStr)) return content;
+    const replacement = typeof newStr === 'string' ? newStr : '';
+    return all ? content.split(oldStr).join(replacement) : content.replace(oldStr, () => replacement);
+  };
+
+  /**
+   * Sources for citations. claude.ai keeps them out of the text: Research
+   * reports carry `md_citations` on the artifact, web-search answers carry
+   * `citations` on text blocks -- each {url, title, metadata, start_index,
+   * end_index}. Without this an export has no sources at all.
+   *
+   * Inserts a ` [[n]](url)` marker at each citation's end_index (indices
+   * count code points -- Python-side strings) and records the source in
+   * `sources` (Map url → {n, title}), which numbers sources across calls so
+   * blocks of one turn share numbering.
+   */
+  const applyCitations = (text, citations, sources) => {
+    if (typeof text !== 'string' || !Array.isArray(citations) || citations.length === 0) return text;
+    const chars = Array.from(text);
+    const marks = [];
+    for (const c of citations) {
+      if (!isObject(c)) continue;
+      const src = Array.isArray(c.sources) && isObject(c.sources[0]) ? c.sources[0] : {};
+      const url = pick(c, ['url']) || pick(src, ['url']);
+      if (!url) continue;
+      if (!sources.has(url)) {
+        const title =
+          pick(c.metadata || {}, ['preview_title']) || pick(c, ['title']) || pick(src, ['title']) || url;
+        sources.set(url, { n: sources.size + 1, title });
+      }
+      const at = c.end_index;
+      if (Number.isInteger(at) && at >= 0 && at <= chars.length) {
+        marks.push({ at, n: sources.get(url).n, url });
+      }
+    }
+    const seen = new Set();
+    marks.sort((a, b) => b.at - a.at || b.n - a.n);
+    for (const m of marks) {
+      const key = `${m.at}:${m.n}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      chars.splice(m.at, 0, ` [[${m.n}]](${m.url})`);
+    }
+    return chars.join('');
+  };
+
+  /** Numbered markdown list of sources; `only` limits it to those urls. */
+  const formatSources = (sources, only) => {
+    const rows = [];
+    for (const [url, s] of sources) {
+      if (only && !only.has(url)) continue;
+      const title = String(s.title).replace(/[[\]]/g, '');
+      rows.push(`${s.n}. [${title}](${url})`);
+    }
+    return rows.join('\n');
   };
 
   /**
@@ -302,7 +371,7 @@
       const title = pick(input, ['title', 'name']) || id;
       const language = pick(input, ['language', 'lang']);
       const mime = pick(input, ['type', 'mime', 'content_type']);
-      const content = typeof input.content === 'string' ? input.content : '';
+      const content = withSources(typeof input.content === 'string' ? input.content : '', input.md_citations);
       const ext = extFromArtifactKind(language, mime);
       const fileName = sanitizeFilename(title) + ext;
       art = { id, title, language, mime, content, fileName };
@@ -320,11 +389,86 @@
     }
 
     if (command === 'rewrite') {
-      if (typeof input.content === 'string') art.content = input.content;
+      if (typeof input.content === 'string') art.content = withSources(input.content, input.md_citations);
       return id;
     }
 
     return id;
+  };
+
+  /** Artifact text with citation markers and a trailing Sources section. */
+  const withSources = (content, citations) => {
+    if (!Array.isArray(citations) || citations.length === 0) return content;
+    const sources = new Map();
+    const marked = applyCitations(content, citations, sources);
+    return sources.size ? `${marked.trimEnd()}\n\n## Sources\n\n${formatSources(sources)}\n` : marked;
+  };
+
+  /**
+   * Write-era artifacts. Claude writes a file with `Write` ({file_path,
+   * content}), changes it with `Edit`, and publishes it with `Artifact`
+   * ({file_path, ...}); the result text holds the published URL. Each
+   * publish snapshots the file's current content into one artifact per
+   * path. Returns the artifact id on the first publish (where the reference
+   * goes in the body), null otherwise.
+   */
+  const applyArtifactPublish = (input, ctx) => {
+    const path = pick(input || {}, ['file_path', 'path']);
+    if (!path || !ctx.files.has(path)) return null;
+    const id = `artifact:${path}`;
+    const existing = ctx.artifactMap.get(id);
+    const content = ctx.files.get(path);
+    const { fileName, title, language } = describeFile(path);
+    const htmlTitle = /<title>([^<]{1,200})<\/title>/i.exec(content);
+    ctx.artifactMap.set(id, {
+      id,
+      title: (htmlTitle && htmlTitle[1].trim()) || pick(input, ['title']) || title,
+      language,
+      mime: undefined,
+      content,
+      fileName,
+      url: existing ? existing.url : undefined,
+    });
+    return existing ? null : id;
+  };
+
+  /** "Published <path> at https://claude.ai/artifact/<id> (Version N…" */
+  const PUBLISHED_RE = /Published (\S+) at (https:\/\/claude\.ai\/artifact\/[A-Za-z0-9_-]+)/;
+
+  /**
+   * Content-bearing tool output kept as an artifact: `show_widget` draws an
+   * SVG / HTML widget inline in the chat ({title, widget_code}).
+   */
+  const applyWidgetCall = (raw, ctx) => {
+    const input = raw.input || {};
+    const code = typeof input.widget_code === 'string' ? input.widget_code : '';
+    if (!code.trim()) return null;
+    const title = pick(input, ['title']) || 'widget';
+    const isSvg = /^\s*<svg[\s>]/i.test(code);
+    const id = `widget:${raw.id || title}`;
+    ctx.artifactMap.set(id, {
+      id,
+      title,
+      language: isSvg ? 'xml' : 'html',
+      mime: undefined,
+      content: code,
+      fileName: sanitizeFilename(title) + (isSvg ? '.svg' : '.html'),
+    });
+    return id;
+  };
+
+  /**
+   * `flag` content block: claude.ai shows a support banner (e.g. a crisis
+   * helpline) next to the message. Keep what the reader saw as a note.
+   */
+  const formatFlag = (raw) => {
+    const h = isObject(raw.helpline) ? raw.helpline : null;
+    if (!h) return `> ⚠️ claude.ai flagged this message${raw.flag ? ` (${raw.flag})` : ''}.`;
+    const ways = [];
+    if (h.phone_number) ways.push(`call ${h.phone_number}`);
+    if (h.sms_number) ways.push(`text ${h.sms_number}`);
+    if (h.web_chat_url) ways.push(`chat: ${h.web_chat_url}`);
+    return `> ⚠️ claude.ai showed a support resource here: **${h.name || 'helpline'}**${ways.length ? ` — ${ways.join(' · ')}` : ''}`;
   };
 
   /** Extract image bytes loader info from a content block. Returns null if
@@ -350,27 +494,44 @@
    * Returns an array of { block, _imageRef? } — _imageRef indicates the
    * caller must populate bytes before rendering.
    */
-  const transformBlock = (raw, artifactMap) => {
+  const transformBlock = (raw, ctx) => {
     const t = raw?.type;
+    const { artifactMap } = ctx;
 
     if (t === 'text') {
       const raw_text = typeof raw.text === 'string' ? raw.text : '';
-      const cleaned = stripUnsupportedPlaceholder(raw_text);
+      ctx.turnText.push(raw_text);
+      const cited = applyCitations(raw_text, raw.citations, ctx.turnSources);
+      const cleaned = stripUnsupportedPlaceholder(cited);
       return cleaned.trim().length > 0 ? [{ block: { kind: 'text', text: cleaned } }] : [];
     }
 
     if (t === 'thinking') {
-      const text =
+      let text =
         typeof raw.thinking === 'string'
           ? raw.thinking
           : typeof raw.text === 'string'
             ? raw.text
             : '';
+      // claude.ai increasingly hides the reasoning itself (thinking: "",
+      // thinking_hidden: true) and only keeps the one-line summaries the UI
+      // shows while it thinks.
+      if (!text && Array.isArray(raw.summaries)) {
+        const lines = raw.summaries.map((s) => pick(s || {}, ['summary'])).filter(Boolean);
+        if (lines.length) text = `${lines.map((l) => `- ${l}`).join('\n')}\n\n_(summary — claude.ai doesn't keep the full reasoning)_`;
+      }
       return text ? [{ block: { kind: 'thinking', text } }] : [];
     }
 
+    // Internal bookkeeping, nothing a reader saw.
+    if (t === 'token_budget') return [];
+
+    if (t === 'flag') return [{ block: { kind: 'text', text: formatFlag(raw) } }];
+
     if (t === 'tool_use') {
       const name = typeof raw.name === 'string' ? raw.name : 'tool';
+      const input = isObject(raw.input) ? raw.input : {};
+      const asCall = { block: { kind: 'tool_call', name, input: safeStringify(raw.input) } };
       if (name === 'artifacts') {
         const id = applyArtifactsCall(raw.input, artifactMap);
         const command = (pick(raw.input || {}, ['command', 'operation']) || 'create').toLowerCase();
@@ -380,9 +541,39 @@
         return [];
       }
       if (name === 'create_file') {
+        const path = pick(input, ['path']);
+        if (path && typeof input.file_text === 'string') ctx.files.set(path, input.file_text);
         const id = applyCreateFileCall(raw, artifactMap);
         if (id) return [{ block: { kind: 'artifact_ref', artifactId: id } }];
         return [];
+      }
+      // Edits to sandbox files. A create_file artifact shows the file as it
+      // is now, so its edits apply right away; Write-era files become
+      // artifacts only when published (Artifact below).
+      if (name === 'str_replace' || name === 'Edit') {
+        const path = pick(input, name === 'Edit' ? ['file_path', 'path'] : ['path']);
+        const oldStr = name === 'Edit' ? input.old_string : input.old_str;
+        const newStr = name === 'Edit' ? input.new_string : input.new_str;
+        if (path && ctx.files.has(path)) {
+          ctx.files.set(path, applyTextEdit(ctx.files.get(path), oldStr, newStr, input.replace_all === true));
+          const created = artifactMap.get(`create_file:${path}`);
+          if (created) created.content = ctx.files.get(path);
+        }
+        return [asCall];
+      }
+      if (name === 'Write') {
+        const path = pick(input, ['file_path', 'path']);
+        if (path && typeof input.content === 'string') ctx.files.set(path, input.content);
+        return [asCall];
+      }
+      if (name === 'Artifact' && pick(input, ['file_path'])) {
+        const id = applyArtifactPublish(input, ctx);
+        return id ? [asCall, { block: { kind: 'artifact_ref', artifactId: id } }] : [asCall];
+      }
+      if (/(^|:)show_widget$/.test(name)) {
+        const id = applyWidgetCall(raw, ctx);
+        if (id) return [{ block: { kind: 'artifact_ref', artifactId: id } }];
+        return [asCall];
       }
       // Content-bearing widgets (message drafts, questionnaires) surface
       // their input as regular text -- it IS the assistant's content, the
@@ -414,6 +605,11 @@
           .join('\n');
       } else {
         text = safeStringify(raw.content);
+      }
+      if (raw.name === 'Artifact') {
+        const m = PUBLISHED_RE.exec(text);
+        const art = m && artifactMap.get(`artifact:${m[1]}`);
+        if (art) art.url = m[2];
       }
       return [
         {
@@ -546,6 +742,27 @@
     return { imageItems, attachments };
   };
 
+  /**
+   * Files the assistant handed over with SendUserFile / present_files whose
+   * tool_result names them ("<path> → file_uuid: <uuid>") but that are
+   * missing from the message's files[]. Returned as files[]-shaped entries.
+   */
+  const DELIVERED_RE = /^\s*(\S[^\n]*?)\s+→\s+file_uuid:\s*([0-9a-f-]{36})/gm;
+  const deliveredFiles = (m) => {
+    const known = new Set((Array.isArray(m.files) ? m.files : []).map((f) => f && (f.file_uuid || f.uuid)));
+    const out = [];
+    for (const b of Array.isArray(m.content) ? m.content : []) {
+      if (!isObject(b) || b.type !== 'tool_result' || !/^(SendUserFile|present_files)$/.test(b.name || '')) continue;
+      const text = extractToolResultText(b.content);
+      for (const x of text.matchAll(DELIVERED_RE)) {
+        if (known.has(x[2])) continue;
+        known.add(x[2]);
+        out.push({ file_uuid: x[2], file_name: x[1].split('/').pop(), file_kind: 'blob' });
+      }
+    }
+    return out;
+  };
+
   const toAbsoluteClaudeUrl = (path) => {
     if (!path) return null;
     if (/^https?:/i.test(path)) return path;
@@ -591,6 +808,9 @@
     const ordered = orderMessages(raw);
     const artifactMap = new Map(); // id → Artifact
     const viewHarvest = opts.inlineTextFiles ? harvestViewToolContent(ordered) : null;
+    // Shared across blocks: sandbox files by path (create_file / Write and
+    // their edits). Per turn: citation sources and the raw text they number.
+    const ctx = { artifactMap, files: new Map(), turnSources: new Map(), turnText: [] };
 
     const turns = [];
     const imageRefs = [];
@@ -601,10 +821,25 @@
       const m = ordered[ti];
       const role = m.sender === 'human' ? 'human' : 'assistant';
       const blocks = [];
+      ctx.turnSources = new Map();
+      ctx.turnText = [];
+
+      // Long chats get compacted: the model continues from a summary of
+      // what came before. Reasoning-level detail, like thinking.
+      const compaction = extractToolResultText(m.compaction_summary);
+      if (compaction.trim()) {
+        blocks.push({ kind: 'thinking', text: `**Context compacted here.** Summary the model continued from:\n\n${compaction}` });
+      }
 
       // Files[] images render inline at the top of the message (matches the
       // way claude.ai displays uploaded/pasted images above the user's text).
-      const filesResult = transformFiles(m.files, opts, viewHarvest);
+      // Plus files handed over with SendUserFile / present_files that
+      // files[] doesn't list (it often doesn't for Write-era outputs).
+      const filesResult = transformFiles(
+        [...(Array.isArray(m.files) ? m.files : []), ...deliveredFiles(m)],
+        opts,
+        viewHarvest
+      );
       const fileImageUuids = new Set();
       for (const item of filesResult.imageItems) {
         const blockIndex = blocks.length;
@@ -618,7 +853,7 @@
         blocks.push({ kind: 'text', text: m.text });
       } else {
         for (const c of contentArr) {
-          const produced = transformBlock(c, artifactMap);
+          const produced = transformBlock(c, ctx);
           for (const item of produced) {
             // claude.ai also lists uploaded images as `image` content blocks
             // pointing at the same file_uuid as files[] -- already emitted
@@ -636,6 +871,13 @@
         }
       }
 
+      // Cited sources the reply's own text doesn't already link to.
+      if (ctx.turnSources.size) {
+        const plain = ctx.turnText.join('\n');
+        const missing = new Set([...ctx.turnSources.keys()].filter((url) => !plain.includes(url)));
+        if (missing.size) blocks.push({ kind: 'text', text: `**Sources**\n\n${formatSources(ctx.turnSources, missing)}` });
+      }
+
       const attachments = [
         ...transformAttachments(m.attachments),
         ...filesResult.attachments,
@@ -651,6 +893,8 @@
       turns.push({
         role,
         createdAt: typeof m.created_at === 'string' ? m.created_at : undefined,
+        // Dictated messages (the renderer marks them with 🎙️).
+        isVoice: m.input_mode === 'speech_input' || undefined,
         blocks,
         attachments,
       });
