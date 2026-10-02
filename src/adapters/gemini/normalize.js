@@ -77,7 +77,7 @@
  */
 (function () {
   const ns = (self.__exporter = self.__exporter || {});
-  const { isTextLikeMime, log } = ns.utils;
+  const { isTextLikeMime, sanitizeFilename, log } = ns.utils;
 
   // ---------------------------------------------------------------------- //
   //  Round walker                                                           //
@@ -290,6 +290,52 @@
     return null;
   };
 
+  /**
+   * Deep Research report (an "immersive" document) at candidate[30][0]:
+   *   [0] id "im_…", [2] title of the research plan, [4] report markdown
+   *   with "[cite: 1, 2]" markers, [5] citation data where each source is
+   *   [[favicon, url, title, …], n, …] (n = the number used in markers).
+   * Returns an Artifact (markers turned into links, Sources list appended)
+   * or null.
+   */
+  const extractImmersiveDoc = (cand) => {
+    const doc = Array.isArray(cand) && Array.isArray(cand[30]) ? cand[30][0] : null;
+    if (!Array.isArray(doc) || typeof doc[4] !== 'string' || !doc[4].trim()) return null;
+    const sources = new Map();
+    const visit = (node, depth) => {
+      if (!Array.isArray(node) || depth > 12) return;
+      const head = node[0];
+      if (Array.isArray(head) && typeof head[1] === 'string' && /^https?:\/\//.test(head[1]) &&
+          Number.isInteger(node[1]) && !sources.has(node[1])) {
+        sources.set(node[1], { url: head[1], title: typeof head[2] === 'string' && head[2] ? head[2] : head[1] });
+      }
+      for (const child of node) visit(child, depth + 1);
+    };
+    for (const part of Array.isArray(doc[5]) ? doc[5] : []) {
+      if (part && typeof part === 'object') for (const v of Object.values(part)) visit(v, 0);
+    }
+    let content = doc[4].replace(/\s?\[cite: ([\d,\s]+)\]/g, (m, nums) => {
+      const refs = nums.split(',').map((n) => parseInt(n, 10)).filter(Number.isInteger);
+      return ` ${refs.map((n) => (sources.has(n) ? `[[${n}]](${sources.get(n).url})` : `[${n}]`)).join(' ')}`;
+    });
+    if (sources.size) {
+      const list = [...sources.entries()].sort((a, b) => a[0] - b[0])
+        .map(([n, s]) => `${n}. [${s.title.replace(/[[\]]/g, '')}](${s.url})`);
+      content = `${content.trimEnd()}\n\n## Sources\n\n${list.join('\n')}\n`;
+    }
+    const heading = /^#\s+(.+)$/m.exec(doc[4]);
+    const title = (heading && heading[1].trim()) || (typeof doc[2] === 'string' && doc[2]) || 'Deep Research report';
+    return {
+      id: typeof doc[0] === 'string' ? doc[0] : `immersive:${title}`,
+      title,
+      language: 'markdown',
+      mime: 'text/markdown',
+      content,
+      fileName: `${sanitizeFilename(title)}.md`,
+      source: 'Deep Research',
+    };
+  };
+
   const extractCandidateText = (candidate) => {
     if (!Array.isArray(candidate)) return '';
     const arr = candidate[1];
@@ -439,6 +485,7 @@
     const imageRefs = [];
     const binaryAttachmentRefs = [];
     const textFileRefs = [];
+    const artifacts = []; // Deep Research reports
 
     for (const round of rounds) {
       // ------- USER TURN --------------------------------------------------
@@ -529,6 +576,11 @@
       if (cleanedText && cleanedText.trim()) {
         aBlocks.push({ kind: 'text', text: cleanedText });
       }
+      const report = extractImmersiveDoc(cand);
+      if (report) {
+        if (!artifacts.some((a) => a.id === report.id)) artifacts.push(report);
+        aBlocks.push({ kind: 'artifact_ref', artifactId: report.id });
+      }
       // Generated images get their own image blocks at the end of the turn,
       // since the renderer only embeds image blocks (it won't resolve any
       // free-form markdown image refs we'd leave behind in the text).
@@ -563,7 +615,7 @@
       title,
       sourceLLM: 'gemini',
       turns,
-      artifacts: [],
+      artifacts,
     };
     return {
       conversation,

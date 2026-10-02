@@ -17,6 +17,7 @@ ChatGPT
 • Charts drawn by Python code are now exported as images.
 
 Gemini
+• Deep Research reports are now exported, with numbered source links and a Sources list.
 • Export file names no longer end with "- Google Gemini".
 
 ## v0.7.37 — 2026-08-03

@@ -621,16 +621,22 @@
     {
       "id": "gemini.deep-research",
       "provider": "gemini",
-      "title": "Deep Research report",
-      "support": "unknown",
+      "title": "Deep Research report (with its sources)",
+      "support": "supported",
       "cost": "high",
       "setup": "Choose Deep Research from the composer tools; start the research when asked.",
       "prompt": "Deep research, keep it short: compare two popular open-source Markdown editors.",
       "expect": {
-        "mdMatches": [
-          "https?://"
+        "artifacts": ">=1",
+        "outputMatches": [
+          "\\[\\[\\d+\\]\\]\\(https?://",
+          "^## Sources$"
+        ],
+        "mdNotMatches": [
+          "\\[cite:"
         ]
-      }
+      },
+      "notes": "Report = candidate[30][0] (immersive doc): [4] markdown with [cite: n] markers, [5] citation data. Before 0.7.39 the report was missing from exports (the old check only looked for any https:// link)."
     }
   ]
 }
