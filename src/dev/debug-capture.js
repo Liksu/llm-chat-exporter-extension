@@ -139,7 +139,9 @@
    * afterwards -- also when the export failed, since that is when it is
    * needed most. Returns whatever `fn` returns / rethrows what it throws.
    *
-   * @param {{ enabled: boolean, adapter: string, options: object }} meta
+   * @param {{ enabled: boolean, adapter: string, options: object, tag?: string }} meta
+   *   tag: caller's label for this export (live tests pass the feature id),
+   *   stored as log._exporter.tag.
    * @param {() => Promise<{ok:boolean, filename?:string, error?:string}>} fn
    */
   const run = async (meta, fn) => {
@@ -180,6 +182,7 @@
             documentTitle: document.title || '',
             exportedAt: new Date().toISOString(),
             options: meta.options,
+            tag: meta.tag || null,
             result: outcome || null,
           },
         },
@@ -202,7 +205,8 @@
       const enabled = typeof ctx.msg.debugCapture === 'boolean'
         ? ctx.msg.debugCapture
         : !!(ns.dev.readSettings && (await ns.dev.readSettings()).debugCapture);
-      return run({ enabled, adapter: ctx.adapter, options: ctx.options }, exec);
+      const tag = typeof ctx.msg.tag === 'string' ? ctx.msg.tag.slice(0, 200) : null;
+      return run({ enabled, adapter: ctx.adapter, options: ctx.options, tag }, exec);
     },
   });
 })();

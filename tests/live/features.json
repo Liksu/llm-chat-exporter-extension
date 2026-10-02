@@ -1,0 +1,288 @@
+{
+  "version": 1,
+  "about": "Catalog of things a user can have in a chat and would expect in an export. Driven by tools/live.js (prepare/collect) and tests/live/TASK.md (Claude Desktop). support: what the extension is expected to handle today -- 'supported' failures are reported as BROKEN, 'unsupported'/'unknown' failures as GAPS, and an unsupported feature that passes as NEWLY WORKING. cost 'high' features (quota-hungry) run only with --include-expensive. automation 'manual' features are listed but never automated.",
+
+  "defaults": {
+    "export": {
+      "mode": "zip",
+      "includeReasoning": true,
+      "includeDates": true,
+      "dateFormat": "iso-utc",
+      "inlineImages": false,
+      "inlineTextFiles": true,
+      "attachmentsAsMarkdown": false
+    }
+  },
+
+  "providers": {
+    "claude": {
+      "newChatUrl": "https://claude.ai/new",
+      "chatUrlPattern": "^https://claude\\.ai/chat/[0-9a-f-]{36}"
+    },
+    "chatgpt": {
+      "newChatUrl": "https://chatgpt.com/",
+      "chatUrlPattern": "^https://chatgpt\\.com/(g/[^/]+/)?c/[0-9a-f-]{36}"
+    },
+    "gemini": {
+      "newChatUrl": "https://gemini.google.com/app",
+      "chatUrlPattern": "^https://gemini\\.google\\.com/(u/\\d+/)?app/[0-9a-f]+"
+    }
+  },
+
+  "features": [
+    {
+      "id": "claude.text-formatting",
+      "provider": "claude",
+      "title": "Plain text with markdown: headings, list, table, code block",
+      "support": "supported",
+      "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
+      "expect": { "turns": ">=2", "mdMatches": ["\\|.*\\|.*\\|", "```(js|javascript)"] }
+    },
+    {
+      "id": "claude.image-upload",
+      "provider": "claude",
+      "title": "Two uploaded images (PNG + JPEG) in one message",
+      "support": "supported",
+      "uploads": ["bar-chart.png", "house-photo.jpg"],
+      "prompt": "Describe each of the two attached images in one sentence.",
+      "expect": { "images": "==2" },
+      "notes": "==2 catches duplicated images (files[] + content[] image blocks). The JPEG comes back as WebP from claude.ai /preview."
+    },
+    {
+      "id": "claude.pdf-upload",
+      "provider": "claude",
+      "title": "Uploaded PDF",
+      "support": "supported",
+      "uploads": ["project-brief.pdf"],
+      "prompt": "What is the project codename and budget in the attached PDF?",
+      "expect": { "mdMatches": ["project-brief\\.pdf"] }
+    },
+    {
+      "id": "claude.text-file-upload",
+      "provider": "claude",
+      "title": "Uploaded markdown and CSV files (inlined with inlineTextFiles)",
+      "support": "supported",
+      "uploads": ["meeting-notes.md", "sales.csv"],
+      "prompt": "Who owns the pagination bug in the notes, and what was total North revenue in the CSV?",
+      "expect": { "mdMatches": ["meeting-notes\\.md", "sales\\.csv", "BLUE HERON|Fix pagination bug|2026-01,North"] }
+    },
+    {
+      "id": "claude.artifact",
+      "provider": "claude",
+      "title": "Artifact (document / code shown in the side panel)",
+      "support": "supported",
+      "prompt": "Create an artifact: a small standalone HTML page with a button that counts clicks.",
+      "expect": { "artifacts": ">=1" }
+    },
+    {
+      "id": "claude.create-file",
+      "provider": "claude",
+      "title": "File generated with code execution (downloadable file in the chat)",
+      "support": "supported",
+      "setup": "Code execution / file creation must be enabled in claude.ai settings (Capabilities). If it is off, skip this feature and say so.",
+      "prompt": "Create a CSV file named fruits.csv with 3 rows (name, color) and give it to me as a downloadable file.",
+      "expect": { "artifacts": ">=1" }
+    },
+    {
+      "id": "claude.extended-thinking",
+      "provider": "claude",
+      "title": "Extended thinking blocks",
+      "support": "supported",
+      "setup": "Turn on extended thinking in the composer (the thinking/clock toggle) before sending.",
+      "prompt": "Think carefully: how many weekdays are there between 2026-03-01 and 2026-03-31 inclusive? Answer with the number.",
+      "expect": { "reasoning": true }
+    },
+    {
+      "id": "claude.web-search",
+      "provider": "claude",
+      "title": "Web search with cited sources",
+      "support": "unknown",
+      "setup": "Web search must be enabled in the composer's tools menu.",
+      "prompt": "Search the web: what is the latest stable version of Node.js? Cite your source.",
+      "expect": { "mdMatches": ["https?://"] },
+      "notes": "Checks that citations/sources survive in some form."
+    },
+    {
+      "id": "claude.edited-branch",
+      "provider": "claude",
+      "title": "Edited message (branching): only the current branch is exported",
+      "support": "supported",
+      "prompt": "Reply with exactly: BRANCH-ONE",
+      "followUps": [
+        "EDIT the message you just sent (pencil icon on your message) to: Reply with exactly: BRANCH-TWO -- and resend it."
+      ],
+      "expect": { "mdMatches": ["BRANCH-TWO"], "mdNotMatches": ["BRANCH-ONE"] }
+    },
+    {
+      "id": "claude.research",
+      "provider": "claude",
+      "title": "Research mode report",
+      "support": "unknown",
+      "cost": "high",
+      "setup": "Turn on Research in the composer.",
+      "prompt": "Research briefly: compare two popular open-source Markdown editors. Keep the report short.",
+      "expect": { "mdMatches": ["https?://"] }
+    },
+
+    {
+      "id": "chatgpt.text-formatting",
+      "provider": "chatgpt",
+      "title": "Plain text with markdown: headings, list, table, code block",
+      "support": "supported",
+      "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
+      "expect": { "turns": ">=2", "mdMatches": ["\\|.*\\|.*\\|", "```(js|javascript)"] }
+    },
+    {
+      "id": "chatgpt.image-upload",
+      "provider": "chatgpt",
+      "title": "Two uploaded images in one message",
+      "support": "supported",
+      "uploads": ["bar-chart.png", "house-photo.jpg"],
+      "prompt": "Describe each of the two attached images in one sentence.",
+      "expect": { "images": "==2" }
+    },
+    {
+      "id": "chatgpt.pdf-upload",
+      "provider": "chatgpt",
+      "title": "Uploaded PDF",
+      "support": "supported",
+      "uploads": ["project-brief.pdf"],
+      "prompt": "What is the project codename and budget in the attached PDF?",
+      "expect": { "mdMatches": ["project-brief\\.pdf"] }
+    },
+    {
+      "id": "chatgpt.image-generation",
+      "provider": "chatgpt",
+      "title": "Generated image",
+      "support": "supported",
+      "prompt": "Generate an image: a simple flat illustration of a red bicycle on a white background.",
+      "expect": { "images": ">=1" }
+    },
+    {
+      "id": "chatgpt.sandbox-file",
+      "provider": "chatgpt",
+      "title": "File produced by code (sandbox:/mnt/data download link)",
+      "support": "supported",
+      "prompt": "Use Python to create a CSV file fruits.csv with 3 rows (name, color) and give me a download link.",
+      "expect": { "files": ">=1" }
+    },
+    {
+      "id": "chatgpt.canvas",
+      "provider": "chatgpt",
+      "title": "Canvas document",
+      "support": "supported",
+      "prompt": "Open a canvas and write a 5-line poem about autumn in it.",
+      "expect": { "artifacts": ">=1" }
+    },
+    {
+      "id": "chatgpt.web-search",
+      "provider": "chatgpt",
+      "title": "Web search with citations",
+      "support": "unknown",
+      "prompt": "Search the web: what is the latest stable version of Node.js? Cite your source.",
+      "expect": { "mdMatches": ["https?://"] },
+      "notes": "Citation markers (\\uE200cite...\\uE201) are stripped today -- audit flags any that leak; mdMatches checks a source survives."
+    },
+    {
+      "id": "chatgpt.reasoning",
+      "provider": "chatgpt",
+      "title": "Reasoning (thinking) model",
+      "support": "supported",
+      "setup": "Pick a thinking/reasoning model in the model picker.",
+      "prompt": "Think carefully: how many weekdays are there between 2026-03-01 and 2026-03-31 inclusive? Answer with the number.",
+      "expect": { "reasoning": true }
+    },
+    {
+      "id": "chatgpt.edited-branch",
+      "provider": "chatgpt",
+      "title": "Edited message (branching): only the current branch is exported",
+      "support": "supported",
+      "prompt": "Reply with exactly: BRANCH-ONE",
+      "followUps": [
+        "EDIT the message you just sent (pencil icon on your message) to: Reply with exactly: BRANCH-TWO -- and resend it."
+      ],
+      "expect": { "mdMatches": ["BRANCH-TWO"], "mdNotMatches": ["BRANCH-ONE"] }
+    },
+    {
+      "id": "chatgpt.deep-research",
+      "provider": "chatgpt",
+      "title": "Deep Research report",
+      "support": "supported",
+      "cost": "high",
+      "setup": "Choose Deep research from the composer tools.",
+      "prompt": "Deep research, keep it short: compare two popular open-source Markdown editors.",
+      "expect": { "artifacts": ">=1" }
+    },
+    {
+      "id": "chatgpt.voice",
+      "provider": "chatgpt",
+      "title": "Voice-mode conversation (transcripts)",
+      "support": "supported",
+      "automation": "manual",
+      "notes": "Needs a microphone; create by hand once, then it is re-exported every run."
+    },
+
+    {
+      "id": "gemini.text-formatting",
+      "provider": "gemini",
+      "title": "Plain text with markdown: headings, list, table, code block",
+      "support": "supported",
+      "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
+      "expect": { "turns": ">=2", "mdMatches": ["\\|.*\\|.*\\|", "```(js|javascript)"] }
+    },
+    {
+      "id": "gemini.image-upload",
+      "provider": "gemini",
+      "title": "Two uploaded images in one message",
+      "support": "supported",
+      "uploads": ["bar-chart.png", "house-photo.jpg"],
+      "prompt": "Describe each of the two attached images in one sentence.",
+      "expect": { "images": "==2" }
+    },
+    {
+      "id": "gemini.pdf-upload",
+      "provider": "gemini",
+      "title": "Uploaded PDF",
+      "support": "supported",
+      "uploads": ["project-brief.pdf"],
+      "prompt": "What is the project codename and budget in the attached PDF?",
+      "expect": { "mdMatches": ["project-brief\\.pdf"] }
+    },
+    {
+      "id": "gemini.image-generation",
+      "provider": "gemini",
+      "title": "Generated image",
+      "support": "supported",
+      "prompt": "Generate an image: a simple flat illustration of a red bicycle on a white background.",
+      "expect": { "images": ">=1" }
+    },
+    {
+      "id": "gemini.thinking",
+      "provider": "gemini",
+      "title": "Thinking model",
+      "support": "supported",
+      "setup": "Pick a thinking model (e.g. 'Thinking' / Pro) in the model picker.",
+      "prompt": "Think carefully: how many weekdays are there between 2026-03-01 and 2026-03-31 inclusive? Answer with the number.",
+      "expect": { "reasoning": true }
+    },
+    {
+      "id": "gemini.canvas",
+      "provider": "gemini",
+      "title": "Canvas document",
+      "support": "unknown",
+      "setup": "Choose Canvas from the composer tools.",
+      "prompt": "In Canvas, write a 5-line poem about autumn.",
+      "expect": { "artifacts": ">=1" }
+    },
+    {
+      "id": "gemini.deep-research",
+      "provider": "gemini",
+      "title": "Deep Research report",
+      "support": "unknown",
+      "cost": "high",
+      "setup": "Choose Deep Research from the composer tools; start the research when asked.",
+      "prompt": "Deep research, keep it short: compare two popular open-source Markdown editors.",
+      "expect": { "mdMatches": ["https?://"] }
+    }
+  ]
+}

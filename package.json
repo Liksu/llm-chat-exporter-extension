@@ -8,6 +8,9 @@
     "audit": "node tools/audit-export.js",
     "drift": "node tools/schema-drift.js",
     "record": "node tools/record-from-har.js",
+    "live:prepare": "node tools/live.js prepare",
+    "live:collect": "node tools/live.js collect",
+    "live:status": "node tools/live.js status",
     "_comment_test_update": "test:update is intended to be run as: UPDATE_GOLDEN=1 npm run test:update (Linux/macOS) or set UPDATE_GOLDEN=1&& npm run test:update (Windows cmd) or $env:UPDATE_GOLDEN=1; npm run test:update (PowerShell)"
   }
 }

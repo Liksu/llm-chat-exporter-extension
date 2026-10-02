@@ -458,6 +458,12 @@ code is 1 when anything at `ERROR` level is found.
 `npm test` also runs the auditor over every scenario's goldens, so a bug
 present at recording time can't be locked in as "expected".
 
+## Live tests
+
+Periodic end-to-end runs against real claude.ai / chatgpt.com / Gemini chats,
+driven by Claude Desktop: see [live/README.md](live/README.md). Each run adds
+`tests/scenarios/local/live-<feature>/` scenarios that `npm test` then covers.
+
 ## Developer tooling in the extension (unpacked installs only)
 
 `src/dev/` holds tooling for testing the extension, not product code:

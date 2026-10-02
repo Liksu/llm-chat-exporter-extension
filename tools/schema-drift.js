@@ -41,7 +41,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-const DEFAULT_BASELINE = path.join(REPO_ROOT, 'tests', 'schema-baseline.json');
+const DEFAULT_BASELINE = process.env.SCHEMA_BASELINE || path.join(REPO_ROOT, 'tests', 'schema-baseline.json');
 
 // -- shape extraction ---------------------------------------------------------
 
@@ -345,4 +345,4 @@ const main = () => {
 
 if (require.main === module) main();
 
-module.exports = { extractShape, endpointKey, collect, diff, merge, responsesFromHar, responsesFromScenario };
+module.exports = { extractShape, endpointKey, collect, diff, merge, loadBaseline, responsesFromHar, responsesFromScenario, DEFAULT_BASELINE };

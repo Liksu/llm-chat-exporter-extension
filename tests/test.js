@@ -271,3 +271,72 @@ test('dev tooling: store installs never load it, product works without it', asyn
     assert.equal(r.captured.downloads.length, 1, 'no .debug.har without dev tooling');
   }
 });
+
+/**
+ * tools/live.js collect: what Claude Desktop leaves in the downloads folder
+ * (an export tagged with a feature id + its .debug.har) becomes a report,
+ * a replayable scenario and a remembered test-chat URL.
+ */
+test('live collect: tagged downloads become report, scenario and fixture', async () => {
+  const { spawnSync } = require('node:child_process');
+  const dir = path.join(SCENARIOS_DIR, 'examples', 'claude-uploaded-images');
+  const scenario = JSON.parse(fs.readFileSync(path.join(dir, 'scenario.json'), 'utf8'));
+  const message = { ...scenario.exports.find((e) => e.message.mode === 'zip').message,
+    debugCapture: true, tag: 'claude.image-upload' };
+  const run = await executeExport(dir, scenario, message, { dev: true });
+  assert.equal(run.captured.downloads.length, 2);
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'exporter-live-'));
+  try {
+    const downloads = path.join(tmp, 'downloads');
+    fs.mkdirSync(downloads);
+    for (const d of run.captured.downloads) {
+      fs.writeFileSync(path.join(downloads, d.filename), Buffer.from(await d.blob.arrayBuffer()));
+    }
+    // A stray file from before the run must be ignored.
+    fs.writeFileSync(path.join(downloads, 'old.debug.har'), '{}');
+    fs.utimesSync(path.join(downloads, 'old.debug.har'), new Date('2020-01-01'), new Date('2020-01-01'));
+
+    const liveDir = path.join(tmp, 'live');
+    const runDir = path.join(liveDir, 'runs', 'test-run');
+    fs.mkdirSync(runDir, { recursive: true });
+    fs.writeFileSync(path.join(liveDir, 'config.local.json'), JSON.stringify({ downloadsDir: downloads }));
+    fs.writeFileSync(path.join(runDir, 'plan.json'), JSON.stringify({
+      createdAt: new Date(Date.now() - 5000).toISOString(),
+      tasks: [
+        { featureId: 'claude.image-upload', provider: 'claude', title: 'Two uploaded images', action: 'create',
+          chatUrlPattern: '^https://claude\.ai/chat/[0-9a-f-]{36}' },
+        { featureId: 'claude.pdf-upload', provider: 'claude', title: 'Uploaded PDF', action: 'create',
+          chatUrlPattern: '^https://claude\.ai/chat/[0-9a-f-]{36}' },
+      ],
+      skipped: [],
+    }));
+
+    const res = spawnSync(process.execPath, [path.join(__dirname, '..', 'tools', 'live.js'), 'collect', runDir], {
+      env: { ...process.env, LIVE_DIR: liveDir, LIVE_SCENARIOS_DIR: path.join(tmp, 'scenarios'),
+        SCHEMA_BASELINE: path.join(tmp, 'baseline.json') },
+      encoding: 'utf8',
+    });
+    assert.equal(res.status, 1, `collect should flag the broken feature\n${res.stderr}`);
+
+    const report = JSON.parse(fs.readFileSync(path.join(runDir, 'report.json'), 'utf8'));
+    const img = report.results.find((r) => r.featureId === 'claude.image-upload');
+    // The example deliberately has one image that fails to download.
+    assert.equal(img.status, 'BROKEN');
+    assert.ok(img.audit.some((f) => f.code === 'image-not-loaded'));
+    assert.ok(img.expect.results.some((x) => !x.ok && /images ==2, got 1/.test(x.check)));
+    assert.equal(img.replayIdentical, true, 'replaying the HAR reproduces the downloaded export');
+    assert.equal(report.results.find((r) => r.featureId === 'claude.pdf-upload').status, 'NOT_RUN');
+    assert.ok(report.drift.length > 0, 'no baseline: everything is drift');
+
+    assert.deepEqual(fs.readdirSync(downloads), ['old.debug.har'], 'run files moved out of downloads');
+    const recorded = JSON.parse(fs.readFileSync(path.join(tmp, 'scenarios', 'live-claude.image-upload', 'scenario.json'), 'utf8'));
+    assert.deepEqual(recorded.auditAllow, ['image-not-loaded']);
+    assert.ok(fs.existsSync(path.join(tmp, 'scenarios', 'live-claude.image-upload', 'expected', 'zip-recorded')));
+    const fixtures = JSON.parse(fs.readFileSync(path.join(liveDir, 'fixtures.local.json'), 'utf8'));
+    assert.equal(fixtures['claude.image-upload'].url, scenario.location);
+    assert.match(fs.readFileSync(path.join(runDir, 'report.md'), 'utf8'), /## Broken[\s\S]*claude\.image-upload/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

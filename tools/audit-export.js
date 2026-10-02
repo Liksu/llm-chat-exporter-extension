@@ -508,4 +508,4 @@ const main = () => {
 
 if (require.main === module) main();
 
-module.exports = { audit, loadZip, loadDir, loadMd };
+module.exports = { audit, loadZip, loadDir, loadMd, stripCode, findLinks };

@@ -1,0 +1,5 @@
+# Local state of live test runs: your downloads path, your test chats' URLs,
+# and run folders with real exports. Never commit.
+config.local.json
+fixtures.local.json
+runs/
