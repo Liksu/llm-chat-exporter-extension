@@ -157,10 +157,10 @@
       "prompt": "Search the web: what is the latest stable version of Node.js? Cite your source.",
       "expect": {
         "assistantMatches": [
-          "\\[\\[\\d+\\]\\]\\(https?://"
+          "\\]\\(https?://"
         ]
       },
-      "notes": "Text blocks carry citations[]; the export adds [n] markers and a Sources list. Don't toggle tools in the composer -- if web search is off, the answer has no sources and that's fine to report."
+      "notes": "Checks that a source link survives in the answer. When text blocks carry citations[] the export adds [[n]](url) markers and a Sources list (covered by claude.mixed / claude.research); when Claude writes the sources itself (citations: [] -- the 2026-10-01 chat) they are plain markdown links. Don't toggle tools in the composer -- if web search is off, the answer has no sources and that's fine to report."
     },
     {
       "id": "claude.widget",
