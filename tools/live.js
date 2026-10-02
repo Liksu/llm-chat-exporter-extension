@@ -292,9 +292,39 @@ const compareOp = (spec, actual) => {
 };
 
 /** Evaluate a feature's `expect` against a loaded export. */
+/**
+ * What a reader sees: the .md without reasoning. Live exports include
+ * reasoning, and its tool-call dumps repeat almost everything -- prompts,
+ * file contents written by tools, search results -- so a text check run on
+ * the raw .md passes even when the feature itself is missing.
+ */
+const visibleText = (md) => md
+  .replace(/<details><summary>Thinking<\/summary>[\s\S]*?<\/details>\n?/g, '')
+  .replace(/^\*\*(?:Tool call: `[^`\n]*`|Tool result|Tool error)\*\*\n\n(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\1[ \t]*$/gm, '');
+
+/** Visible text of the assistant's turns only. */
+const assistantText = (visible) => {
+  const out = [];
+  let inAssistant = false;
+  for (const line of visible.split('\n')) {
+    if (/^## Assistant/.test(line)) inAssistant = true;
+    else if (/^## (Human|Artifacts|Attachments)/.test(line)) inAssistant = false;
+    else if (inAssistant) out.push(line);
+  }
+  return out.join('\n');
+};
+
+/**
+ * Evaluate a feature's `expect` against a loaded export.
+ *   mdMatches / mdNotMatches  regex on the visible .md (both roles)
+ *   assistantMatches          regex on the assistant's visible turns only
+ *   outputMatches             regex on visible .md + artifacts/ + files/
+ *   turns/images/files/artifacts counts, reasoning (a Thinking block)
+ */
 const checkExpectations = (feature, exp) => {
   const { stripCode, findLinks } = require('./audit-export');
-  const md = exp.md || '';
+  const raw = exp.md || '';
+  const md = visibleText(raw);
   const links = findLinks(stripCode(md));
   const count = {
     turns: (md.match(/^## (Human|Assistant)( \(🎙️\))?\s*$/gm) || []).length,
@@ -314,16 +344,38 @@ const checkExpectations = (feature, exp) => {
     results.push({ check: `${key} ${r.text}`, ok: r.ok });
   }
   if (e.reasoning) {
-    results.push({ check: 'reasoning present', ok: /<details><summary>Thinking<\/summary>/.test(md) });
+    results.push({ check: 'reasoning present', ok: /<details><summary>Thinking<\/summary>/.test(raw) });
   }
   for (const re of e.mdMatches || []) results.push({ check: `matches /${re}/`, ok: new RegExp(re, 'm').test(md) });
+  const said = assistantText(md);
+  for (const re of e.assistantMatches || []) results.push({ check: `assistant says /${re}/`, ok: new RegExp(re, 'm').test(said) });
   if (e.outputMatches) {
-    // Everything the export holds as text: the .md plus artifacts/ and files/.
-    const all = [md, ...[...exp.files.entries()].filter(([k]) => /^(artifacts|files)\//.test(k)).map(([, b]) => b.toString('utf8'))].join('\n');
+    // What the assistant produced: its visible turns plus artifacts/ and
+    // files/ -- never the user's own messages.
+    const all = [said, ...[...exp.files.entries()].filter(([k]) => /^(artifacts|files)\//.test(k)).map(([, b]) => b.toString('utf8'))].join('\n');
     for (const re of e.outputMatches) results.push({ check: `output matches /${re}/`, ok: new RegExp(re, 'm').test(all) });
   }
   for (const re of e.mdNotMatches || []) results.push({ check: `does not match /${re}/`, ok: !new RegExp(re, 'm').test(md) });
   return { counts: count, results };
+};
+
+/**
+ * A chat of the same provider that has none of the special features: the
+ * newest `<provider>.text-formatting` export in any run. Expectations that
+ * also pass on it don't test the feature (see collect: weak checks).
+ */
+const findControlExport = (provider) => {
+  if (!fs.existsSync(RUNS_DIR)) return null;
+  const { loadZip, loadMd } = require('./audit-export');
+  const runs = fs.readdirSync(RUNS_DIR).map((d) => path.join(RUNS_DIR, d))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  for (const run of runs) {
+    const dir = path.join(run, 'downloads', `${provider}.text-formatting`);
+    if (!fs.existsSync(dir)) continue;
+    const file = fs.readdirSync(dir).find((n) => /\.(zip|md)$/i.test(n));
+    if (file) return { path: path.join(dir, file), exp: /\.zip$/i.test(file) ? loadZip(path.join(dir, file)) : loadMd(path.join(dir, file)) };
+  }
+  return null;
 };
 
 /** HAR → tests/scenarios/local/live-<id>, goldens from the current code. */
@@ -417,6 +469,7 @@ const collectRun = async (args) => {
   const runDownloads = path.join(runDir, 'downloads');
   const results = [];
   const harPaths = [];
+  const controls = new Map(); // provider → control export (see findControlExport)
   for (const task of plan.tasks) {
     const feature = featureById.get(task.featureId);
     const dest = path.join(runDownloads, task.featureId);
@@ -464,6 +517,18 @@ const collectRun = async (args) => {
     const exp = /\.zip$/i.test(exportName) ? loadZip(exportPath) : loadMd(exportPath);
     r.audit = audit(exp).map((f) => ({ severity: f.severity, code: f.code, message: f.message }));
     r.expect = checkExpectations(feature || {}, exp);
+    // Control: a check that also passes on a chat without the feature
+    // tests nothing specific. (Checks satisfied by the prompt itself are
+    // caught statically: see the catalog test in tests/test.js.)
+    if (feature && feature.expect && !task.featureId.endsWith('.text-formatting')) {
+      const control = controls.has(task.provider) ? controls.get(task.provider) : findControlExport(task.provider);
+      controls.set(task.provider, control);
+      if (control) {
+        const c = checkExpectations(feature, control.exp).results;
+        const passing = c.filter((x) => x.ok && !/^turns /.test(x.check)).map((x) => x.check);
+        r.control = { export: path.relative(REPO_ROOT, control.path), alsoPasses: passing, weak: c.length > 0 && c.every((x) => x.ok) };
+      }
+    }
     const auditErrors = r.audit.filter((f) => f.severity === 'error');
     let matrixOk = true;
     if (feature && feature.matrix) {
@@ -545,6 +610,11 @@ const renderReport = (rep) => {
     out.push(`## ${STATUS_TITLE[s]}`, '');
     for (const r of rows) {
       out.push(`- **${r.featureId}** — ${r.title}${r.url ? ` · ${r.url}` : ''}`);
+      if (r.control && r.control.weak) {
+        out.push(`  - ⚠ weak check: every expectation also passes on a chat without this feature (\`${r.control.export}\`) — tighten \`expect\` in features.json`);
+      } else if (r.control && r.control.alsoPasses.length) {
+        out.push(`  - ⚠ also true without the feature: ${r.control.alsoPasses.join('; ')}`);
+      }
       if (r.matrix) {
         if (r.matrix.error) out.push(`  - settings matrix failed to run: ${r.matrix.error}`);
         else {
@@ -633,4 +703,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { checkExpectations, findDownloads, snippetFor, renderPlan, renderReport, compareOp };
+module.exports = { checkExpectations, findDownloads, snippetFor, renderPlan, renderReport, compareOp, visibleText };

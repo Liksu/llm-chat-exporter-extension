@@ -124,10 +124,28 @@ Add an entry to `features.json`:
   "expect": {
     "turns": ">=2", "images": "==2", "files": ">=1", "artifacts": ">=1",
     "reasoning": true,
-    "mdMatches": ["regex"], "mdNotMatches": ["regex"]
+    "mdMatches": ["regex"], "mdNotMatches": ["regex"],
+    "assistantMatches": ["regex"], "outputMatches": ["regex"]
   }
 }
 ```
 
 Every export is also audited (`tools/audit-export.js`): any audit error
 fails the feature regardless of `expect`.
+
+### Writing checks that test the feature
+
+Live exports include reasoning, and its tool-call dumps repeat almost
+everything (prompts, file contents tools wrote, search results). So:
+
+- All text checks ignore reasoning (Thinking blocks, tool calls/results).
+- `mdMatches` sees the user's turns too — use it for what the user
+  brought (upload names, inlined file contents). `npm test` fails if an
+  `mdMatches` regex matches the feature's own prompt or follow-ups.
+- `assistantMatches` sees only the assistant's turns; `outputMatches`
+  sees the assistant's turns plus `artifacts/` and `files/`.
+- Prefer structure over text: `files: ">=1"` proves the upload is in the
+  export, a filename match only proves it's mentioned.
+- `collect` also runs every feature's checks on a plain chat of the same
+  provider (`*.text-formatting`); if they all pass there too, the report
+  marks the check as weak.

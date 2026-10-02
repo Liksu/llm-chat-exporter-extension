@@ -36,7 +36,7 @@
       "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
       "expect": {
         "turns": ">=2",
-        "mdMatches": [
+        "assistantMatches": [
           "\\|.*\\|.*\\|",
           "```(js|javascript)"
         ]
@@ -67,8 +67,12 @@
       ],
       "prompt": "What is the project codename and budget in the attached PDF?",
       "expect": {
+        "files": ">=1",
         "mdMatches": [
           "project-brief\\.pdf"
+        ],
+        "assistantMatches": [
+          "BLUE HERON"
         ]
       }
     },
@@ -86,7 +90,8 @@
         "mdMatches": [
           "meeting-notes\\.md",
           "sales\\.csv",
-          "BLUE HERON|Fix pagination bug|2026-01,North"
+          "\\| Bob \\| Fix pagination bug \\| Oct 7 \\|",
+          "2026-01,North,120,14400"
         ]
       }
     },
@@ -151,8 +156,8 @@
       "support": "supported",
       "prompt": "Search the web: what is the latest stable version of Node.js? Cite your source.",
       "expect": {
-        "mdMatches": [
-          "\\[\\[\\d+\\]\\]\\(https?://|https?://"
+        "assistantMatches": [
+          "\\[\\[\\d+\\]\\]\\(https?://"
         ]
       },
       "notes": "Text blocks carry citations[]; the export adds [n] markers and a Sources list. Don't toggle tools in the composer -- if web search is off, the answer has no sources and that's fine to report."
@@ -212,7 +217,7 @@
         "EDIT the message you just sent (pencil icon on your message) to: Reply with exactly: BRANCH-TWO -- and resend it."
       ],
       "expect": {
-        "mdMatches": [
+        "assistantMatches": [
           "BRANCH-TWO"
         ],
         "mdNotMatches": [
@@ -245,9 +250,11 @@
         "reasoning": true,
         "mdMatches": [
           "project-brief\\.pdf",
-          "meeting-notes\\.md",
+          "meeting-notes\\.md"
+        ],
+        "assistantMatches": [
           "E ?= ?mc",
-          "https?://"
+          "\\[\\[\\d+\\]\\]\\(https?://"
         ],
         "outputMatches": [
           "Next steps",
@@ -323,7 +330,7 @@
       "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
       "expect": {
         "turns": ">=2",
-        "mdMatches": [
+        "assistantMatches": [
           "\\|.*\\|.*\\|",
           "```(js|javascript)"
         ]
@@ -353,8 +360,12 @@
       ],
       "prompt": "What is the project codename and budget in the attached PDF?",
       "expect": {
+        "files": ">=1",
         "mdMatches": [
           "project-brief\\.pdf"
+        ],
+        "assistantMatches": [
+          "BLUE HERON"
         ]
       }
     },
@@ -415,8 +426,11 @@
       "support": "unknown",
       "prompt": "Search the web: what is the latest stable version of Node.js? Cite your source.",
       "expect": {
-        "mdMatches": [
-          "https?://"
+        "assistantMatches": [
+          "\\]\\(https?://"
+        ],
+        "mdNotMatches": [
+          "[\\uE000-\\uF8FF]"
         ]
       },
       "notes": "Citation markers (\\uE200cite...\\uE201) are stripped today -- audit flags any that leak; mdMatches checks a source survives."
@@ -442,7 +456,7 @@
         "EDIT the message you just sent (pencil icon on your message) to: Reply with exactly: BRANCH-TWO -- and resend it."
       ],
       "expect": {
-        "mdMatches": [
+        "assistantMatches": [
           "BRANCH-TWO"
         ],
         "mdNotMatches": [
@@ -507,7 +521,7 @@
       "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
       "expect": {
         "turns": ">=2",
-        "mdMatches": [
+        "assistantMatches": [
           "\\|.*\\|.*\\|",
           "```(js|javascript)"
         ]
@@ -537,8 +551,12 @@
       ],
       "prompt": "What is the project codename and budget in the attached PDF?",
       "expect": {
+        "files": ">=1",
         "mdMatches": [
           "project-brief\\.pdf"
+        ],
+        "assistantMatches": [
+          "BLUE HERON"
         ]
       }
     },
@@ -612,7 +630,7 @@
       "prompt": "For an export test: list three facts about the Moon as a numbered list.",
       "expect": {
         "turns": ">=2",
-        "mdMatches": [
+        "assistantMatches": [
           "^1\\."
         ]
       },

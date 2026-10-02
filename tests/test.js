@@ -353,3 +353,48 @@ test('settings matrix: all 160 option combinations', async () => {
     assert.deepEqual(sum.findings, [], `${name}: ${JSON.stringify(sum.findings, null, 1)}`);
   }
 });
+
+/**
+ * Live expectations must test the export, not echo the prompt. mdMatches
+ * sees the user's turns too, so a regex that matches the prompt or a
+ * follow-up passes without the assistant doing anything.
+ */
+test('live catalog: expectations are valid and not satisfied by the prompt', () => {
+  const catalog = JSON.parse(fs.readFileSync(path.join(__dirname, 'live', 'features.json'), 'utf8'));
+  const ids = new Set();
+  for (const f of catalog.features) {
+    assert.ok(!ids.has(f.id), `duplicate id ${f.id}`);
+    ids.add(f.id);
+    assert.ok(catalog.providers[f.provider], `${f.id}: unknown provider`);
+    const e = f.expect || {};
+    for (const key of ['mdMatches', 'mdNotMatches', 'assistantMatches', 'outputMatches']) {
+      for (const re of e[key] || []) assert.doesNotThrow(() => new RegExp(re, 'm'), `${f.id}: bad regex ${re}`);
+    }
+    const typed = [f.prompt || '', ...(f.followUps || [])].join('\n');
+    for (const re of e.mdMatches || []) {
+      assert.ok(!new RegExp(re, 'm').test(typed),
+        `${f.id}: mdMatches /${re}/ matches the prompt itself — use assistantMatches/outputMatches`);
+    }
+    for (const u of f.uploads || []) {
+      assert.ok(fs.existsSync(path.join(__dirname, 'live', 'fixtures', u)), `${f.id}: missing fixture ${u}`);
+    }
+  }
+});
+
+/** What each expectation looks at (tools/live.js checkExpectations). */
+test('live checks: scopes of md / assistant / output matches', () => {
+  const { checkExpectations } = require('../tools/live');
+  const md = [
+    '# Chat', '', '## Human', '', 'PROMPT-TOKEN', '', '---', '',
+    '## Assistant', '',
+    '<details><summary>Thinking</summary>', '', 'THINK-TOKEN', '', '</details>', '',
+    '**Tool call: `Write`**', '', '```json', '{"content": "DUMP-TOKEN"}', '```', '',
+    'REPLY-TOKEN', '', '---', '',
+  ].join('\n');
+  const exp = { mode: 'zip', md, files: new Map([['files/user-upload.txt', Buffer.from('UPLOAD-TOKEN')]]) };
+  const check = (expect) => checkExpectations({ expect }, exp).results.map((r) => r.ok);
+  assert.deepEqual(check({ mdMatches: ['PROMPT-TOKEN', 'REPLY-TOKEN', 'DUMP-TOKEN', 'THINK-TOKEN'] }), [true, true, false, false]);
+  assert.deepEqual(check({ assistantMatches: ['REPLY-TOKEN', 'PROMPT-TOKEN', 'DUMP-TOKEN'] }), [true, false, false]);
+  assert.deepEqual(check({ outputMatches: ['REPLY-TOKEN', 'UPLOAD-TOKEN', 'PROMPT-TOKEN', 'DUMP-TOKEN'] }), [true, true, false, false]);
+  assert.deepEqual(check({ reasoning: true }), [true]);
+});
