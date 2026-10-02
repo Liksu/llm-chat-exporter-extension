@@ -6,13 +6,16 @@ LLM Chat Exporter saves the conversation you are currently viewing to your compu
 
 WHAT GETS SAVED
 
-The export includes the conversation in order – your messages and the AI responses, plus:
+The export includes the conversation in order – your messages and the AI responses, plus:
 
-- Images you uploaded and images generated in the chat
-- Files you uploaded
+- Images you uploaded (in original quality in ZIP) and images generated in the chat, including charts drawn by code
+- Files you uploaded and files the AI created for you, in their final version
 - Long text pasted into the chat
 - Code blocks and formatting
-- Claude artifacts and ChatGPT canvas documents
+- Claude artifacts, ChatGPT canvas documents and tools, and drawings or diagrams rendered in the chat
+- Deep Research and Research reports from Claude, ChatGPT, and Gemini, with their sources
+- Source links from web-search answers
+- Claude Cowork sessions
 - ChatGPT voice-mode messages as transcribed text
 - The model's thinking/reasoning and tool calls, when you enable that option
 
@@ -51,8 +54,8 @@ A ZIP archive with the conversation as Markdown, plus separate files when they a
 Depending on your export options and the chat content, the ZIP may include:
 
 - /assets for images
-- /files for uploaded files
-- /artifacts for artifacts and canvas documents
+- /files for uploaded files and files the AI created
+- /artifacts for artifacts, canvas documents, and research reports
 
 ZIP is better for long conversations, image-heavy chats, or chats with uploaded files, because it can preserve files alongside the Markdown export instead of forcing everything into one document.
 
@@ -60,15 +63,15 @@ OPTIONS
 
 A few toggles are available in the popup:
 
-- Inline images – embed images directly into the Markdown. When disabled, ZIP exports save images in /assets; Markdown-only exports keep the conversation as a single .md file and use image placeholders.
+- Inline images – embed images directly into the Markdown. When disabled, ZIP exports save images in /assets; Markdown-only exports keep the conversation as a single .md file and use image placeholders.
 
-- Inline text uploads – include supported text uploads such as .md, .txt, .json, .csv, and similar files directly in the conversation body. When disabled, these files are treated as attachments.
+- Inline text uploads – include supported text uploads such as .md, .txt, .json, .csv, and similar files directly in the conversation body. When disabled, these files are treated as attachments.
 
-- Inline attachments – render inlined text content as readable text/Markdown instead of wrapping it in code blocks. Useful for .md notes and documents; the code-block version is usually better for .json, .csv, logs, and other structured formats.
+- Inline attachments – render inlined text content as readable text/Markdown instead of wrapping it in code blocks. Useful for .md notes and documents; the code-block version is usually better for .json, .csv, logs, and other structured formats.
 
-- Include dates – add message dates to the export.
+- Include dates – add message dates to the export.
 
-- Include reasoning – include thinking blocks and tool calls when available. Off by default.
+- Include reasoning – include thinking blocks and tool calls when available. Off by default.
 
 Defaults are configurable on the Options page, available from the gear icon in the popup. You can set different defaults for Claude, ChatGPT, and Gemini, and choose how message dates are formatted.
 
@@ -83,11 +86,11 @@ When images or uploaded files need to be included in the export, the extension f
 
 PERMISSIONS
 
-- activeTab – read the current chat when you click Export.
-- storage – remember your export preferences.
-- declarativeNetRequestWithHostAccess – adjust CORS headers from Google's image CDNs so Gemini images and attached files can be embedded or saved. Scoped to those hosts only.
-- Host access to claude.ai, chatgpt.com, and gemini.google.com – run the script that extracts the conversation.
-- Host access to *.googleusercontent.com, *.usercontent.google.com, and lh1.google.com–lh7.google.com – fetch Gemini images and uploaded files.
+- activeTab – read the current chat when you click Export.
+- storage – remember your export preferences.
+- declarativeNetRequestWithHostAccess – adjust CORS headers from Google's image CDNs so Gemini images and attached files can be embedded or saved. Scoped to those hosts only.
+- Host access to claude.ai, chatgpt.com, and gemini.google.com – run the script that extracts the conversation.
+- Host access to *.googleusercontent.com, *.usercontent.google.com, and lh1.google.com–lh7.google.com – fetch Gemini images and uploaded files.
 
 FEEDBACK
 
