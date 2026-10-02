@@ -1,0 +1,3 @@
+# Upload fixtures must stay byte-identical (the PDF has byte offsets).
+*.pdf binary
+tests/live/fixtures/** -text
