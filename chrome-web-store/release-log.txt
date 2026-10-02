@@ -2,24 +2,22 @@
 
 ## v0.7.39 — 2026-10-01
 
-Claude: ZIP exports now contain your uploaded images in original quality, not the downscaled preview
-Claude: published artifacts (the new claude.ai/artifact pages) are exported, in their latest version, with a link to the page
-Claude: files Claude created and then edited are exported in their final version
-Claude: files Claude sends you are exported even when they don't appear in the chat's file list
-Claude: Research reports and web search answers keep their sources (numbered references plus a Sources list)
-Claude: thinking summaries are exported (claude.ai no longer keeps the full reasoning text)
-Claude: drawings and diagrams Claude renders in the chat are saved as SVG/HTML files
-Claude: dictated messages are marked with 🎙️; support notices are kept; internal blocks no longer show up as unknown
-Gemini: file names no longer end with "- Google Gemini"
-ChatGPT: charts drawn by Python code are exported as images
-Images Claude sends you now display inline in Markdown exports
-Claude Docs documents are linked from the export (their content isn't included yet)
+Claude
+• Fixed images appearing twice in exports.
+• Your uploaded images are now exported in original quality (ZIP), named by their real format.
+• Artifacts made with Claude's new artifact pages are exported in their latest version, with a link to the online page.
+• Files Claude created and then edited are exported in their final version; files Claude sends you are always included.
+• Research reports and web-search answers keep their sources: numbered references plus a Sources list.
+• Thinking summaries are included with "Include reasoning".
+• Drawings and diagrams Claude renders in the chat are saved as SVG/HTML files.
+• Dictated messages are marked with 🎙️, support notices are kept, and images that fail to download are clearly marked.
+• Claude Docs documents are linked from the export (their content isn't exported yet).
 
-## v0.7.38 — 2026-10-01
+ChatGPT
+• Charts drawn by Python code are now exported as images.
 
-Fixed duplicated images in Claude exports
-Image files in ZIP exports are now named after their actual format (Claude serves uploaded photos as WebP)
-Claude images that fail to download are now marked as such instead of looking like a skipped image
+Gemini
+• Export file names no longer end with "- Google Gemini".
 
 ## v0.7.37 — 2026-08-03
 
