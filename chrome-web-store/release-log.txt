@@ -1,10 +1,7 @@
 ﻿# LLM Chat Exporter — Release Log
 
-## v0.7.38 — 2026-10-01
+## v0.7.39 — 2026-10-01
 
-Fixed duplicated images in Claude exports
-Image files in ZIP exports are now named after their actual format (Claude serves uploaded photos as WebP)
-Claude images that fail to download are now marked as such instead of looking like a skipped image
 Claude: ZIP exports now contain your uploaded images in original quality, not the downscaled preview
 Claude: published artifacts (the new claude.ai/artifact pages) are exported, in their latest version, with a link to the page
 Claude: files Claude created and then edited are exported in their final version
@@ -17,6 +14,12 @@ Gemini: file names no longer end with "- Google Gemini"
 ChatGPT: charts drawn by Python code are exported as images
 Images Claude sends you now display inline in Markdown exports
 Claude Docs documents are linked from the export (their content isn't included yet)
+
+## v0.7.38 — 2026-10-01
+
+Fixed duplicated images in Claude exports
+Image files in ZIP exports are now named after their actual format (Claude serves uploaded photos as WebP)
+Claude images that fail to download are now marked as such instead of looking like a skipped image
 
 ## v0.7.37 — 2026-08-03
 
