@@ -338,8 +338,12 @@ const audit = (exp) => {
       continue;
     }
     if (t.startsWith('sandbox:')) {
-      add(exp.mode === 'zip' ? 'error' : 'warn', 'sandbox-link',
-        `unresolved sandbox link "${link.label}" → ${t}`, { line: link.line });
+      // The provider refused the file (marked "no longer available") --
+      // reported as file-unavailable; nothing the exporter could do.
+      const base = t.split('/').pop();
+      const refused = md.includes(`📎 ~~${base}~~ _(no longer available)_`);
+      add(exp.mode === 'zip' && !refused ? 'error' : 'warn', 'sandbox-link',
+        `unresolved sandbox link "${link.label}" → ${t}${refused ? ' (file unavailable)' : ''}`, { line: link.line });
       continue;
     }
     if (/^[a-z][a-z0-9+.-]*:/i.test(t)) continue; // external URL

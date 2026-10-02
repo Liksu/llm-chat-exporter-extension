@@ -7,6 +7,7 @@
     "test:update": "node --test --test-reporter=spec tests/test.js",
     "audit": "node tools/audit-export.js",
     "drift": "node tools/schema-drift.js",
+    "matrix": "node tools/settings-matrix.js",
     "record": "node tools/record-from-har.js",
     "live:prepare": "node tools/live.js prepare",
     "live:collect": "node tools/live.js collect",

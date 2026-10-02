@@ -340,3 +340,16 @@ test('live collect: tagged downloads become report, scenario and fixture', async
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+/**
+ * Every combination of export options on a conversation with artifacts,
+ * reasoning, files, citations and voice: each output obeys its options.
+ */
+test('settings matrix: all 160 option combinations', async () => {
+  const { runMatrix, summarize } = require('../tools/settings-matrix');
+  for (const name of ['claude-new-tools', 'claude-uploaded-images']) {
+    const sum = summarize(await runMatrix({ scenarioDir: path.join(SCENARIOS_DIR, 'examples', name) }));
+    assert.equal(sum.total, 160);
+    assert.deepEqual(sum.findings, [], `${name}: ${JSON.stringify(sum.findings, null, 1)}`);
+  }
+});

@@ -155,12 +155,16 @@
     };
     entries['metadata.json'] = utf8ToBytes(JSON.stringify(meta, null, 2));
 
-    const zipped = await new Promise((resolve, reject) => {
-      fflate.zip(entries, { level: 6 }, (err, data) => {
-        if (err) reject(err);
-        else resolve(data);
+    // Async zip compresses big entries in Web Workers; where there are none
+    // (the Node test harness) fall back to the synchronous API.
+    const zipped = typeof Worker === 'undefined'
+      ? fflate.zipSync(entries, { level: 6 })
+      : await new Promise((resolve, reject) => {
+        fflate.zip(entries, { level: 6 }, (err, data) => {
+          if (err) reject(err);
+          else resolve(data);
+        });
       });
-    });
 
     return new Blob([zipped], { type: 'application/zip' });
   };

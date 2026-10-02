@@ -20,6 +20,7 @@
     slugifyAnchor,
     softBreaks,
     uint8ToBase64,
+    sniffImageMime,
     escapeMdInline,
     formatBytes,
     formatTurnDate,
@@ -185,7 +186,10 @@
           return `![${alt}](${path})`;
         }
         const b64 = uint8ToBase64(block.bytes);
-        return `![${alt}](data:${block.mime || 'image/png'};base64,${b64})`;
+        // A data URL only displays with an image/* type; servers sometimes
+        // label image bytes application/octet-stream.
+        const mime = /^image\//.test(block.mime || '') ? block.mime : sniffImageMime(block.bytes) || 'image/png';
+        return `![${alt}](data:${mime};base64,${b64})`;
       }
 
       case 'artifact_ref': {

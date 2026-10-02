@@ -685,6 +685,22 @@
       out.push({
         block: { kind: 'tool_result', text, isError: false },
       });
+      // Charts / images the code displayed ("<<ImageDisplayed>>"): the
+      // picture shown in the chat, so visible regardless of reasoning.
+      // metadata.aggregate_result.messages[{message_type:'image',
+      // image_url:'sediment://file_…'}]
+      const agg = isObject(meta.aggregate_result) ? meta.aggregate_result : {};
+      for (const msg of Array.isArray(agg.messages) ? agg.messages : []) {
+        if (!isObject(msg) || msg.message_type !== 'image' || typeof msg.image_url !== 'string') continue;
+        const mm = /^(?:sediment|file-service):\/\/(file[-_][A-Za-z0-9]+)$/.exec(msg.image_url);
+        if (!mm) continue;
+        const charts = Array.isArray(meta.ada_visualizations) ? meta.ada_visualizations : [];
+        const title = charts.length === 1 && typeof charts[0].title === 'string' ? charts[0].title : '';
+        out.push({
+          block: { kind: 'image', mime: 'image/png', name: title ? `${title}.png` : `${mm[1]}.png`, bytes: new Uint8Array(0) },
+          _imageRef: { fileId: mm[1] },
+        });
+      }
       return out;
     }
 

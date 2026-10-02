@@ -93,7 +93,9 @@
   };
 
   const fetchFile = async (orgId, fileUuid, userScopeId) => {
-    const candidates = [];
+    // /organizations/…/contents serves every kind (uploads, blobs Claude
+    // sent, originals of images) as of 2026-10; try it before the guesses.
+    const candidates = [`${BASE}/organizations/${orgId}/files/${fileUuid}/contents`];
     if (userScopeId) {
       candidates.push(
         `${BASE}/${userScopeId}/files/${fileUuid}/preview`,
@@ -104,7 +106,6 @@
     }
     candidates.push(
       `${BASE}/organizations/${orgId}/files/${fileUuid}/preview`,
-      `${BASE}/organizations/${orgId}/files/${fileUuid}/contents`,
       `${BASE}/organizations/${orgId}/files/${fileUuid}/download`,
       `${BASE}/organizations/${orgId}/files/${fileUuid}`,
     );

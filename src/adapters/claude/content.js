@@ -114,40 +114,42 @@
     if (mode === 'zip' || inlineImages) {
       for (const { turnIndex, blockIndex, ref } of imageRefs) {
         const block = conversation.turns[turnIndex].blocks[blockIndex];
-        try {
-          let bytes;
-          let mime = ref.mime;
-          // ZIP keeps the original upload; md (images inlined as data URLs)
-          // stays on the lighter preview so the file doesn't balloon.
-          if (mode === 'zip' && ref.fileUuid) {
-            try {
-              const r = await claudeApi.fetchOriginal(orgId, ref.fileUuid);
-              if (r.bytes.length) {
-                bytes = r.bytes;
-                mime = utils.sniffImageMime(r.bytes) || r.mime || mime;
-              }
-            } catch (err) {
-              log.debug('original image unavailable, using preview', ref.fileUuid, err);
+        // ZIP keeps the original upload; md (images inlined as data URLs)
+        // prefers the lighter preview so the file doesn't balloon. Either
+        // falls back to the other.
+        const original = async () => {
+          const r = await claudeApi.fetchOriginal(orgId, ref.fileUuid);
+          return { bytes: r.bytes, mime: utils.sniffImageMime(r.bytes) || r.mime };
+        };
+        const preview = () => (ref.url
+          ? ns.fetchBinary.fetchAsBytes(ref.url)
+          : claudeApi.fetchFile(orgId, ref.fileUuid, userScopeId));
+        const sources = [];
+        if (ref.fileUuid) sources.push(original);
+        if (ref.url || ref.fileUuid) {
+          if (mode === 'zip') sources.push(preview);
+          else sources.unshift(preview);
+        }
+        let lastErr = null;
+        for (const source of sources) {
+          try {
+            const r = await source();
+            if (r.bytes && r.bytes.length > 0) {
+              block.bytes = r.bytes;
+              // Files Claude sends come back as application/octet-stream.
+              block.mime = utils.sniffImageMime(r.bytes) ||
+                (/^image\//.test(r.mime || '') ? r.mime : '') || ref.mime;
+              break;
             }
+          } catch (err) {
+            lastErr = err;
           }
-          if (!bytes && ref.url) {
-            const r = await ns.fetchBinary.fetchAsBytes(ref.url);
-            bytes = r.bytes;
-            if (r.mime) mime = r.mime;
-          } else if (!bytes && ref.fileUuid) {
-            const r = await claudeApi.fetchFile(orgId, ref.fileUuid, userScopeId);
-            bytes = r.bytes;
-            if (r.mime) mime = r.mime;
-          }
-          if (bytes && bytes.length > 0) {
-            block.bytes = bytes;
-            block.mime = mime;
-          } else {
-            block.fetchError = ref.url || ref.fileUuid ? 'empty response' : 'no download reference';
-          }
-        } catch (err) {
-          log.warn('image fetch failed', ref, err);
-          block.fetchError = err instanceof Error ? err.message : String(err);
+        }
+        if (!block.bytes || block.bytes.length === 0) {
+          if (lastErr) log.warn('image fetch failed', ref, lastErr);
+          block.fetchError = lastErr
+            ? (lastErr instanceof Error ? lastErr.message : String(lastErr))
+            : sources.length ? 'empty response' : 'no download reference';
         }
       }
     }

@@ -14,6 +14,9 @@ Claude: thinking summaries are exported (claude.ai no longer keeps the full reas
 Claude: drawings and diagrams Claude renders in the chat are saved as SVG/HTML files
 Claude: dictated messages are marked with 🎙️; support notices are kept; internal blocks no longer show up as unknown
 Gemini: file names no longer end with "- Google Gemini"
+ChatGPT: charts drawn by Python code are exported as images
+Images Claude sends you now display inline in Markdown exports
+Claude Docs documents are linked from the export (their content isn't included yet)
 
 ## v0.7.37 — 2026-08-03
 

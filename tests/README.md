@@ -525,6 +525,24 @@ contain tool names from your own connectors.
 First run: there is no baseline, so everything is reported as new. Feed
 it a few debug HARs of ordinary chats and `--update` to start.
 
+## Settings matrix
+
+```bash
+npm run matrix -- <file.har>...            # debug HARs of one chat (zip + md export)
+npm run matrix -- --scenario <scenario-dir>
+```
+
+Replays one conversation with every combination of export options — mode
+× reasoning × dates (off + 4 formats) × inline images × inline text files
+× attachments-as-markdown = 160 exports, about 2 s — and checks each
+output obeys its options (images inline vs `assets/` vs placeholders,
+reasoning present exactly when on, date line format under every turn,
+inlined `File:` blocks, unfenced `.md` attachments, same artifacts as a
+baseline, clean audit). A zip and an md debug HAR of the same chat
+together cover every fetch the combinations need. `npm test` runs it on
+the example scenarios; live `*.kitchen-sink` features run it on real
+chats.
+
 ## Page-triggered exports (for browser automation)
 
 Options page → **Developer** → *Allow exports triggered from the page*.

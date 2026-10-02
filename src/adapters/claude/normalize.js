@@ -434,6 +434,8 @@
 
   /** "Published <path> at https://claude.ai/artifact/<id> (Version N…" */
   const PUBLISHED_RE = /Published (\S+) at (https:\/\/claude\.ai\/artifact\/[A-Za-z0-9_-]+)/;
+  /** "Created a new Artifact at https://claude.ai/artifact/<id> (…) from the Artifact type …" */
+  const TYPED_CREATED_RE = /Created a new Artifact at (https:\/\/claude\.ai\/artifact\/[A-Za-z0-9_-]+)/;
 
   /**
    * Content-bearing tool output kept as an artifact: `show_widget` draws an
@@ -532,6 +534,7 @@
       const name = typeof raw.name === 'string' ? raw.name : 'tool';
       const input = isObject(raw.input) ? raw.input : {};
       const asCall = { block: { kind: 'tool_call', name, input: safeStringify(raw.input) } };
+      if (raw.id) ctx.toolInputs.set(raw.id, input);
       if (name === 'artifacts') {
         const id = applyArtifactsCall(raw.input, artifactMap);
         const command = (pick(raw.input || {}, ['command', 'operation']) || 'create').toLowerCase();
@@ -610,6 +613,18 @@
         const m = PUBLISHED_RE.exec(text);
         const art = m && artifactMap.get(`artifact:${m[1]}`);
         if (art) art.url = m[2];
+        // Docs / Slides / Design artifacts are created from an Artifact type;
+        // their content lives in that type's own service and is edited via
+        // its tools, so all an export can carry is the link.
+        const typed = TYPED_CREATED_RE.exec(text);
+        const call = ctx.toolInputs.get(raw.tool_use_id);
+        if (typed && call && call.type_url) {
+          const title = pick(call, ['title']) || 'claude.ai document';
+          return [
+            { block: { kind: 'text', text: `📄 **${title}** — made on claude.ai; its content isn't included in this export: [open](${typed[1]})` } },
+            { block: { kind: 'tool_result', text, isError: raw.is_error === true } },
+          ];
+        }
       }
       return [
         {
@@ -810,7 +825,7 @@
     const viewHarvest = opts.inlineTextFiles ? harvestViewToolContent(ordered) : null;
     // Shared across blocks: sandbox files by path (create_file / Write and
     // their edits). Per turn: citation sources and the raw text they number.
-    const ctx = { artifactMap, files: new Map(), turnSources: new Map(), turnText: [] };
+    const ctx = { artifactMap, files: new Map(), toolInputs: new Map(), turnSources: new Map(), turnText: [] };
 
     const turns = [];
     const imageRefs = [];

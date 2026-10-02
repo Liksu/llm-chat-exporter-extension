@@ -110,7 +110,19 @@ is saved inside the project. Then:
 - Don't change the model, Effort or tool toggles: they are saved
   preferences. If a feature needs a toggle that is off, note it and skip.
 - To know a reply has finished, look for the absence of a Stop button
-  (`button[aria-label*="Stop" i]`) with short checks.
+  (`button[aria-label*="Stop" i]`) with short checks. On ChatGPT the
+  composer shows the voice-mode button again when it's done.
+- Multi-line prompts: type each line, Shift+Enter between lines. claude.ai
+  and ChatGPT turn a typed ```` ```python ```` line into a code block; on
+  claude.ai the block can't be left by typing ```` ``` ````, so the plan
+  puts code blocks last. Send with the Send button (Enter inside a code
+  block adds a line).
+- Gemini: file inputs only exist after opening the "+" menu. In a Google
+  Workspace account uploads may fail on send (error badge on each file);
+  then remove them / start over without uploads and report it.
+- Matrix features have a second export snippet (`<id>#md`): run both on
+  the same page. `collect` replays the chat with all 160 option
+  combinations from those two HARs.
 
 ### Running the export snippet
 

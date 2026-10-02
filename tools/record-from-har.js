@@ -376,7 +376,10 @@ function main() {
     } catch {
       continue;
     }
-    if (isManifestHost(u.hostname, hostMatchers)) {
+    // A debug-capture HAR holds only the extension's own requests -- keep
+    // all of them (ChatGPT files come from *.oaiusercontent.com, which is
+    // not in host_permissions). DevTools HARs get filtered to manifest hosts.
+    if (meta || isManifestHost(u.hostname, hostMatchers)) {
       relevant.push(entry);
     } else {
       skippedCounts.set(u.hostname, (skippedCounts.get(u.hostname) || 0) + 1);

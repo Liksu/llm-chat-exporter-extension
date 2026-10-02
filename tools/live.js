@@ -164,6 +164,12 @@ const prepare = (args) => {
       followUps: wantNew ? f.followUps || [] : [],
       exportDetail: detail,
       exportSnippet: snippetFor(detail),
+      // Settings matrix: one more export in md mode; together with the
+      // main zip export its HAR covers every fetch any option combination
+      // needs (tools/settings-matrix.js).
+      extraExports: f.matrix
+        ? [{ tag: `${f.id}#md`, snippet: snippetFor({ ...detail, mode: 'md', inlineImages: true, inlineTextFiles: true, tag: `${f.id}#md` }) }]
+        : [],
     });
   }
 
@@ -197,12 +203,19 @@ const renderPlan = (plan) => {
         : `${n++}. Open ${t.url} (a new chat, **outside** any project).`);
       if (t.setup) out.push(`${n++}. Setup: ${t.setup}`);
       if (t.uploads.length) out.push(`${n++}. Attach: ${t.uploads.map((u) => `\`${u}\``).join(', ')}`);
-      out.push(`${n++}. Send this message:`, '', '   ```text', ...t.prompt.split('\n').map((l) => `   ${l}`), '   ```');
+      // A fence longer than any backtick run inside the prompt.
+      const fence = '`'.repeat(Math.max(3, ...(t.prompt.match(/`+/g) || []).map((s) => s.length + 1)));
+      out.push(`${n++}. Send this message${t.prompt.includes('\n') ? ' (line breaks: Shift+Enter)' : ''}:`, '',
+        `   ${fence}text`, ...t.prompt.split('\n').map((l) => `   ${l}`), `   ${fence}`);
       for (const fu of t.followUps) out.push(`${n++}. Wait for the reply to finish, then: ${fu}`);
       out.push(`${n++}. Wait until the reply has fully finished (no stop button / spinner). The URL must have changed from the start URL to the new chat's, matching \`${t.chatUrlPattern}\`.`);
       out.push(`${n++}. Run the export snippet below.`, '');
     }
     out.push('```js', t.exportSnippet, '```', '');
+    for (const x of t.extraExports || []) {
+      out.push(`Then, on the same page, run this second export (\`${x.tag}\`, for the settings matrix):`, '');
+      out.push('```js', x.snippet, '```', '');
+    }
   });
   if (plan.skipped.length) {
     out.push('## Skipped', '');
@@ -251,7 +264,8 @@ const findDownloads = (downloadsDir, since, featureIds) => {
       continue;
     }
     const meta = har.log && har.log._exporter;
-    if (!meta || !featureIds.has(meta.tag)) continue;
+    // "<id>" or an extra export of the same feature ("<id>#md", matrix).
+    if (!meta || typeof meta.tag !== 'string' || !featureIds.has(meta.tag.split('#')[0])) continue;
     const prev = byFeature.get(meta.tag);
     if (prev && prev.har.mtime > f.mtime) continue;
     let exportFile = null;
@@ -406,25 +420,37 @@ const collectRun = async (args) => {
   for (const task of plan.tasks) {
     const feature = featureById.get(task.featureId);
     const dest = path.join(runDownloads, task.featureId);
-    const hit = found.get(task.featureId);
-    if (hit) {
+    const hits = [found.get(task.featureId), ...(task.extraExports || []).map((x) => found.get(x.tag))].filter(Boolean);
+    if (hits.length) {
       fs.rmSync(dest, { recursive: true, force: true });
       const move = args.keepDownloads ? (a, b) => { fs.mkdirSync(path.dirname(b), { recursive: true }); fs.copyFileSync(a, b); } : moveFile;
-      move(hit.har.full, path.join(dest, hit.har.name));
-      if (hit.exportFile) move(hit.exportFile.full, path.join(dest, hit.exportFile.name));
+      for (const hit of hits) {
+        move(hit.har.full, path.join(dest, hit.har.name));
+        if (hit.exportFile) move(hit.exportFile.full, path.join(dest, hit.exportFile.name));
+      }
     }
     const local = fs.existsSync(dest) ? fs.readdirSync(dest) : [];
-    const harName = local.find((n) => /\.har$/i.test(n));
-    const exportName = local.find((n) => /\.(zip|md)$/i.test(n));
+    // The main export is the one tagged with the bare feature id; extra
+    // ones ("<id>#md") only feed the settings matrix.
+    const hars = local.filter((n) => /\.har$/i.test(n)).map((n) => {
+      const log = JSON.parse(fs.readFileSync(path.join(dest, n), 'utf8')).log;
+      return { name: n, meta: log._exporter || {} };
+    });
+    const main = hars.find((h) => h.meta.tag === task.featureId) || hars[0];
     const r = { featureId: task.featureId, provider: task.provider, title: task.title, action: task.action, support: feature ? feature.support : 'unknown' };
-    if (!harName) {
+    if (!main) {
       r.status = 'NOT_RUN';
       results.push(r);
       continue;
     }
+    const harName = main.name;
     const harPath = path.join(dest, harName);
-    harPaths.push(harPath);
-    const meta = JSON.parse(fs.readFileSync(harPath, 'utf8')).log._exporter || {};
+    harPaths.push(...hars.map((h) => path.join(dest, h.name)));
+    const meta = main.meta;
+    const mainFile = meta.result && meta.result.filename;
+    const stem = mainFile ? mainFile.replace(/\.(zip|md)$/i, '') : null;
+    const exportName = local.find((n) => stem && n.startsWith(stem) && n.endsWith(path.extname(mainFile))) ||
+      local.find((n) => /\.(zip|md)$/i.test(n));
     r.url = meta.location;
     r.extensionResult = meta.result;
     if (!meta.result || !meta.result.ok || !exportName) {
@@ -439,7 +465,19 @@ const collectRun = async (args) => {
     r.audit = audit(exp).map((f) => ({ severity: f.severity, code: f.code, message: f.message }));
     r.expect = checkExpectations(feature || {}, exp);
     const auditErrors = r.audit.filter((f) => f.severity === 'error');
-    const pass = auditErrors.length === 0 && r.expect.results.every((x) => x.ok);
+    let matrixOk = true;
+    if (feature && feature.matrix) {
+      const { runMatrix, summarize } = require('./settings-matrix');
+      try {
+        const m = await runMatrix({ hars: hars.map((h) => path.join(dest, h.name)) });
+        r.matrix = summarize(m);
+        matrixOk = r.matrix.failed === 0;
+      } catch (e) {
+        r.matrix = { error: e.message };
+        matrixOk = false;
+      }
+    }
+    const pass = auditErrors.length === 0 && r.expect.results.every((x) => x.ok) && matrixOk;
     const supported = r.support === 'supported';
     r.status = pass ? (supported ? 'OK' : 'NEWLY_WORKING') : (supported ? 'BROKEN' : 'GAP');
     try {
@@ -507,6 +545,13 @@ const renderReport = (rep) => {
     out.push(`## ${STATUS_TITLE[s]}`, '');
     for (const r of rows) {
       out.push(`- **${r.featureId}** — ${r.title}${r.url ? ` · ${r.url}` : ''}`);
+      if (r.matrix) {
+        if (r.matrix.error) out.push(`  - settings matrix failed to run: ${r.matrix.error}`);
+        else {
+          out.push(`  - settings matrix: ${r.matrix.total - r.matrix.failed}/${r.matrix.total} combinations OK (chat covers ${JSON.stringify(r.matrix.covers)})`);
+          for (const f of r.matrix.findings) out.push(`    - ✗ ${f.problem} — ${f.count} combination(s), e.g. ${f.examples.slice(0, 2).join(' | ')}`);
+        }
+      }
       if (s === 'OK' || s === 'NOT_RUN') continue;
       if (r.error) out.push(`  - ${r.error}`);
       for (const x of (r.expect && r.expect.results) || []) if (!x.ok) out.push(`  - ✗ expected ${x.check}`);

@@ -9,7 +9,7 @@ _Updated: 2026-10-01T05:48:00Z_
 
 ![photo.jpg](data:image/webp;base64,UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==)
 
-_[image not loaded: gone.png — fetch https://claude.ai/api/c0000000-0000-0000-0000-0000000000cc/files/00000000-0000-0000-0000-0000000000f2/preview failed: 404 ]_
+_[image not loaded: gone.png — fetchOriginal 00000000-0000-0000-0000-0000000000f2 → 404]_
 
 What is in these pictures?
 

@@ -1,7 +1,6 @@
 {
   "version": 1,
   "about": "Catalog of things a user can have in a chat and would expect in an export. Driven by tools/live.js (prepare/collect) and tests/live/TASK.md (Claude Desktop). support: what the extension is expected to handle today -- 'supported' failures are reported as BROKEN, 'unsupported'/'unknown' failures as GAPS, and an unsupported feature that passes as NEWLY WORKING. cost 'high' features (quota-hungry) run only with --include-expensive. automation 'manual' features are listed but never automated. context: new test chats start in the provider test project when config.local.json lists the provider in useProjectFor; outside-project / project force one or the other.",
-
   "defaults": {
     "export": {
       "mode": "zip",
@@ -13,7 +12,6 @@
       "attachmentsAsMarkdown": false
     }
   },
-
   "providers": {
     "claude": {
       "newChatUrl": "https://claude.ai/new",
@@ -28,7 +26,6 @@
       "chatUrlPattern": "^https://gemini\\.google\\.com/(u/\\d+/)?app/[0-9a-f]+"
     }
   },
-
   "features": [
     {
       "id": "claude.text-formatting",
@@ -37,16 +34,27 @@
       "support": "supported",
       "context": "outside-project",
       "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
-      "expect": { "turns": ">=2", "mdMatches": ["\\|.*\\|.*\\|", "```(js|javascript)"] }
+      "expect": {
+        "turns": ">=2",
+        "mdMatches": [
+          "\\|.*\\|.*\\|",
+          "```(js|javascript)"
+        ]
+      }
     },
     {
       "id": "claude.image-upload",
       "provider": "claude",
       "title": "Two uploaded images (PNG + JPEG) in one message",
       "support": "supported",
-      "uploads": ["bar-chart.png", "house-photo.jpg"],
+      "uploads": [
+        "bar-chart.png",
+        "house-photo.jpg"
+      ],
       "prompt": "Describe each of the two attached images in one sentence.",
-      "expect": { "images": "==2" },
+      "expect": {
+        "images": "==2"
+      },
       "notes": "==2 catches duplicated images (files[] + content[] image blocks). The JPEG comes back as WebP from claude.ai /preview."
     },
     {
@@ -54,18 +62,33 @@
       "provider": "claude",
       "title": "Uploaded PDF",
       "support": "supported",
-      "uploads": ["project-brief.pdf"],
+      "uploads": [
+        "project-brief.pdf"
+      ],
       "prompt": "What is the project codename and budget in the attached PDF?",
-      "expect": { "mdMatches": ["project-brief\\.pdf"] }
+      "expect": {
+        "mdMatches": [
+          "project-brief\\.pdf"
+        ]
+      }
     },
     {
       "id": "claude.text-file-upload",
       "provider": "claude",
       "title": "Uploaded markdown and CSV files (inlined with inlineTextFiles)",
       "support": "supported",
-      "uploads": ["meeting-notes.md", "sales.csv"],
+      "uploads": [
+        "meeting-notes.md",
+        "sales.csv"
+      ],
       "prompt": "Who owns the pagination bug in the notes, and what was total North revenue in the CSV?",
-      "expect": { "mdMatches": ["meeting-notes\\.md", "sales\\.csv", "BLUE HERON|Fix pagination bug|2026-01,North"] }
+      "expect": {
+        "mdMatches": [
+          "meeting-notes\\.md",
+          "sales\\.csv",
+          "BLUE HERON|Fix pagination bug|2026-01,North"
+        ]
+      }
     },
     {
       "id": "claude.artifact",
@@ -73,7 +96,12 @@
       "title": "Artifact (published page: Write + Artifact tools)",
       "support": "supported",
       "prompt": "Create an artifact: a small standalone HTML page with a button that counts clicks.",
-      "expect": { "artifacts": ">=1", "mdMatches": ["\\[online\\]\\(https://claude\\.ai/artifact/"] },
+      "expect": {
+        "artifacts": ">=1",
+        "mdMatches": [
+          "\\[online\\]\\(https://claude\\.ai/artifact/"
+        ]
+      },
       "notes": "Since 2026-09 artifacts are files written with Write, edited with Edit and published with Artifact (claude.ai/artifact/<id>); the older `artifacts` tool still appears in Research reports."
     },
     {
@@ -82,7 +110,11 @@
       "title": "File generated for download (Write + SendUserFile)",
       "support": "supported",
       "prompt": "Create a CSV file named fruits.csv with 3 rows (name, color) and give it to me as a downloadable file.",
-      "expect": { "outputMatches": ["Apple,Red|name,color"] },
+      "expect": {
+        "outputMatches": [
+          "Apple,Red|name,color"
+        ]
+      },
       "notes": "The file comes via files[] or only via the SendUserFile result; with inlineTextFiles it is inlined, otherwise saved under files/."
     },
     {
@@ -91,8 +123,14 @@
       "title": "File created, then changed in a follow-up: the export has the final version",
       "support": "supported",
       "prompt": "Create a markdown file notes.md with the heading 'Plan for the trip' and 3 bullet points, and give it to me as a file.",
-      "followUps": ["Send: In notes.md, make the heading all uppercase and give me the updated file."],
-      "expect": { "outputMatches": ["PLAN FOR THE TRIP"] },
+      "followUps": [
+        "Send: In notes.md, make the heading all uppercase and give me the updated file."
+      ],
+      "expect": {
+        "outputMatches": [
+          "PLAN FOR THE TRIP"
+        ]
+      },
       "notes": "Edits (str_replace / Edit) must be applied to the exported file."
     },
     {
@@ -101,7 +139,9 @@
       "title": "Thinking (claude.ai keeps only summaries)",
       "support": "supported",
       "prompt": "Think carefully: how many weekdays are there between 2026-03-01 and 2026-03-31 inclusive? Answer with the number.",
-      "expect": { "reasoning": true },
+      "expect": {
+        "reasoning": true
+      },
       "notes": "No separate thinking toggle any more; thinking runs at the default Effort. Don't change Effort (it's a saved preference). The API returns thinking: \"\" with summaries[]."
     },
     {
@@ -110,7 +150,11 @@
       "title": "Web search with cited sources",
       "support": "supported",
       "prompt": "Search the web: what is the latest stable version of Node.js? Cite your source.",
-      "expect": { "mdMatches": ["\\[\\[\\d+\\]\\]\\(https?://|https?://"] },
+      "expect": {
+        "mdMatches": [
+          "\\[\\[\\d+\\]\\]\\(https?://|https?://"
+        ]
+      },
       "notes": "Text blocks carry citations[]; the export adds [n] markers and a Sources list. Don't toggle tools in the composer -- if web search is off, the answer has no sources and that's fine to report."
     },
     {
@@ -119,7 +163,9 @@
       "title": "Inline visual widget (SVG / HTML drawn in the chat)",
       "support": "supported",
       "prompt": "Draw a simple SVG illustration of a sunset over mountains right here in the chat (not as a file).",
-      "expect": { "artifacts": ">=1" },
+      "expect": {
+        "artifacts": ">=1"
+      },
       "notes": "visualize:show_widget {title, widget_code}; saved as an .svg/.html artifact. If Claude makes a file or artifact instead, note that."
     },
     {
@@ -128,7 +174,11 @@
       "title": "Web image search results shown in the chat",
       "support": "unsupported",
       "prompt": "Show me a few pictures of the Mitsubishi Outlander PHEV dashboard.",
-      "expect": { "outputMatches": ["!\\[[^\\]]*\\]\\(https?://"] },
+      "expect": {
+        "outputMatches": [
+          "!\\[[^\\]]*\\]\\(https?://"
+        ]
+      },
       "notes": "image_search results appear only as a tool call today."
     },
     {
@@ -137,7 +187,11 @@
       "title": "Places search shown on a map",
       "support": "unsupported",
       "prompt": "Show me 3 coffee shops near Union Square in San Francisco on a map.",
-      "expect": { "outputMatches": ["\\]\\(https://(www\\.)?google\\.[a-z.]+/maps"] },
+      "expect": {
+        "outputMatches": [
+          "\\]\\(https://(www\\.)?google\\.[a-z.]+/maps"
+        ]
+      },
       "notes": "places_search + places_map_display_v0: the map/list widget appears only as tool calls today."
     },
     {
@@ -157,7 +211,14 @@
       "followUps": [
         "EDIT the message you just sent (pencil icon on your message) to: Reply with exactly: BRANCH-TWO -- and resend it."
       ],
-      "expect": { "mdMatches": ["BRANCH-TWO"], "mdNotMatches": ["BRANCH-ONE"] }
+      "expect": {
+        "mdMatches": [
+          "BRANCH-TWO"
+        ],
+        "mdNotMatches": [
+          "BRANCH-ONE"
+        ]
+      }
     },
     {
       "id": "claude.mixed",
@@ -165,7 +226,12 @@
       "title": "Everything at once: images + PDF + text file, thinking, web search, artifact created then updated, generated file, tricky formatting",
       "support": "supported",
       "setup": "Turn on extended thinking and web search in the composer.",
-      "uploads": ["bar-chart.png", "house-photo.jpg", "project-brief.pdf", "meeting-notes.md"],
+      "uploads": [
+        "bar-chart.png",
+        "house-photo.jpg",
+        "project-brief.pdf",
+        "meeting-notes.md"
+      ],
       "prompt": "Mixed export test. Using all attached files: describe both images in one line each, give the project codename from the PDF, and list the action items from the notes. Also search the web for the current version of Node.js. In your answer include one sentence in Ukrainian, an emoji, the formula $E=mc^2$, and a markdown code block whose content contains a line with three backticks.",
       "followUps": [
         "Send: Now create an artifact: a markdown report that combines all of the above, with a table.",
@@ -173,10 +239,64 @@
         "Send: Use code execution to create summary.json with the codename and budget, and give it to me as a downloadable file."
       ],
       "expect": {
-        "turns": ">=8", "images": "==2", "artifacts": ">=2", "reasoning": true,
-        "mdMatches": ["project-brief\\.pdf", "meeting-notes\\.md", "E ?= ?mc", "https?://"]
+        "turns": ">=8",
+        "images": "==2",
+        "artifacts": ">=1",
+        "reasoning": true,
+        "mdMatches": [
+          "project-brief\\.pdf",
+          "meeting-notes\\.md",
+          "E ?= ?mc",
+          "https?://"
+        ],
+        "outputMatches": [
+          "Next steps",
+          "\"codename\": \"BLUE HERON\""
+        ]
       },
       "notes": "Catches interactions: uploads next to artifacts, artifact versions, thinking interleaved with tool use, nested code fences, non-Latin text."
+    },
+    {
+      "id": "claude.kitchen-sink",
+      "provider": "claude",
+      "title": "Kitchen sink for the settings matrix: my code + uploaded images, PDF, md, csv, js; generated chart PNG, code file, artifact",
+      "support": "supported",
+      "matrix": true,
+      "uploads": [
+        "bar-chart.png",
+        "house-photo.jpg",
+        "project-brief.pdf",
+        "meeting-notes.md",
+        "sales.csv",
+        "app.js"
+      ],
+      "prompt": "Kitchen-sink export test. 1) Fix the bug in my code below and in the attached app.js. 2) Describe both images in one line each. 3) Give the codename from the PDF and the action items from the notes. 4) Total the revenue in sales.csv. My code:\n```python\ndef add(a, b):\n    return a - b\n```",
+      "followUps": [
+        "Send: Use Python to draw a bar chart PNG of revenue by month from sales.csv and send me the PNG file, plus the fixed code as fixed.py.",
+        "Send: Now create an artifact: an HTML page that summarizes this whole chat with a table."
+      ],
+      "expect": {
+        "turns": ">=6",
+        "images": ">=3",
+        "artifacts": ">=1",
+        "outputMatches": [
+          "return a \\+ b"
+        ]
+      },
+      "notes": "Multi-line prompt: type line breaks with Shift+Enter."
+    },
+    {
+      "id": "claude.docs",
+      "provider": "claude",
+      "title": "Claude Docs document (artifact made from the Docs type)",
+      "support": "unsupported",
+      "prompt": "Create a Claude doc titled Export test doc with a table of the first 5 prime numbers and their squares.",
+      "expect": {
+        "outputMatches": [
+          "\b121\b"
+        ]
+      },
+      "notes": "Artifact publish with type_url (Docs) + mcp__Claude_Docs__* edits; content lives in the Docs service. Export has a link only (📄 …)."
     },
     {
       "id": "claude.research",
@@ -186,10 +306,15 @@
       "cost": "high",
       "setup": "Turn on Research in the composer.",
       "prompt": "Research briefly: compare two popular open-source Markdown editors. Keep the report short.",
-      "expect": { "artifacts": ">=1", "outputMatches": ["\\[\\[\\d+\\]\\]\\(https?://", "^## Sources$"] },
+      "expect": {
+        "artifacts": ">=1",
+        "outputMatches": [
+          "\\[\\[\\d+\\]\\]\\(https?://",
+          "^## Sources$"
+        ]
+      },
       "notes": "launch_extended_search_task, then an `artifacts` create whose md_citations hold the sources."
     },
-
     {
       "id": "chatgpt.text-formatting",
       "provider": "chatgpt",
@@ -197,25 +322,42 @@
       "support": "supported",
       "context": "outside-project",
       "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
-      "expect": { "turns": ">=2", "mdMatches": ["\\|.*\\|.*\\|", "```(js|javascript)"] }
+      "expect": {
+        "turns": ">=2",
+        "mdMatches": [
+          "\\|.*\\|.*\\|",
+          "```(js|javascript)"
+        ]
+      }
     },
     {
       "id": "chatgpt.image-upload",
       "provider": "chatgpt",
       "title": "Two uploaded images in one message",
       "support": "supported",
-      "uploads": ["bar-chart.png", "house-photo.jpg"],
+      "uploads": [
+        "bar-chart.png",
+        "house-photo.jpg"
+      ],
       "prompt": "Describe each of the two attached images in one sentence.",
-      "expect": { "images": "==2" }
+      "expect": {
+        "images": "==2"
+      }
     },
     {
       "id": "chatgpt.pdf-upload",
       "provider": "chatgpt",
       "title": "Uploaded PDF",
       "support": "supported",
-      "uploads": ["project-brief.pdf"],
+      "uploads": [
+        "project-brief.pdf"
+      ],
       "prompt": "What is the project codename and budget in the attached PDF?",
-      "expect": { "mdMatches": ["project-brief\\.pdf"] }
+      "expect": {
+        "mdMatches": [
+          "project-brief\\.pdf"
+        ]
+      }
     },
     {
       "id": "chatgpt.image-generation",
@@ -223,7 +365,9 @@
       "title": "Generated image",
       "support": "supported",
       "prompt": "Generate an image: a simple flat illustration of a red bicycle on a white background.",
-      "expect": { "images": ">=1" }
+      "expect": {
+        "images": ">=1"
+      }
     },
     {
       "id": "chatgpt.sandbox-file",
@@ -231,15 +375,39 @@
       "title": "File produced by code (sandbox:/mnt/data download link)",
       "support": "supported",
       "prompt": "Use Python to create a CSV file fruits.csv with 3 rows (name, color) and give me a download link.",
-      "expect": { "files": ">=1" }
+      "expect": {
+        "files": ">=1"
+      }
     },
     {
       "id": "chatgpt.canvas",
       "provider": "chatgpt",
-      "title": "Canvas document",
-      "support": "supported",
+      "title": "Writing block (replaced Canvas in 2026-10)",
+      "support": "unknown",
       "prompt": "Open a canvas and write a 5-line poem about autumn in it.",
-      "expect": { "artifacts": ">=1" }
+      "expect": {
+        "outputMatches": [
+          "[Aa]utumn"
+        ],
+        "mdNotMatches": [
+          "unknown:"
+        ]
+      },
+      "notes": "ChatGPT now answers 'Canvas has been replaced by writing blocks' and writes the text inline. Old chats with canvas textdocs still export as artifacts; check what a writing block looks like in the raw data."
+    },
+    {
+      "id": "chatgpt.code-chart",
+      "provider": "chatgpt",
+      "title": "Chart displayed by Python code",
+      "support": "supported",
+      "uploads": [
+        "sales.csv"
+      ],
+      "prompt": "Use Python to draw a bar chart of revenue by month from the attached sales.csv and show it here.",
+      "expect": {
+        "images": ">=1"
+      },
+      "notes": "execution_output metadata.aggregate_result.messages[{message_type:'image', image_url:'sediment://file_…'}] (+ ada_visualizations)."
     },
     {
       "id": "chatgpt.web-search",
@@ -247,7 +415,11 @@
       "title": "Web search with citations",
       "support": "unknown",
       "prompt": "Search the web: what is the latest stable version of Node.js? Cite your source.",
-      "expect": { "mdMatches": ["https?://"] },
+      "expect": {
+        "mdMatches": [
+          "https?://"
+        ]
+      },
       "notes": "Citation markers (\\uE200cite...\\uE201) are stripped today -- audit flags any that leak; mdMatches checks a source survives."
     },
     {
@@ -257,7 +429,9 @@
       "support": "supported",
       "setup": "Pick a thinking/reasoning model in the model picker.",
       "prompt": "Think carefully: how many weekdays are there between 2026-03-01 and 2026-03-31 inclusive? Answer with the number.",
-      "expect": { "reasoning": true }
+      "expect": {
+        "reasoning": true
+      }
     },
     {
       "id": "chatgpt.edited-branch",
@@ -268,21 +442,43 @@
       "followUps": [
         "EDIT the message you just sent (pencil icon on your message) to: Reply with exactly: BRANCH-TWO -- and resend it."
       ],
-      "expect": { "mdMatches": ["BRANCH-TWO"], "mdNotMatches": ["BRANCH-ONE"] }
+      "expect": {
+        "mdMatches": [
+          "BRANCH-TWO"
+        ],
+        "mdNotMatches": [
+          "BRANCH-ONE"
+        ]
+      }
     },
     {
-      "id": "chatgpt.mixed",
+      "id": "chatgpt.kitchen-sink",
       "provider": "chatgpt",
-      "title": "Everything at once: images + PDF, web search, Python file, generated image, canvas, tricky formatting",
+      "title": "Kitchen sink for the settings matrix: my code + uploaded images, PDF, md, csv, js; generated chart, image, file, writing block",
       "support": "supported",
-      "uploads": ["bar-chart.png", "house-photo.jpg", "project-brief.pdf"],
-      "prompt": "Mixed export test. Using the attached files: describe both images in one line each and give the project codename from the PDF. Also search the web for the current version of Node.js. In your answer include one sentence in Ukrainian, an emoji, the formula $E=mc^2$, and a markdown code block whose content contains a line with three backticks.",
-      "followUps": [
-        "Send: Use Python to create summary.csv with the codename and budget and give me a download link.",
-        "Send: Generate an image of a red bicycle.",
-        "Send: Open a canvas and write a 3-line summary of this chat in it."
+      "matrix": true,
+      "uploads": [
+        "bar-chart.png",
+        "house-photo.jpg",
+        "project-brief.pdf",
+        "meeting-notes.md",
+        "sales.csv",
+        "app.js"
       ],
-      "expect": { "turns": ">=8", "images": ">=3", "files": ">=1", "artifacts": ">=1", "mdMatches": ["E ?= ?mc", "https?://"] }
+      "prompt": "Kitchen-sink export test. 1) Fix the bug in my code below and in the attached app.js. 2) Describe both images in one line each. 3) Give the codename from the PDF and the action items from the notes. 4) Total the revenue in sales.csv. My code:\n```python\ndef add(a, b):\n    return a - b\n```",
+      "followUps": [
+        "Send: Use Python to draw a bar chart of revenue by month from sales.csv, show it here, and give me the fixed code as fixed.py (download link).",
+        "Send: Generate an image of a red bicycle.",
+        "Send: Write a 3-line summary of this chat in a writing block."
+      ],
+      "expect": {
+        "turns": ">=8",
+        "images": ">=4",
+        "files": ">=1",
+        "outputMatches": [
+          "return a \\+ b"
+        ]
+      }
     },
     {
       "id": "chatgpt.deep-research",
@@ -292,7 +488,9 @@
       "cost": "high",
       "setup": "Choose Deep research from the composer tools.",
       "prompt": "Deep research, keep it short: compare two popular open-source Markdown editors.",
-      "expect": { "artifacts": ">=1" }
+      "expect": {
+        "artifacts": ">=1"
+      }
     },
     {
       "id": "chatgpt.voice",
@@ -302,32 +500,48 @@
       "automation": "manual",
       "notes": "Needs a microphone; create by hand once, then it is re-exported every run."
     },
-
     {
       "id": "gemini.text-formatting",
       "provider": "gemini",
       "title": "Plain text with markdown: headings, list, table, code block",
       "support": "supported",
       "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
-      "expect": { "turns": ">=2", "mdMatches": ["\\|.*\\|.*\\|", "```(js|javascript)"] }
+      "expect": {
+        "turns": ">=2",
+        "mdMatches": [
+          "\\|.*\\|.*\\|",
+          "```(js|javascript)"
+        ]
+      }
     },
     {
       "id": "gemini.image-upload",
       "provider": "gemini",
       "title": "Two uploaded images in one message",
       "support": "supported",
-      "uploads": ["bar-chart.png", "house-photo.jpg"],
+      "uploads": [
+        "bar-chart.png",
+        "house-photo.jpg"
+      ],
       "prompt": "Describe each of the two attached images in one sentence.",
-      "expect": { "images": "==2" }
+      "expect": {
+        "images": "==2"
+      }
     },
     {
       "id": "gemini.pdf-upload",
       "provider": "gemini",
       "title": "Uploaded PDF",
       "support": "supported",
-      "uploads": ["project-brief.pdf"],
+      "uploads": [
+        "project-brief.pdf"
+      ],
       "prompt": "What is the project codename and budget in the attached PDF?",
-      "expect": { "mdMatches": ["project-brief\\.pdf"] }
+      "expect": {
+        "mdMatches": [
+          "project-brief\\.pdf"
+        ]
+      }
     },
     {
       "id": "gemini.image-generation",
@@ -335,7 +549,9 @@
       "title": "Generated image",
       "support": "supported",
       "prompt": "Generate an image: a simple flat illustration of a red bicycle on a white background.",
-      "expect": { "images": ">=1" }
+      "expect": {
+        "images": ">=1"
+      }
     },
     {
       "id": "gemini.thinking",
@@ -344,7 +560,9 @@
       "support": "supported",
       "setup": "Pick a thinking model (e.g. 'Thinking' / Pro) in the model picker.",
       "prompt": "Think carefully: how many weekdays are there between 2026-03-01 and 2026-03-31 inclusive? Answer with the number.",
-      "expect": { "reasoning": true }
+      "expect": {
+        "reasoning": true
+      }
     },
     {
       "id": "gemini.canvas",
@@ -353,20 +571,37 @@
       "support": "unknown",
       "setup": "Choose Canvas from the composer tools.",
       "prompt": "In Canvas, write a 5-line poem about autumn.",
-      "expect": { "artifacts": ">=1" }
+      "expect": {
+        "artifacts": ">=1"
+      }
     },
     {
-      "id": "gemini.mixed",
+      "id": "gemini.kitchen-sink",
       "provider": "gemini",
-      "title": "Everything at once: images + PDF, generated image, tricky formatting",
+      "title": "Kitchen sink for the settings matrix: my code + uploaded images, PDF, md, csv, js; generated image and code",
       "support": "supported",
-      "uploads": ["bar-chart.png", "house-photo.jpg", "project-brief.pdf"],
-      "prompt": "Mixed export test. Using the attached files: describe both images in one line each and give the project codename from the PDF. In your answer include one sentence in Ukrainian, an emoji, the formula $E=mc^2$, and a markdown code block whose content contains a line with three backticks.",
+      "matrix": true,
+      "uploads": [
+        "bar-chart.png",
+        "house-photo.jpg",
+        "project-brief.pdf",
+        "meeting-notes.md",
+        "sales.csv",
+        "app.js"
+      ],
+      "prompt": "Kitchen-sink export test. 1) Fix the bug in my code below and in the attached app.js. 2) Describe both images in one line each. 3) Give the codename from the PDF and the action items from the notes. 4) Total the revenue in sales.csv. My code:\n```python\ndef add(a, b):\n    return a - b\n```",
       "followUps": [
         "Send: Generate an image of a red bicycle.",
-        "Send: Summarize this chat in 3 bullets."
+        "Send: Write the fixed app.js as a complete file in a code block."
       ],
-      "expect": { "turns": ">=6", "images": ">=3", "mdMatches": ["project-brief\\.pdf", "E ?= ?mc"] }
+      "expect": {
+        "turns": ">=6",
+        "images": ">=3",
+        "outputMatches": [
+          "return a \\+ b"
+        ]
+      },
+      "notes": "2026-10-01: file uploads failed in a Google Workspace account under automation (upload errors on send). If that happens, continue without uploads and report it."
     },
     {
       "id": "gemini.notebook-chat",
@@ -376,7 +611,12 @@
       "context": "project",
       "chatUrlPattern": "^https://gemini\\.google\\.com/",
       "prompt": "For an export test: list three facts about the Moon as a numbered list.",
-      "expect": { "turns": ">=2", "mdMatches": ["^1\\."] },
+      "expect": {
+        "turns": ">=2",
+        "mdMatches": [
+          "^1\\."
+        ]
+      },
       "notes": "Notebook chat URLs and API were never checked by the extension. If this works, add gemini to useProjectFor in config.local.json so all Gemini test chats go to the notebook."
     },
     {
@@ -387,7 +627,11 @@
       "cost": "high",
       "setup": "Choose Deep Research from the composer tools; start the research when asked.",
       "prompt": "Deep research, keep it short: compare two popular open-source Markdown editors.",
-      "expect": { "mdMatches": ["https?://"] }
+      "expect": {
+        "mdMatches": [
+          "https?://"
+        ]
+      }
     }
   ]
 }
