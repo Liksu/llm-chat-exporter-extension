@@ -278,12 +278,11 @@
       "expect": {
         "turns": ">=6",
         "images": ">=3",
-        "artifacts": ">=1",
         "outputMatches": [
           "return a \\+ b"
         ]
       },
-      "notes": "Multi-line prompt: type line breaks with Shift+Enter."
+      "notes": "Multi-line prompt: type line breaks with Shift+Enter. The 2026-10-01 test chat answered the last follow-up with a Claude Docs document instead of an artifact, so artifacts are not expected here (see claude.artifact / claude.docs)."
     },
     {
       "id": "claude.docs",
