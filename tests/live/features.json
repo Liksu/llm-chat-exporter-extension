@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Catalog of things a user can have in a chat and would expect in an export. Driven by tools/live.js (prepare/collect) and tests/live/TASK.md (Claude Desktop). support: what the extension is expected to handle today -- 'supported' failures are reported as BROKEN, 'unsupported'/'unknown' failures as GAPS, and an unsupported feature that passes as NEWLY WORKING. cost 'high' features (quota-hungry) run only with --include-expensive. automation 'manual' features are listed but never automated.",
+  "about": "Catalog of things a user can have in a chat and would expect in an export. Driven by tools/live.js (prepare/collect) and tests/live/TASK.md (Claude Desktop). support: what the extension is expected to handle today -- 'supported' failures are reported as BROKEN, 'unsupported'/'unknown' failures as GAPS, and an unsupported feature that passes as NEWLY WORKING. cost 'high' features (quota-hungry) run only with --include-expensive. automation 'manual' features are listed but never automated. context: new test chats start in the provider test project when config.local.json lists the provider in useProjectFor; outside-project / project force one or the other.",
 
   "defaults": {
     "export": {
@@ -33,8 +33,9 @@
     {
       "id": "claude.text-formatting",
       "provider": "claude",
-      "title": "Plain text with markdown: headings, list, table, code block",
+      "title": "Plain text with markdown: headings, list, table, code block (regular chat, outside the test project)",
       "support": "supported",
+      "context": "outside-project",
       "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
       "expect": { "turns": ">=2", "mdMatches": ["\\|.*\\|.*\\|", "```(js|javascript)"] }
     },
@@ -127,8 +128,9 @@
     {
       "id": "chatgpt.text-formatting",
       "provider": "chatgpt",
-      "title": "Plain text with markdown: headings, list, table, code block",
+      "title": "Plain text with markdown: headings, list, table, code block (regular chat, outside the test project)",
       "support": "supported",
+      "context": "outside-project",
       "prompt": "For an export test: write a short answer about tea that contains a level-2 heading, a bulleted list of 3 items, a 2x3 markdown table, and a JavaScript code block of 3 lines.",
       "expect": { "turns": ">=2", "mdMatches": ["\\|.*\\|.*\\|", "```(js|javascript)"] }
     },
@@ -273,6 +275,17 @@
       "setup": "Choose Canvas from the composer tools.",
       "prompt": "In Canvas, write a 5-line poem about autumn.",
       "expect": { "artifacts": ">=1" }
+    },
+    {
+      "id": "gemini.notebook-chat",
+      "provider": "gemini",
+      "title": "Chat inside a Gemini notebook",
+      "support": "unknown",
+      "context": "project",
+      "chatUrlPattern": "^https://gemini\\.google\\.com/",
+      "prompt": "For an export test: list three facts about the Moon as a numbered list.",
+      "expect": { "turns": ">=2", "mdMatches": ["^1\\."] },
+      "notes": "Notebook chat URLs and API were never checked by the extension. If this works, add gemini to useProjectFor in config.local.json so all Gemini test chats go to the notebook."
     },
     {
       "id": "gemini.deep-research",

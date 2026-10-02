@@ -54,7 +54,30 @@ old chats come back in the new format too. `--recreate <id>` /
    is two files).
 4. **Accounts.** Be signed in to all three in that Chrome profile. Code
    execution / file creation on claude.ai should be enabled.
-5. **Claude Desktop** with the Claude in Chrome extension connected, and
+5. **Test projects** (recommended). Keep test chats — and what the models
+   remember from them — out of your own history: a Claude project, a
+   ChatGPT project created with **Project-only memory** (can't be changed
+   later), optionally a Gemini notebook. No instructions, no files in
+   them. Put their URLs in `config.local.json`:
+
+   ```json
+   {
+     "downloadsDir": "D:/Downloads",
+     "projects": {
+       "claude": "https://claude.ai/project/…",
+       "chatgpt": "https://chatgpt.com/g/g-p-…/project",
+       "gemini": "https://gemini.google.com/notebook/…"
+     },
+     "useProjectFor": ["claude", "chatgpt"]
+   }
+   ```
+
+   New test chats for providers in `useProjectFor` start in the project.
+   Features with `"context": "outside-project"` (the `*.text-formatting`
+   ones) still use a regular chat, so both kinds stay covered;
+   `"context": "project"` (`gemini.notebook-chat`) always uses it. Add
+   `gemini` to `useProjectFor` once `gemini.notebook-chat` passes.
+6. **Claude Desktop** with the Claude in Chrome extension connected, and
    access to this folder.
 
 ## Scheduling
@@ -91,6 +114,8 @@ Add an entry to `features.json`:
   "support": "unknown",              // supported | unsupported | unknown
   "cost": "high",                    // optional: only with --include-expensive
   "automation": "manual",            // optional: never automated
+  "context": "outside-project",      // optional: project | outside-project (default: per useProjectFor)
+  "chatUrlPattern": "^https://…",    // optional: override the provider's chat URL pattern
   "setup": "Toggle X in the composer",
   "uploads": ["bar-chart.png"],      // from fixtures/
   "prompt": "What to send",

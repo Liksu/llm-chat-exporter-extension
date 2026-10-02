@@ -23,7 +23,8 @@
  *   node tools/live.js status
  *       Catalog coverage: which features have a test chat, last result.
  *
- * Local, gitignored files: tests/live/config.local.json ({downloadsDir}),
+ * Local, gitignored files: tests/live/config.local.json ({downloadsDir,
+ * projects: {provider: url}, useProjectFor: [provider]} -- see README),
  * tests/live/fixtures.local.json (your test chats' URLs), tests/live/runs/.
  */
 
@@ -87,8 +88,25 @@ const snippetFor = (detail) => `(async () => {
   return 'TIMEOUT: no result after 180 s';
 })()`;
 
+/**
+ * Where a new test chat starts: the provider's test project (keeps test
+ * chats and their memory away from the user's own) or a plain new chat.
+ * feature.context 'project' / 'outside-project' overrides the per-provider
+ * default from config.useProjectFor. Returns { url, inProject }, or null
+ * when the feature needs a project that isn't configured.
+ */
+const startFor = (cfg, catalog, feature) => {
+  const project = cfg.projects && cfg.projects[feature.provider];
+  const plain = { url: catalog.providers[feature.provider].newChatUrl, inProject: false };
+  if (feature.context === 'outside-project') return plain;
+  if (feature.context === 'project') return project ? { url: project, inProject: true } : null;
+  return project && (cfg.useProjectFor || []).includes(feature.provider)
+    ? { url: project, inProject: true }
+    : plain;
+};
+
 const prepare = (args) => {
-  loadConfig();
+  const cfg = loadConfig();
   const catalog = readJson(CATALOG);
   const fixtures = readJson(FIXTURES, {});
   const only = parseList(args.only);
@@ -112,14 +130,20 @@ const prepare = (args) => {
       skipped.push({ id: f.id, reason: 'expensive (cost: high) -- pass --include-expensive to create it' });
       continue;
     }
+    const start = wantNew ? startFor(cfg, catalog, f) : null;
+    if (wantNew && !start) {
+      skipped.push({ id: f.id, reason: `needs a ${f.provider} test project -- add it to config.local.json "projects"` });
+      continue;
+    }
     const detail = exportDetail(catalog, f);
     tasks.push({
       featureId: f.id,
       provider: f.provider,
       title: f.title,
       action: wantNew ? 'create' : 'reexport',
-      url: wantNew ? provider.newChatUrl : known,
-      chatUrlPattern: provider.chatUrlPattern,
+      url: wantNew ? start.url : known,
+      inProject: wantNew ? start.inProject : undefined,
+      chatUrlPattern: f.chatUrlPattern || provider.chatUrlPattern,
       setup: wantNew ? f.setup || null : null,
       uploads: wantNew ? (f.uploads || []).map((u) => path.join(UPLOADS_DIR, u)) : [],
       prompt: wantNew ? f.prompt || null : null,
@@ -152,12 +176,14 @@ const renderPlan = (plan) => {
       out.push('2. Run the export snippet below.', '');
     } else {
       let n = 1;
-      out.push(`${n++}. Open ${t.url} (a new chat).`);
+      out.push(t.inProject
+        ? `${n++}. Open ${t.url} — the **test project**. Start the chat from the project's own composer (not the global "New chat"), so it lands in the project.`
+        : `${n++}. Open ${t.url} (a new chat, **outside** any project).`);
       if (t.setup) out.push(`${n++}. Setup: ${t.setup}`);
       if (t.uploads.length) out.push(`${n++}. Attach: ${t.uploads.map((u) => `\`${u}\``).join(', ')}`);
       out.push(`${n++}. Send this message:`, '', '   ```text', ...t.prompt.split('\n').map((l) => `   ${l}`), '   ```');
       for (const fu of t.followUps) out.push(`${n++}. Wait for the reply to finish, then: ${fu}`);
-      out.push(`${n++}. Wait until the reply has fully finished (no stop button / spinner). The URL must match \`${t.chatUrlPattern}\`.`);
+      out.push(`${n++}. Wait until the reply has fully finished (no stop button / spinner). The URL must have changed from the start URL to the new chat's, matching \`${t.chatUrlPattern}\`.`);
       out.push(`${n++}. Run the export snippet below.`, '');
     }
     out.push('```js', t.exportSnippet, '```', '');
@@ -388,7 +414,10 @@ const collectRun = async (args) => {
     } catch (e) {
       r.replay = `recording failed: ${e.message}`;
     }
-    if (meta.location && new RegExp(task.chatUrlPattern).test(meta.location)) {
+    // Remember the chat for re-export -- a real chat URL only, not the
+    // project / new-chat page it was started from.
+    if (meta.location && new RegExp(task.chatUrlPattern).test(meta.location) &&
+        (task.action !== 'create' || meta.location !== task.url)) {
       fixtures[task.featureId] = { url: meta.location, lastRun: plan.createdAt.slice(0, 10), lastStatus: r.status };
     }
     results.push(r);
