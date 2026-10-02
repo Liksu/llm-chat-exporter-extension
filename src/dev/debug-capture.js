@@ -1,6 +1,8 @@
 /**
- * Debug capture: record every fetch an export makes and save it as a HAR
- * file next to the export.
+ * Debug capture (dev tooling, see dev-common.js): record every fetch an
+ * export makes and save it as a HAR file next to the export. On when the
+ * "Save debug data" dev option is set, or when a page-triggered export
+ * passes `debugCapture: true`.
  *
  * Purpose: when an export comes out wrong, the raw API responses are what
  * explains it -- and providers change those without notice. The HAR feeds
@@ -191,5 +193,16 @@
     return result;
   };
 
-  ns.debugCapture = { run, noteProxied };
+  ns.dev = Object.assign(ns.dev || {}, {
+    debugCapture: { run },
+    // Called by geminiApi.fetchAsset for service-worker proxied fetches.
+    noteProxied,
+    // Hook used by core/export-entry.js around every export.
+    aroundExport: async (ctx, exec) => {
+      const enabled = typeof ctx.msg.debugCapture === 'boolean'
+        ? ctx.msg.debugCapture
+        : !!(ns.dev.readSettings && (await ns.dev.readSettings()).debugCapture);
+      return run({ enabled, adapter: ctx.adapter, options: ctx.options }, exec);
+    },
+  });
 })();

@@ -1,34 +1,23 @@
 /**
- * Export entry points shared by all adapters' content.js.
+ * Export entry point shared by all adapters' content.js.
  *
  *   ns.exportEntry.register(adapterId, handleExport)
  *
- * wires `handleExport(options)` to:
- *   1. chrome.runtime.onMessage `{kind:'export', ...}` -- the popup.
- *   2. A page event, only when the user enabled "Allow exports triggered
- *      from the page" in options. Lets browser automation (Claude in
- *      Chrome, Playwright) export without clicking the extension popup:
+ * wires `handleExport(options)` to the popup's chrome.runtime message
+ * `{kind:'export', ...}` and normalizes the message into options.
  *
- *        window.dispatchEvent(new CustomEvent('llm-exporter:export',
- *          { detail: JSON.stringify({ mode: 'zip', debugCapture: true }) }));
- *
- *      The result comes back as an `llm-exporter:export-result` event
- *      (detail: JSON string) and in
- *      `document.documentElement.dataset.llmExporterResult`.
- *      detail is a JSON string because objects do not cross from the page's
- *      JS world into the content script's.
- *
- * Both paths go through ns.debugCapture, which saves a HAR of the export's
- * requests when "Save debug data" is on (or the caller asks for it).
+ * Developer tooling (src/dev/, loaded only into unpacked installs -- see
+ * dev-loader.js) hooks in through:
+ *   - ns.dev.aroundExport(ctx, exec): wraps every export (debug capture);
+ *   - ns.exportEntry.run(msg): starts an export the way the popup would
+ *     (page-triggered exports).
+ * Without src/dev nothing here changes behavior.
  */
 (function () {
   const ns = (self.__exporter = self.__exporter || {});
   const { log } = ns.utils;
 
-  const PAGE_EVENT = 'llm-exporter:export';
-  const PAGE_RESULT_EVENT = 'llm-exporter:export-result';
-
-  /** Normalize a message/event payload into handleExport options. */
+  /** Normalize a message payload into handleExport options. */
   const toOptions = (msg) => ({
     mode: msg.mode === 'zip' ? 'zip' : 'md',
     includeReasoning: !!msg.includeReasoning,
@@ -41,64 +30,31 @@
     attachmentsAsMarkdown: !!msg.attachmentsAsMarkdown,
   });
 
-  /** Global settings straight from storage (settings.js is not loaded in
-   *  content scripts). Empty object when unavailable. */
-  const readGlobalSettings = () =>
-    new Promise((resolve) => {
-      try {
-        chrome.storage.sync.get('settings', (got) => {
-          resolve((got && got.settings && got.settings.global) || {});
-        });
-      } catch (_) {
-        resolve({});
-      }
-    });
+  let registered = null; // { adapterId, handleExport }
+
+  /** Run one export; never throws -- failures come back as {ok:false}. */
+  const run = async (msg) => {
+    if (!registered) return { ok: false, error: 'No exporter on this page.' };
+    const { adapterId, handleExport } = registered;
+    const options = toOptions(msg || {});
+    const exec = () => handleExport(options);
+    try {
+      const around = ns.dev && ns.dev.aroundExport;
+      return await (around ? around({ adapter: adapterId, options, msg: msg || {} }, exec) : exec());
+    } catch (err) {
+      log.error(`${adapterId} export failed`, err);
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  };
 
   const register = (adapterId, handleExport) => {
-    const run = async (msg) => {
-      const options = toOptions(msg);
-      const enabled = typeof msg.debugCapture === 'boolean'
-        ? msg.debugCapture
-        : !!(await readGlobalSettings()).debugCapture;
-      try {
-        return await ns.debugCapture.run({ enabled, adapter: adapterId, options },
-          () => handleExport(options));
-      } catch (err) {
-        log.error(`${adapterId} export failed`, err);
-        return { ok: false, error: err instanceof Error ? err.message : String(err) };
-      }
-    };
-
+    registered = { adapterId, handleExport };
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (!msg || msg.kind !== 'export') return false;
       run(msg).then(sendResponse);
       return true; // async response
     });
-
-    if (typeof self.addEventListener !== 'function') return;
-    self.addEventListener(PAGE_EVENT, async (event) => {
-      const reply = (result) => {
-        const json = JSON.stringify(result);
-        try {
-          document.documentElement.dataset.llmExporterResult = json;
-        } catch (_) { /* no documentElement */ }
-        self.dispatchEvent(new CustomEvent(PAGE_RESULT_EVENT, { detail: json }));
-      };
-      const settings = await readGlobalSettings();
-      if (!settings.pageTrigger) {
-        reply({ ok: false, error: 'Page-triggered exports are disabled in LLM Chat Exporter options.' });
-        return;
-      }
-      let msg = {};
-      try {
-        msg = typeof event.detail === 'string' && event.detail ? JSON.parse(event.detail) : {};
-      } catch (_) {
-        reply({ ok: false, error: 'event detail must be a JSON string' });
-        return;
-      }
-      reply(await run(msg));
-    });
   };
 
-  ns.exportEntry = { register, toOptions };
+  ns.exportEntry = { register, run, toOptions };
 })();

@@ -33,7 +33,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 
 const {
-  SCRIPTS_BY_ADAPTER,
+  scriptsFor,
   createBrowserContext,
   loadScripts,
   installDownloadCapture,
@@ -143,8 +143,11 @@ function dispatchMessage(messageListeners, message) {
 /**
  * Set up a browser context for the scenario, fire one export message and
  * return what came out: { response, captured, sandbox }. No assertions.
+ *
+ * env.dev loads the dev tooling (src/dev/); env.storeInstall and
+ * env.devSettings are passed to the browser context.
  */
-async function executeExport(scenarioDir, scenario, message) {
+async function executeExport(scenarioDir, scenario, message, env = {}) {
   const mockFetch = createMockFetch(scenarioDir, scenario);
 
   const browser = createBrowserContext({
@@ -152,17 +155,15 @@ async function executeExport(scenarioDir, scenario, message) {
     documentTitle: scenario.documentTitle,
     fakeDate: scenario.fakeDate,
     mockFetch,
+    storeInstall: env.storeInstall,
+    devSettings: env.devSettings,
   });
 
   // Seed token caches BEFORE content.js loads (some adapters synchronously
   // touch self.__exporter<Adapter>.token at module init).
   seedAuth(browser.sandbox, scenario.auth);
 
-  const scripts = SCRIPTS_BY_ADAPTER[scenario.adapter];
-  if (!scripts) {
-    throw new Error(`Unknown adapter: ${scenario.adapter}`);
-  }
-  loadScripts(browser.context, scripts);
+  loadScripts(browser.context, scriptsFor(scenario.adapter, { dev: !!env.dev }));
   installDownloadCapture(browser.sandbox, browser.captured);
 
   const response = await dispatchMessage(browser.messageListeners, message);

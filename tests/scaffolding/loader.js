@@ -44,8 +44,8 @@ const SCRIPTS_BY_ADAPTER = {
     'src/core/markdown.js',
     'src/core/zip.js',
     'src/core/download.js',
-    'src/core/debug-capture.js',
     'src/core/export-entry.js',
+    'src/core/dev-loader.js',
     'src/adapters/chatgpt/api.js',
     'src/adapters/chatgpt/normalize.js',
     'src/adapters/chatgpt/content.js',
@@ -57,8 +57,8 @@ const SCRIPTS_BY_ADAPTER = {
     'src/core/markdown.js',
     'src/core/zip.js',
     'src/core/download.js',
-    'src/core/debug-capture.js',
     'src/core/export-entry.js',
+    'src/core/dev-loader.js',
     'src/adapters/claude/api.js',
     'src/adapters/claude/normalize.js',
     'src/adapters/claude/content.js',
@@ -70,13 +70,33 @@ const SCRIPTS_BY_ADAPTER = {
     'src/core/markdown.js',
     'src/core/zip.js',
     'src/core/download.js',
-    'src/core/debug-capture.js',
     'src/core/export-entry.js',
+    'src/core/dev-loader.js',
     'src/adapters/gemini/api.js',
     'src/adapters/gemini/normalize.js',
     'src/adapters/gemini/content.js',
   ],
 };
+
+/**
+ * Developer tooling (src/dev/). In the extension, core/dev-loader.js
+ * import()s these into unpacked installs; vm contexts have no import(), so
+ * tests that need them load them directly (scriptsFor(adapter, {dev:true}))
+ * ahead of dev-loader, which then sees ns.dev and stands down.
+ */
+const DEV_SCRIPTS = [
+  'src/dev/dev-common.js',
+  'src/dev/debug-capture.js',
+  'src/dev/page-trigger.js',
+];
+
+function scriptsFor(adapter, { dev = false } = {}) {
+  const base = SCRIPTS_BY_ADAPTER[adapter];
+  if (!base) throw new Error(`Unknown adapter: ${adapter}`);
+  if (!dev) return base;
+  const at = base.indexOf('src/core/dev-loader.js');
+  return [...base.slice(0, at), ...DEV_SCRIPTS, ...base.slice(at)];
+}
 
 /**
  * Minimal Event/CustomEvent shapes. Real DOM Event has more (composedPath,
@@ -146,11 +166,15 @@ function makeDocument(initialTitle) {
  * chrome.runtime.onMessage shim. Returns the listener registry so the test
  * driver can fire export messages into content.js.
  */
-function makeChromeRuntime({ manifestVersion = '0.0.0-test' } = {}) {
+function makeChromeRuntime({ manifestVersion = '0.0.0-test', storeInstall = false, devSettings } = {}) {
   const messageListeners = [];
+  const local = devSettings ? { devSettings } : {};
   const chrome = {
     runtime: {
-      getManifest: () => ({ version: manifestVersion }),
+      // Web Store installs have update_url; unpacked (dev) ones don't.
+      getManifest: () => (storeInstall
+        ? { version: manifestVersion, update_url: 'https://clients2.google.com/service/update2/crx' }
+        : { version: manifestVersion }),
       onMessage: {
         addListener: (fn) => messageListeners.push(fn),
         removeListener: (fn) => {
@@ -166,6 +190,13 @@ function makeChromeRuntime({ manifestVersion = '0.0.0-test' } = {}) {
       sync: {
         get: (_keys, cb) => cb && cb({}),
         set: (_items, cb) => cb && cb(),
+      },
+      local: {
+        get: (key, cb) => cb && cb(key in local ? { [key]: local[key] } : {}),
+        set: (items, cb) => {
+          Object.assign(local, items);
+          if (cb) cb();
+        },
       },
     },
   };
@@ -210,11 +241,16 @@ function makeFrozenDate(frozenIsoString) {
  *   documentTitle?: string,
  *   fakeDate?: string,
  *   mockFetch?: (input: any, init?: any) => Promise<Response>,
+ *   storeInstall?: boolean,   manifest has update_url (no dev tooling)
+ *   devSettings?: object,     chrome.storage.local devSettings
  * }} opts
  */
 function createBrowserContext(opts) {
   const { Event, CustomEvent } = makeEventClasses();
-  const { chrome, messageListeners } = makeChromeRuntime();
+  const { chrome, messageListeners } = makeChromeRuntime({
+    storeInstall: opts.storeInstall,
+    devSettings: opts.devSettings,
+  });
   // blob/filename: the export itself (first download). downloads: every
   // download, in order -- debug capture adds a .debug.har after it.
   const captured = { blob: null, filename: null, downloads: [] };
@@ -349,6 +385,8 @@ function installDownloadCapture(sandbox, captured) {
 
 module.exports = {
   SCRIPTS_BY_ADAPTER,
+  DEV_SCRIPTS,
+  scriptsFor,
   createBrowserContext,
   loadScripts,
   installDownloadCapture,

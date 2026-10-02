@@ -92,7 +92,7 @@ test('debug capture: HAR replays into an identical export', async () => {
   const zipExport = scenario.exports.find((e) => e.message.mode === 'zip');
   const message = { ...zipExport.message, debugCapture: true };
 
-  const original = await executeExport(srcDir, scenario, message);
+  const original = await executeExport(srcDir, scenario, message, { dev: true });
   assert.ok(original.response && original.response.ok, 'export failed');
   const downloads = original.captured.downloads;
   assert.equal(downloads.length, 2, 'expected the export plus a .debug.har');
@@ -161,7 +161,7 @@ test('schema drift: flags new content block types', () => {
  * only when the user enabled it in options.
  */
 test('page-triggered export: gated by the pageTrigger option', async () => {
-  const { createBrowserContext, loadScripts, installDownloadCapture, SCRIPTS_BY_ADAPTER } =
+  const { createBrowserContext, loadScripts, installDownloadCapture, scriptsFor } =
     require('./scaffolding/loader');
   const { createMockFetch } = require('./scaffolding/fetch-mock');
   const dir = path.join(SCENARIOS_DIR, 'examples', 'claude-uploaded-images');
@@ -172,6 +172,7 @@ test('page-triggered export: gated by the pageTrigger option', async () => {
       location: scenario.location,
       fakeDate: scenario.fakeDate,
       mockFetch: createMockFetch(dir, scenario),
+      devSettings: { pageTrigger },
     });
     const { sandbox } = browser;
     const target = new EventTarget();
@@ -179,8 +180,7 @@ test('page-triggered export: gated by the pageTrigger option', async () => {
     sandbox.dispatchEvent = target.dispatchEvent.bind(target);
     sandbox.CustomEvent = CustomEvent;
     sandbox.document.documentElement = { dataset: {} };
-    sandbox.chrome.storage.sync.get = (_keys, cb) => cb({ settings: { global: { pageTrigger } } });
-    loadScripts(browser.context, SCRIPTS_BY_ADAPTER.claude);
+    loadScripts(browser.context, scriptsFor('claude', { dev: true }));
     installDownloadCapture(sandbox, browser.captured);
 
     const result = new Promise((resolve) =>
@@ -206,7 +206,7 @@ test('page-triggered export: gated by the pageTrigger option', async () => {
  * wrapper's sight; geminiApi.fetchAsset reports them via noteProxied.
  */
 test('debug capture: records service-worker proxied asset fetches', async () => {
-  const { createBrowserContext, loadScripts, installDownloadCapture, SCRIPTS_BY_ADAPTER } =
+  const { createBrowserContext, loadScripts, installDownloadCapture, scriptsFor } =
     require('./scaffolding/loader');
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
   const okUrl = 'https://lh3.googleusercontent.com/gg/ok-image';
@@ -216,11 +216,11 @@ test('debug capture: records service-worker proxied asset fetches', async () => 
       ? new Response(png, { status: 200, headers: { 'content-type': 'image/png' } })
       : new Response('nope', { status: 404, statusText: 'Not Found' })),
   });
-  loadScripts(browser.context, SCRIPTS_BY_ADAPTER.gemini);
+  loadScripts(browser.context, scriptsFor('gemini', { dev: true }));
   installDownloadCapture(browser.sandbox, browser.captured);
   const ns = browser.sandbox.__exporter;
 
-  const result = await ns.debugCapture.run({ enabled: true, adapter: 'gemini', options: {} }, async () => {
+  const result = await ns.dev.debugCapture.run({ enabled: true, adapter: 'gemini', options: {} }, async () => {
     const got = await ns.geminiApi.fetchAsset(okUrl);
     assert.ok(Buffer.from(got.bytes).equals(png), 'service-worker emulation returns the mocked bytes');
     await assert.rejects(ns.geminiApi.fetchAsset('https://lh3.googleusercontent.com/gg/missing'), /HTTP 404/);
@@ -237,4 +237,37 @@ test('debug capture: records service-worker proxied asset fetches', async () => 
   assert.ok(Buffer.from(entries[0].response.content.text, 'base64').equals(png));
   assert.equal(entries[1].response.status, 502);
   assert.match(entries[1]._error, /HTTP 404/);
+});
+
+/**
+ * Dev tooling (src/dev/) must stay out of store installs and must not be
+ * needed by the product: the export works the same without it.
+ */
+test('dev tooling: store installs never load it, product works without it', async () => {
+  const dir = path.join(SCENARIOS_DIR, 'examples', 'claude-uploaded-images');
+  const scenario = JSON.parse(fs.readFileSync(path.join(dir, 'scenario.json'), 'utf8'));
+  const zipExport = scenario.exports.find((e) => e.message.mode === 'zip');
+  // Asking for debug capture must not matter where there is no dev tooling.
+  const message = { ...zipExport.message, debugCapture: true };
+
+  for (const storeInstall of [true, false]) {
+    const { createBrowserContext } = require('./scaffolding/loader');
+    const probe = createBrowserContext({ location: scenario.location, storeInstall });
+    const urls = [];
+    probe.sandbox.chrome.runtime.getURL = (f) => {
+      urls.push(f);
+      return `chrome-extension://test/${f}`;
+    };
+    const { loadScripts, scriptsFor } = require('./scaffolding/loader');
+    loadScripts(probe.context, scriptsFor('claude'));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(probe.sandbox.__exporter.devLoader.isUnpacked(), !storeInstall);
+    assert.deepEqual(urls.length > 0, !storeInstall,
+      storeInstall ? 'store install must not try to load src/dev' : 'unpacked install tries src/dev');
+    assert.equal(probe.sandbox.__exporter.dev, undefined);
+
+    const r = await executeExport(dir, scenario, message, { storeInstall });
+    assert.ok(r.response.ok, r.response.error);
+    assert.equal(r.captured.downloads.length, 1, 'no .debug.har without dev tooling');
+  }
 });

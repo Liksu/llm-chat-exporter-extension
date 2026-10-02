@@ -226,8 +226,6 @@
         inlineImages: !!inlineImagesEl.checked,
         inlineTextFiles: !!inlineTextFilesEl.checked,
         attachmentsAsMarkdown: !!attachmentsAsMarkdownEl.checked,
-        // Developer option, set on the options page only.
-        debugCapture: !!(effectiveSettings && effectiveSettings.debugCapture),
       });
       if (!resp) throw new Error('No response from page. Try reloading the tab.');
       if (!resp.ok) throw new Error(resp.error || 'Export failed.');

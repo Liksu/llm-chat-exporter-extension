@@ -1,7 +1,7 @@
 # Privacy Policy
 
 **Extension:** LLM Chat Exporter
-**Last updated:** 2026-10-01
+**Last updated:** 2026-05-10
 
 ## Summary
 
@@ -12,11 +12,6 @@ LLM Chat Exporter does not collect, transmit, sell, or share any personal data. 
 When you open the popup on a supported site ([claude.ai](https://claude.ai), [chatgpt.com](https://chatgpt.com), or [gemini.google.com](https://gemini.google.com)) and click **Export**, the extension reads the contents of the conversation in the active tab — text, images, file attachments, artifacts, and (optionally) reasoning — and assembles a Markdown file or a ZIP archive. The result is saved to your computer through Chrome's normal download flow.
 
 The extension includes a small service worker that proxies asset downloads (uploaded files and inline / generated images) when those live on a different host than the chat page. This is purely a CORS workaround so the same bytes the page already displays can be embedded in the export — the bytes never leave your browser and are not transmitted to any third party.
-
-### Developer options (off by default)
-
-- **Save debug data with each export** — also downloads a `.debug.har` file with the raw responses the chat service returned while exporting. Like the export itself, it is saved only to your computer and contains the conversation. Request headers and bodies (which carry sign-in tokens) are not recorded.
-- **Allow exports triggered from the page** — lets scripts running on the chat page start an export without the popup (used for automated testing). The result is still only a download to your computer.
 
 ## Data the extension accesses
 

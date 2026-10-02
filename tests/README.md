@@ -458,6 +458,20 @@ code is 1 when anything at `ERROR` level is found.
 `npm test` also runs the auditor over every scenario's goldens, so a bug
 present at recording time can't be locked in as "expected".
 
+## Developer tooling in the extension (unpacked installs only)
+
+`src/dev/` holds tooling for testing the extension, not product code:
+debug capture, page-triggered exports and the **Developer** section of the
+options page. `src/core/dev-loader.js` (the only part that ships) loads it
+when the extension is installed unpacked — a Web Store install has
+`update_url` in its manifest and never tries. `release.ps1` leaves
+`src/dev/` out of the zip. Product code must work without it; `npm test`
+checks both.
+
+To get it: `chrome://extensions` → Developer mode → *Load unpacked* → the
+repo root. The dev toggles are saved immediately to
+`chrome.storage.local` (`devSettings`), separate from user settings.
+
 ## Debug data from real exports
 
 Options page → **Developer** → *Save debug data with each export*. Every

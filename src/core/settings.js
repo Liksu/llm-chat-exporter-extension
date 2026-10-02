@@ -40,12 +40,6 @@
       inlineImages: true,
       inlineTextFiles: false,
       attachmentsAsMarkdown: false,
-      // Developer options (global-only). debugCapture: save a .debug.har of
-      // the export's API requests next to each export (core/debug-capture.js).
-      // pageTrigger: let page scripts / browser automation start an export
-      // via a DOM event (core/export-entry.js).
-      debugCapture: false,
-      pageTrigger: false,
     },
     perAdapter: { claude: {}, chatgpt: {}, gemini: {} },
   };

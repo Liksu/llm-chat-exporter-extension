@@ -29,6 +29,12 @@
     "https://lh6.google.com/*",
     "https://lh7.google.com/*"
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/dev/*"],
+      "matches": ["https://claude.ai/*", "https://chatgpt.com/*", "https://gemini.google.com/*"]
+    }
+  ],
   "background": {
     "service_worker": "src/background/service-worker.js"
   },
@@ -43,8 +49,8 @@
         "src/core/markdown.js",
         "src/core/zip.js",
         "src/core/download.js",
-        "src/core/debug-capture.js",
         "src/core/export-entry.js",
+        "src/core/dev-loader.js",
         "src/adapters/claude/api.js",
         "src/adapters/claude/normalize.js",
         "src/adapters/cowork/api.js",
@@ -73,8 +79,8 @@
         "src/core/markdown.js",
         "src/core/zip.js",
         "src/core/download.js",
-        "src/core/debug-capture.js",
         "src/core/export-entry.js",
+        "src/core/dev-loader.js",
         "src/adapters/chatgpt/api.js",
         "src/adapters/chatgpt/normalize.js",
         "src/adapters/chatgpt/content.js"
@@ -101,8 +107,8 @@
         "src/core/markdown.js",
         "src/core/zip.js",
         "src/core/download.js",
-        "src/core/debug-capture.js",
         "src/core/export-entry.js",
+        "src/core/dev-loader.js",
         "src/adapters/gemini/api.js",
         "src/adapters/gemini/normalize.js",
         "src/adapters/gemini/content.js"

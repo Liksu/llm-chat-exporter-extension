@@ -103,6 +103,15 @@ try {
           Remove-Item $_.FullName -Force
         }
     }
+    # Developer tooling (src/dev/): loaded only into unpacked installs by
+    # src/core/dev-loader.js and never shipped. The manifest still lists
+    # src/dev/* in web_accessible_resources; missing files there are fine.
+    $devDir = Join-Path $stagingDir 'src\dev'
+    if (Test-Path $devDir) {
+      Remove-Item $devDir -Recurse -Force
+      $excluded += 'src\dev\ (developer tooling)'
+    }
+
     if ($excluded.Count -gt 0) {
       Write-Host "Excluded: $($excluded -join ', ')" -ForegroundColor DarkGray
     }

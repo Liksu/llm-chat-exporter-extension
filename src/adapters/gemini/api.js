@@ -427,8 +427,10 @@
     } catch (e) {
       throw new Error(`gemini asset (sw): ${e && e.message ? e.message : e}`);
     }
-    if (ns.debugCapture) {
-      ns.debugCapture.noteProxied(reply && reply.ok === true
+    // Dev tooling (src/dev/debug-capture.js): the fetch wrapper can't see
+    // requests made by the service worker, so report them.
+    if (ns.dev && ns.dev.noteProxied) {
+      ns.dev.noteProxied(reply && reply.ok === true
         ? { url, ok: true, mime: reply.mime, base64: reply.base64 }
         : { url, ok: false, error: (reply && reply.error) || 'no response from service worker' });
     }
