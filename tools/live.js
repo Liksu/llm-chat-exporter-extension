@@ -162,6 +162,10 @@ const prepare = (args) => {
       uploads: wantNew ? (f.uploads || []).map((u) => path.join(UPLOADS_DIR, u)) : [],
       prompt: wantNew ? f.prompt || null : null,
       followUps: wantNew ? f.followUps || [] : [],
+      // fixtures.local.json "note": what the user wants the tester to know
+      // about this test chat (e.g. "continued by hand on …, differences
+      // expected"). Shown in plan.md and the report.
+      note: (fixtures[f.id] && fixtures[f.id].note) || null,
       exportDetail: detail,
       exportSnippet: snippetFor(detail),
       // Settings matrix: one more export in md mode; together with the
@@ -193,6 +197,7 @@ const renderPlan = (plan) => {
   plan.tasks.forEach((t, i) => {
     out.push(`## ${i + 1}. ${t.featureId} — ${t.action === 'create' ? 'CREATE a new chat' : 're-export'}`, '');
     out.push(`_${t.title}_`, '');
+    if (t.note) out.push(`> **Note from the user about this chat:** ${t.note}`, '');
     if (t.action === 'reexport') {
       out.push(`1. Open ${t.url} and wait until the conversation has loaded.`);
       out.push('2. Run the export snippet below.', '');
@@ -490,7 +495,7 @@ const collectRun = async (args) => {
       return { name: n, meta: log._exporter || {} };
     });
     const main = hars.find((h) => h.meta.tag === task.featureId) || hars[0];
-    const r = { featureId: task.featureId, provider: task.provider, title: task.title, action: task.action, support: feature ? feature.support : 'unknown' };
+    const r = { featureId: task.featureId, provider: task.provider, title: task.title, action: task.action, support: feature ? feature.support : 'unknown', note: task.note || undefined };
     if (!main) {
       r.status = 'NOT_RUN';
       results.push(r);
@@ -557,7 +562,7 @@ const collectRun = async (args) => {
     // project / new-chat page it was started from.
     if (meta.location && new RegExp(task.chatUrlPattern).test(meta.location) &&
         (task.action !== 'create' || meta.location !== task.url)) {
-      fixtures[task.featureId] = { url: meta.location, lastRun: plan.createdAt.slice(0, 10), lastStatus: r.status };
+      fixtures[task.featureId] = { ...fixtures[task.featureId], url: meta.location, lastRun: plan.createdAt.slice(0, 10), lastStatus: r.status };
     }
     results.push(r);
   }
@@ -610,6 +615,7 @@ const renderReport = (rep) => {
     out.push(`## ${STATUS_TITLE[s]}`, '');
     for (const r of rows) {
       out.push(`- **${r.featureId}** — ${r.title}${r.url ? ` · ${r.url}` : ''}`);
+      if (r.note) out.push(`  - ℹ note: ${r.note}`);
       if (r.control && r.control.weak) {
         out.push(`  - ⚠ weak check: every expectation also passes on a chat without this feature (\`${r.control.export}\`) — tighten \`expect\` in features.json`);
       } else if (r.control && r.control.alsoPasses.length) {

@@ -48,7 +48,11 @@ node tools/live.js prepare
 
 Add `--include-expensive` only if the user agrees (Deep Research etc. eat
 quota). `--only claude` (or a feature id, comma-separated) narrows the run.
-Read the generated `tests/live/runs/<date>/plan.md`.
+Read the generated `tests/live/runs/<date>/plan.md`. Tasks may carry a
+**note from the user** about that test chat (from
+`tests/live/fixtures.local.json`, e.g. "changed by hand, differences
+expected") — take it into account when judging results and don't report
+expected differences as regressions.
 
 Tell the user: how many chats will be **re-exported** (existing test chats,
 read-only) and which **new chats** will be created (feature id + one-line
