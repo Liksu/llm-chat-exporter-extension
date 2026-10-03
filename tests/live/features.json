@@ -118,9 +118,10 @@
       "expect": {
         "outputMatches": [
           "Apple,Red|name,color"
-        ]
+        ],
+        "artifacts": ">=1"
       },
-      "notes": "The file comes via files[] or only via the SendUserFile result; with inlineTextFiles it is inlined, otherwise saved under files/."
+      "notes": "Write + SendUserFile: text files Claude creates are exported as artifacts (artifacts/ in ZIP, Artifacts section in md) whatever \"Inline text uploads\" is set to. Binary ones stay attachments."
     },
     {
       "id": "claude.file-edit",

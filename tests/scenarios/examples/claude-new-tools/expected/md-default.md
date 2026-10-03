@@ -49,7 +49,7 @@ Write a script, fix it, and send me a JSON summary file.
 
 Done: hello.py is fixed and summary.json is attached.
 
-📎 [summary.json](#att-1)
+🧩 [summary.json](#artifact-file-00000000-0000-0000-0000-000000000777)
 
 ---
 
@@ -106,6 +106,11 @@ Rainfall rose in 2025. [[1]](https://example.org/rain) Sea levels too. [[2]](htt
 
 ```
 
-## Attachments
+### <a id="artifact-file-00000000-0000-0000-0000-000000000777"></a>summary.json
 
-- <a id="att-1"></a>**summary.json** _(application/json)_
+```json
+{
+  "codename": "EXAMPLE"
+}
+
+```

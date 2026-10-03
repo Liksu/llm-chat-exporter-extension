@@ -49,7 +49,7 @@ Write a script, fix it, and send me a JSON summary file.
 
 Done: hello.py is fixed and summary.json is attached.
 
-📎 [summary.json](files/summary.json)
+🧩 [summary.json](artifacts/summary.json)
 
 ---
 
@@ -79,6 +79,4 @@ I'm sorry you're feeling this way. The rainfall report is ready.
 
 - [Rainfall report.md](artifacts/Rainfall report.md)
 
-## Attachments
-
-- <a id="att-1"></a>[summary.json](files/summary.json) _(application/json)_
+- [summary.json](artifacts/summary.json)

@@ -693,7 +693,7 @@
    * body. The API returns them in files[] with file_kind === 'image' and a
    * ready-to-fetch preview_url / preview_asset.url.
    */
-  const transformFiles = (rawList, options, viewHarvest) => {
+  const transformFiles = (rawList, options, viewHarvest, fromAssistant) => {
     if (!Array.isArray(rawList)) return { imageItems: [], attachments: [] };
     const inlineTextFiles = !!(options && options.inlineTextFiles);
     const imageItems = [];
@@ -725,7 +725,9 @@
         continue;
       }
 
-      if (inlineTextFiles && isTextLikeMime(mimeFromExt, fileName)) {
+      // Text files the assistant created are deliverables, not uploads:
+      // always fetched, then turned into artifacts (promoteFileArtifacts).
+      if ((inlineTextFiles || fromAssistant) && isTextLikeMime(mimeFromExt, fileName)) {
         // Text-like file. Prefer content harvested from `view` tool_results
         // (works whenever Claude has already read this file in the chat).
         // Fall back to attempted direct fetch if we have nothing.
@@ -740,6 +742,7 @@
           path: filePath,
           needsContentFetch: !harvested,
           size,
+          asArtifact: fromAssistant || undefined,
         });
         continue;
       }
@@ -772,7 +775,7 @@
       for (const x of text.matchAll(DELIVERED_RE)) {
         if (known.has(x[2])) continue;
         known.add(x[2]);
-        out.push({ file_uuid: x[2], file_name: x[1].split('/').pop(), file_kind: 'blob' });
+        out.push({ file_uuid: x[2], file_name: x[1].split('/').pop(), file_kind: 'blob', path: x[1] });
       }
     }
     return out;
@@ -853,7 +856,8 @@
       const filesResult = transformFiles(
         [...(Array.isArray(m.files) ? m.files : []), ...deliveredFiles(m)],
         opts,
-        viewHarvest
+        viewHarvest,
+        role === 'assistant'
       );
       const fileImageUuids = new Set();
       for (const item of filesResult.imageItems) {
@@ -891,6 +895,17 @@
         const plain = ctx.turnText.join('\n');
         const missing = new Set([...ctx.turnSources.keys()].filter((url) => !plain.includes(url)));
         if (missing.size) blocks.push({ kind: 'text', text: `**Sources**\n\n${formatSources(ctx.turnSources, missing)}` });
+      }
+
+      // A file Claude wrote with Write / create_file and then sent: its
+      // final content is already known from the tool calls.
+      for (const att of filesResult.attachments) {
+        if (!att.asArtifact || att.text) continue;
+        const known = att.path && (ctx.files.get(att.path) ?? ctx.files.get(cleanFilePath(att.path)));
+        if (typeof known === 'string') {
+          att.text = known;
+          att.needsContentFetch = false;
+        }
       }
 
       const attachments = [
@@ -931,5 +946,38 @@
     return { conversation, imageRefs, binaryAttachmentRefs, textFileRefs };
   };
 
-  ns.claudeNormalize = { normalize };
+  /**
+   * Turn text files the assistant created (attachments marked asArtifact,
+   * content fetched by now) into artifacts: a 🧩 reference where the file
+   * was in the message, the content under artifacts/ (ZIP) or in the
+   * Artifacts section (md). A file already exported as an artifact by path
+   * (create_file, published Artifact) is just dropped from the attachments.
+   * Files whose content couldn't be loaded stay attachments.
+   */
+  const promoteFileArtifacts = (conversation) => {
+    const byId = new Map(conversation.artifacts.map((a) => [a.id, a]));
+    for (const turn of conversation.turns) {
+      const keep = [];
+      for (const att of turn.attachments) {
+        if (!att.asArtifact || att.needsContentFetch || att.fetchError ||
+            typeof att.text !== 'string' || att.text === '_(failed to load file content)_') {
+          keep.push(att);
+          continue;
+        }
+        const path = att.path ? cleanFilePath(att.path) : '';
+        if (path && (byId.has(`create_file:${path}`) || byId.has(`artifact:${path}`))) continue;
+        const id = `file:${att.fileUuid || path || att.fileName}`;
+        if (!byId.has(id)) {
+          const { fileName, title, language } = describeFile(att.fileName || path || 'file.txt');
+          const art = { id, title, language, mime: att.mime, content: att.text, fileName };
+          byId.set(id, art);
+          conversation.artifacts.push(art);
+        }
+        turn.blocks.push({ kind: 'artifact_ref', artifactId: id });
+      }
+      turn.attachments = keep;
+    }
+  };
+
+  ns.claudeNormalize = { normalize, promoteFileArtifacts };
 })();

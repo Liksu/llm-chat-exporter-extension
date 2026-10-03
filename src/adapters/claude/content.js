@@ -202,6 +202,10 @@
       }
     }
 
+    // Text files Claude created → artifacts (needs their content, so after
+    // the fetches above).
+    claudeNormalize.promoteFileArtifacts(conversation);
+
     const baseName = sanitizeFilename(conversation.title || 'conversation');
     const stamp = todayStamp();
     const innerBase = `${baseName}-${stamp}`;
