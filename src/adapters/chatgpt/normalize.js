@@ -120,9 +120,30 @@
    * collapses, and per-line trailing whitespace gets trimmed.
    */
   const CITE_MARKER_RE = /\uE200[\s\S]*?\uE201/g;
+  // Two marker types carry visible text rather than a chip: `entity`
+  // (["product","TPS63802",…] -- the name is part of the sentence) and
+  // `url` (title + address of an inline link). Keep those as text/link.
+  const markerText = (marker) => {
+    const [type, ...args] = marker.slice(1, -1).split('');
+    if (type === 'entity') {
+      try {
+        const v = JSON.parse(args[0]);
+        if (Array.isArray(v) && typeof v[1] === 'string') return v[1];
+      } catch (_) {
+        /* not the known shape */
+      }
+      return '';
+    }
+    if (type === 'url') {
+      const href = args.find((a) => /^https?:\/\//.test(a));
+      const title = args.find((a) => a && a !== href);
+      if (href) return `[${(title || href).replace(/[[\]]/g, '')}](${href})`;
+    }
+    return '';
+  };
   const stripCiteMarkers = (text) => {
     if (typeof text !== 'string' || !text) return text;
-    let out = text.replace(CITE_MARKER_RE, '');
+    let out = text.replace(CITE_MARKER_RE, markerText);
     if (out === text) return text;
     out = out.replace(/ {2,}/g, ' ');
     out = out.replace(/ +([.,;:!?])/g, '$1');
@@ -159,13 +180,18 @@
   const extractSandboxLinks = (text) => {
     const refs = [];
     if (typeof text !== 'string' || !text) return refs;
-    const seen = new Set();
+    const seen = new Map();
     SANDBOX_LINK_RE.lastIndex = 0;
     let m;
     while ((m = SANDBOX_LINK_RE.exec(text)) !== null) {
       const sandboxPath = m[1].trim();
-      if (!sandboxPath || seen.has(sandboxPath)) continue;
-      seen.add(sandboxPath);
+      // `![alt](sandbox:…)`: shown as a picture (md mode can inline it).
+      const asImage = m.index > 0 && text[m.index - 1] === '!';
+      if (!sandboxPath) continue;
+      if (seen.has(sandboxPath)) {
+        if (asImage) seen.get(sandboxPath).asImage = true;
+        continue;
+      }
       // basename, with URL decoding if the model emitted percent-escapes
       let tail = sandboxPath.split('/').pop() || sandboxPath;
       try {
@@ -173,7 +199,9 @@
       } catch {
         /* leave as-is */
       }
-      refs.push({ sandboxPath, fileName: tail });
+      const ref = { sandboxPath, fileName: tail, asImage };
+      seen.set(sandboxPath, ref);
+      refs.push(ref);
     }
     return refs;
   };
@@ -559,8 +587,12 @@
     }
 
     if (ct === 'text') {
-      const text = partsToText(content.parts);
+      let text = partsToText(content.parts);
       if (!text) return out;
+      // Generative-UI answers: components (<box>, <Link/>, <Cite/>…) → markdown.
+      if (role === 'assistant' && ns.chatgptGenui && ns.chatgptGenui.isGenUi(meta)) {
+        text = ns.chatgptGenui.render(text, meta);
+      }
       // Assistant -> tool dispatch: the message has content_type "text" but
       // recipient is a specific tool id (e.g. image-gen's "t2uay3k.sj1i4kz"
       // or "file_search.msearch"), and the body is the JSON/text payload
@@ -854,7 +886,7 @@
     // scope (not per-turn) because the same file is often mentioned in
     // multiple messages — we register the synthetic attachment exactly
     // once, on the first turn where it appears.
-    const sandboxPathsSeen = new Set();
+    const sandboxPathsSeen = new Map(); // sandboxPath → attachment
     // Canvas (canmore) state. `artifacts` accumulates the conversation-wide
     // list (mirrors Claude's artifact array). `currentArtifact` points at
     // the last create so subsequent update_textdoc edits apply to the right
@@ -1010,7 +1042,10 @@
       }
 
       // Attachments ride on user messages (and rarely on assistant ones).
-      const atts = transformAttachments(m, opts).filter(
+      // `container.open_image` results carry the sandbox image the model
+      // looked at -- its own working step, not something shown in the chat.
+      const lookedAt = m.author && m.author.role === 'tool' && /open_image$/.test(m.author.name || '');
+      const atts = (lookedAt ? [] : transformAttachments(m, opts)).filter(
         (a) => !(a.fileUuid && inlineImageIds.has(a.fileUuid))
       );
       for (const a of atts) {
@@ -1040,10 +1075,11 @@
           }
           const refs = extractSandboxLinks(item.block.text);
           for (const ref of refs) {
-            if (sandboxPathsSeen.has(ref.sandboxPath)) continue;
-            sandboxPathsSeen.add(ref.sandboxPath);
-            const attIndex = currentAttachments.length;
-            currentAttachments.push({
+            if (sandboxPathsSeen.has(ref.sandboxPath)) {
+              if (ref.asImage) sandboxPathsSeen.get(ref.sandboxPath).asImage = true;
+              continue;
+            }
+            const att = {
               category: 'binary',
               fileName: ref.fileName,
               mime: 'application/octet-stream',
@@ -1051,7 +1087,11 @@
               sandboxPath: ref.sandboxPath,
               sandboxMessageId: m.id,
               fromInlineLink: true,
-            });
+            };
+            if (ref.asImage) att.asImage = true;
+            sandboxPathsSeen.set(ref.sandboxPath, att);
+            const attIndex = currentAttachments.length;
+            currentAttachments.push(att);
             binaryAttachmentRefs.push({ turnIndex: ti, attIndex });
           }
         }

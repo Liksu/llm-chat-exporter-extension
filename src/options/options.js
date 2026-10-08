@@ -6,6 +6,7 @@
   const savedMsg = document.getElementById('savedMsg');
   const includeReasoningEl = document.getElementById('includeReasoning');
   const includeDatesEl = document.getElementById('includeDates');
+  const includeLinkEl = document.getElementById('includeLink');
   const dateFormatEl = document.getElementById('dateFormat');
   const inlineImagesEl = document.getElementById('inlineImages');
   const inlineTextFilesEl = document.getElementById('inlineTextFiles');
@@ -35,6 +36,11 @@
     {
       key: 'includeDates',
       label: 'Include timestamps',
+      kind: 'bool',
+    },
+    {
+      key: 'includeLink',
+      label: 'Include chat link',
       kind: 'bool',
     },
     {
@@ -223,6 +229,7 @@
     setRadio('mode', settings.global.mode);
     includeReasoningEl.checked = settings.global.includeReasoning;
     includeDatesEl.checked = !!settings.global.includeDates;
+    includeLinkEl.checked = settings.global.includeLink !== false;
     dateFormatEl.value = settings.global.dateFormat || 'locale';
     inlineImagesEl.checked = settings.global.inlineImages !== false;
     inlineTextFilesEl.checked = !!settings.global.inlineTextFiles;
@@ -252,6 +259,7 @@
     settings.global.mode = getRadio('mode') || 'md';
     settings.global.includeReasoning = !!includeReasoningEl.checked;
     settings.global.includeDates = !!includeDatesEl.checked;
+    settings.global.includeLink = !!includeLinkEl.checked;
     settings.global.dateFormat = dateFormatEl.value || 'locale';
     settings.global.inlineImages = !!inlineImagesEl.checked;
     settings.global.inlineTextFiles = !!inlineTextFilesEl.checked;

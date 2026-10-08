@@ -135,7 +135,10 @@ const prepare = (args) => {
     if (only.length && !only.includes(f.provider) && !only.includes(f.id)) continue;
     const provider = catalog.providers[f.provider];
     const known = fixtures[f.id] && fixtures[f.id].url;
-    const wantNew = args.recreateAll || recreate.has(f.id) || !known;
+    // refresh 'each-run': a fresh chat every time. Re-exporting an old chat
+    // catches API changes, but not new markup the model writes (ChatGPT's
+    // generative-UI components only appear in new answers).
+    const wantNew = args.recreateAll || recreate.has(f.id) || !known || f.refresh === 'each-run';
     if (f.automation === 'manual' && wantNew) {
       skipped.push({ id: f.id, reason: 'manual feature without a test chat -- create it by hand, export once with the page snippet' });
       continue;
@@ -670,7 +673,7 @@ const status = () => {
   const fixtures = readJson(FIXTURES, {});
   for (const f of catalog.features) {
     const fx = fixtures[f.id];
-    const flags = [f.support, f.cost === 'high' ? 'expensive' : null, f.automation === 'manual' ? 'manual' : null].filter(Boolean).join(', ');
+    const flags = [f.support, f.cost === 'high' ? 'expensive' : null, f.automation === 'manual' ? 'manual' : null, f.refresh === 'each-run' ? 'fresh each run' : null].filter(Boolean).join(', ');
     console.log(`${f.id.padEnd(28)} ${(fx ? `${fx.lastStatus || '?'} @ ${fx.lastRun}` : 'no test chat').padEnd(26)} ${flags}`);
   }
 };

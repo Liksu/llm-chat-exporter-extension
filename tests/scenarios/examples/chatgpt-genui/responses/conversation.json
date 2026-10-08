@@ -1,0 +1,251 @@
+{
+  "title": "Generative UI",
+  "create_time": 1791460800,
+  "update_time": 1791460900,
+  "default_model_slug": "gpt-6-thinking",
+  "current_node": "msg-5",
+  "mapping": {
+    "root": {
+      "id": "root",
+      "message": null,
+      "parent": null,
+      "children": [
+        "msg-1"
+      ]
+    },
+    "msg-1": {
+      "id": "msg-1",
+      "message": {
+        "id": "msg-1",
+        "author": {
+          "role": "user",
+          "name": null,
+          "metadata": {}
+        },
+        "create_time": 1791460801,
+        "content": {
+          "content_type": "text",
+          "parts": [
+            "Ждать ли полного BOM?"
+          ]
+        },
+        "status": "finished_successfully",
+        "end_turn": null,
+        "weight": 1,
+        "metadata": {},
+        "recipient": "all",
+        "channel": null
+      },
+      "parent": "root",
+      "children": [
+        "msg-2"
+      ]
+    },
+    "msg-2": {
+      "id": "msg-2",
+      "message": {
+        "id": "msg-2",
+        "author": {
+          "role": "tool",
+          "name": "container.open_image",
+          "metadata": {}
+        },
+        "create_time": 1791460802,
+        "content": {
+          "content_type": "execution_output",
+          "text": ""
+        },
+        "status": "finished_successfully",
+        "end_turn": null,
+        "weight": 1,
+        "metadata": {
+          "attachments": [
+            {
+              "id": "file_00000000aaaa",
+              "name": "user-x/abc/mnt/data/board_top.png",
+              "mime_type": "image/png",
+              "size": 1000
+            }
+          ]
+        },
+        "recipient": "all",
+        "channel": null
+      },
+      "parent": "msg-1",
+      "children": [
+        "msg-3"
+      ]
+    },
+    "msg-3": {
+      "id": "msg-3",
+      "message": {
+        "id": "msg-3",
+        "author": {
+          "role": "assistant",
+          "name": null,
+          "metadata": {}
+        },
+        "create_time": 1791460803,
+        "content": {
+          "content_type": "text",
+          "parts": [
+            "Короткий ответ: **резервируй детали заранее**. <Cite ref=\"turn1search0\"/>\n\n### <Link url=\"https://example.com/forum/thread\" title=\"Parts on hand [forum]\"/>\n\n<box gap={2}>\n  <row align=\"center\" gap={2}>\n    <icon name=\"book-open\" color=\"secondary\"/>\n    **Официальные инструкции**\n  </row>\n  <text><Link url=\"https://example.com/help/library\" title=\"Parts library\"/> — как резервировать.</text>\n</box>\n\n<box border radius=\"lg\" padding={3} gap={2}>\n  <box background=\"surface-secondary\" padding={3} align=\"center\" gap={1}>\n    **Выбираешь компоненты**\n    <caption>Parts Manager → Order Parts</caption>\n  </box>\n  <row justify=\"center\">\n    <icon name=\"arrow-down\" color=\"tertiary\"/>\n  </row>\n  <grid columns={2} gap={2}>\n    <grid-item>\n      <box padding={3} gap={1}>\n        <icon name=\"package-check\" color=\"success\" size=\"lg\"/>\n        **Есть на складе**\n        <text size=\"xs\">Выкупаешь</text>\n      </box>\n    </grid-item>\n    <grid-item>\n      <box padding={3} gap={1}>\n        **Нет на складе**\n        <text size=\"xs\">Pre-order</text>\n      </box>\n    </grid-item>\n  </grid>\n</box>\n\nЗамены: <Entity category=\"product\" value=\"TPS63802\" disambig=\"buck-boost regulator\"/> и <Entity category=\"product\" value=\"TPS63070\" disambig=\"buck-boost regulator\"/>. <Cite refs={[\"turn1search0\",\"turn2view1\",\"turn9search9\"]}/> <CodeCite tool=\"container\" citation_id=\"a1\" line_range_start={1} line_range_end={5}/>\n\n<AsyncImage query=\"slide switch\" aspectRatio=\"1:1\" maxWidth=\"132px\"/>\n\n<box gap={3}>\n  <row align=\"start\" gap={3}>\n    <box flex=\"1\" gap={1}>\n      **Вариант 1**\n\n      <badge color=\"success\">Лучше для продажи</badge>\n\n      Язычок между батареей и контактом.\n    </box>\n  </row>\n  <divider color=\"subtle\"/>\n  <row align=\"start\" gap={3}>\n    <box flex=\"1\" gap={1}>\n      **Вариант 2**\n    </box>\n  </row>\n</box>\n\nКод и `<Link/>` в коде не трогаем:\n\n```jsx\n<box gap={2}><Link url=\"x\"/></box>\n```"
+          ]
+        },
+        "status": "finished_successfully",
+        "end_turn": true,
+        "weight": 1,
+        "metadata": {
+          "model_slug": "gpt-6-thinking",
+          "search_result_groups": [
+            {
+              "type": "search_result_group",
+              "domain": "example.org",
+              "entries": [
+                {
+                  "type": "search_result",
+                  "url": "https://example.org/datasheet.pdf",
+                  "title": "Datasheet",
+                  "ref_id": {
+                    "turn_index": 2,
+                    "ref_type": "view",
+                    "ref_index": 1
+                  }
+                },
+                {
+                  "type": "search_result",
+                  "url": "https://example.com/forum/thread",
+                  "title": "Parts on hand",
+                  "ref_id": {
+                    "turn_index": 1,
+                    "ref_type": "search",
+                    "ref_index": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "model_dil_v2": {
+            "code": "function __dilSafe(){}",
+            "constants": {},
+            "fallbackMarkdown": "fallback",
+            "fallbackMarkdownVersion": 1,
+            "validationWarnings": [],
+            "requiredComponents": [
+              "Cite",
+              "Link"
+            ],
+            "appData": {
+              "opGenui": {
+                "componentResults": {
+                  "c-1": {
+                    "status": "resolved",
+                    "componentName": "Cite",
+                    "state": {
+                      "items": [
+                        {
+                          "url": "https://example.com/forum/thread",
+                          "ref_id": "turn1search0",
+                          "refs": [
+                            {
+                              "turn_index": 1,
+                              "ref_type": "search",
+                              "ref_index": 0
+                            }
+                          ],
+                          "source_label": "Forum",
+                          "title": "Product\nFolder\nTools &\nSupport"
+                        }
+                      ]
+                    }
+                  },
+                  "c-2": {
+                    "status": "resolved",
+                    "componentName": "AsyncImage",
+                    "state": {
+                      "images": [
+                        {
+                          "url": "https://example.com/shop/switch",
+                          "content_url": "https://images.example.com/proxy/1",
+                          "original_content_url": "https://example.com/img/switch.jpg",
+                          "title": "Slide switch"
+                        }
+                      ]
+                    }
+                  },
+                  "c-3": {
+                    "status": "failed",
+                    "componentName": "CodeCite",
+                    "code": "tool_failed"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "recipient": "all",
+        "channel": "final"
+      },
+      "parent": "msg-2",
+      "children": [
+        "msg-4"
+      ]
+    },
+    "msg-4": {
+      "id": "msg-4",
+      "message": {
+        "id": "msg-4",
+        "author": {
+          "role": "user",
+          "name": null,
+          "metadata": {}
+        },
+        "create_time": 1791460804,
+        "content": {
+          "content_type": "text",
+          "parts": [
+            "А старый формат?"
+          ]
+        },
+        "status": "finished_successfully",
+        "end_turn": null,
+        "weight": 1,
+        "metadata": {},
+        "recipient": "all",
+        "channel": null
+      },
+      "parent": "msg-3",
+      "children": [
+        "msg-5"
+      ]
+    },
+    "msg-5": {
+      "id": "msg-5",
+      "message": {
+        "id": "msg-5",
+        "author": {
+          "role": "assistant",
+          "name": null,
+          "metadata": {}
+        },
+        "create_time": 1791460805,
+        "content": {
+          "content_type": "text",
+          "parts": [
+            "Есть entity[\"product\",\"TPS2116\",\"power mux\"] и обсуждение urlForum threadhttps://example.com/forum/thread. citeturn1search0"
+          ]
+        },
+        "status": "finished_successfully",
+        "end_turn": true,
+        "weight": 1,
+        "metadata": {
+          "model_slug": "gpt-5"
+        },
+        "recipient": "all",
+        "channel": "final"
+      },
+      "parent": "msg-4",
+      "children": []
+    }
+  }
+}

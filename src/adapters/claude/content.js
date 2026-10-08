@@ -23,7 +23,7 @@
    * fetching pass — cowork's documents arrive inline as artifacts and the
    * sandbox file endpoints reject its non-UUID session id.
    */
-  const handleCoworkExport = async ({ mode, includeReasoning, includeDates, dateFormat, inlineImages, attachmentsAsMarkdown }) => {
+  const handleCoworkExport = async ({ mode, includeReasoning, includeDates, link, dateFormat, inlineImages, attachmentsAsMarkdown }) => {
     const { coworkApi, coworkNormalize } = ns;
     const sessionId = coworkApi.parseSessionIdFromUrl(location.href);
     if (!sessionId) {
@@ -53,6 +53,7 @@
       const blob = await zip.build(conversation, {
         includeReasoning,
         includeDates,
+        link,
         dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
@@ -65,6 +66,7 @@
         mode: 'md',
         includeReasoning,
         includeDates,
+        link,
         dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
@@ -77,12 +79,13 @@
     return { ok: true, filename };
   };
 
-  const handleExport = async ({ mode, includeReasoning, includeDates, dateFormat, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
+  const handleExport = async ({ mode, includeReasoning, includeDates, link, dateFormat, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
     if (ns.coworkApi && ns.coworkApi.isCoworkUrl(location.href)) {
       return handleCoworkExport({
         mode,
         includeReasoning,
         includeDates,
+        link,
         dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
@@ -215,6 +218,7 @@
       const blob = await zip.build(conversation, {
         includeReasoning,
         includeDates,
+        link,
         dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
@@ -227,6 +231,7 @@
         mode: 'md',
         includeReasoning,
         includeDates,
+        link,
         dateFormat,
         inlineImages,
         attachmentsAsMarkdown,

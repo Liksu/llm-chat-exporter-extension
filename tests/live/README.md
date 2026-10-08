@@ -37,9 +37,13 @@ Statuses: **BROKEN** (a `supported` feature fails) · **EXPORT_FAILED** ·
 **NOT_RUN** · **OK**.
 
 The first run creates all test chats (one per feature, ~25); later runs
-mostly re-export them — cheap, and enough to catch API changes, because
-old chats come back in the new format too. `--recreate <id>` /
-`--recreate-all` make fresh ones.
+mostly re-export them. That is cheap and catches changes in the API
+envelope (old chats come back in the new format), but not changes in
+what the model *writes*: a message keeps the markup it was generated
+with. ChatGPT's generative-UI components (`<Link/>`, `<Cite/>`, `<box>`)
+only appeared in new answers. So features marked `"refresh": "each-run"`
+(web search, text formatting, generative UI) get a fresh chat every run.
+`--recreate <id>` / `--recreate-all` make fresh ones for the rest.
 
 ## One-time setup
 

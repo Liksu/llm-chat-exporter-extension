@@ -7,6 +7,8 @@
  *     global: {
  *       mode: 'md'|'zip',
  *       includeReasoning: boolean,
+ *       includeDates: boolean,
+ *       includeLink: boolean,
  *       inlineImages: boolean,
  *       inlineTextFiles: boolean,
  *       attachmentsAsMarkdown: boolean,
@@ -25,6 +27,9 @@
       mode: 'md',
       includeReasoning: false,
       includeDates: false,
+      // Chat address under the title (and `url` in metadata.json). It only
+      // opens for the account that owns the chat, so it gives nothing away.
+      includeLink: true,
       // How per-message timestamps are rendered when includeDates is on:
       //   'locale'     — toLocaleString in the exporting machine's locale
       //   'iso'        — YYYY-MM-DD HH:MM in local time (sortable, no TZ)
@@ -50,6 +55,7 @@
     'mode',
     'includeReasoning',
     'includeDates',
+    'includeLink',
     'inlineImages',
     'inlineTextFiles',
     'attachmentsAsMarkdown',

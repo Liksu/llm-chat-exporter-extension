@@ -161,7 +161,8 @@
           "\\]\\(https?://"
         ]
       },
-      "notes": "Checks that a source link survives in the answer. When text blocks carry citations[] the export adds [[n]](url) markers and a Sources list (covered by claude.mixed / claude.research); when Claude writes the sources itself (citations: [] -- the 2026-10-01 chat) they are plain markdown links. Don't toggle tools in the composer -- if web search is off, the answer has no sources and that's fine to report."
+      "notes": "Checks that a source link survives in the answer. When text blocks carry citations[] the export adds [[n]](url) markers and a Sources list (covered by claude.mixed / claude.research); when Claude writes the sources itself (citations: [] -- the 2026-10-01 chat) they are plain markdown links. Don't toggle tools in the composer -- if web search is off, the answer has no sources and that's fine to report.",
+      "refresh": "each-run"
     },
     {
       "id": "claude.widget",
@@ -335,7 +336,8 @@
           "\\|.*\\|.*\\|",
           "```(js|javascript)"
         ]
-      }
+      },
+      "refresh": "each-run"
     },
     {
       "id": "chatgpt.image-upload",
@@ -431,10 +433,30 @@
           "\\]\\(https?://"
         ],
         "mdNotMatches": [
+          "[\\uE000-\\uF8FF]",
+          "<(Link|Cite|CodeCite|Entity|AsyncImage)\\b|<(box|row|grid|caption|badge)[\\s>]"
+        ]
+      },
+      "notes": "Old answers: private-use citation markers are stripped (url/entity markers keep their text). Generative-UI answers (gpt-6+): <Cite/> becomes [[n]](url) + a Sources list, <Link/> a link. Recreated every run: what the model writes only shows up in new answers.",
+      "refresh": "each-run"
+    },
+    {
+      "id": "chatgpt.generative-ui",
+      "provider": "chatgpt",
+      "title": "Generative UI answer (cards, link chips, entities, image search)",
+      "support": "supported",
+      "refresh": "each-run",
+      "prompt": "Search the web and compare two small SMD slide switches for a battery-powered device. Show them side by side as cards with a picture of each, link the product pages and cite your sources.",
+      "expect": {
+        "assistantMatches": [
+          "\\]\\(https?://"
+        ],
+        "mdNotMatches": [
+          "<(Link|Cite|CodeCite|Entity|AsyncImage)\\b|<(box|row|grid|caption|badge)[\\s>]",
           "[\\uE000-\\uF8FF]"
         ]
       },
-      "notes": "Citation markers (\\uE200cite...\\uE201) are stripped today -- audit flags any that leak; mdMatches checks a source survives."
+      "notes": "gpt-6 answers are markdown + JSX-like components (metadata.model_dil_v2): layout tags are dropped, Link/Cite/Entity/AsyncImage become markdown (src/adapters/chatgpt/genui.js). The model decides whether to use components; if the md shows none, the check is weak -- say so."
     },
     {
       "id": "chatgpt.reasoning",
@@ -526,7 +548,8 @@
           "\\|.*\\|.*\\|",
           "```(js|javascript)"
         ]
-      }
+      },
+      "refresh": "each-run"
     },
     {
       "id": "gemini.image-upload",

@@ -133,6 +133,29 @@ test('debug capture: HAR replays into an identical export', async () => {
 });
 
 /**
+ * "+link" only adds a line under the title and `url` in metadata.json, so one
+ * on/off check covers it -- it doesn't interact with the other options.
+ */
+test('chat link: in the header and metadata.json only when asked', async () => {
+  const dir = path.join(SCENARIOS_DIR, 'examples', 'chatgpt-basic-text');
+  const scenario = JSON.parse(fs.readFileSync(path.join(dir, 'scenario.json'), 'utf8'));
+  const base = scenario.exports.find((e) => e.message.mode === 'zip').message;
+  const exportWith = async (includeLink) => {
+    const r = await executeExport(dir, scenario, { ...base, includeLink });
+    assert.ok(r.response && r.response.ok, 'export failed');
+    const files = await unzipBlob(r.captured.blob, r.sandbox);
+    const text = (name) => Buffer.from(files[Object.keys(files).find((n) => n.endsWith(name) && !n.includes('/'))]).toString('utf8');
+    return { md: text('.md'), meta: JSON.parse(text('metadata.json')) };
+  };
+  const on = await exportWith(true);
+  assert.match(on.md, /^_Link: <https:\/\/chatgpt\.com\/c\/00000000-0000-0000-0000-000000000001>_ {2}$/m);
+  assert.equal(on.meta.url, 'https://chatgpt.com/c/00000000-0000-0000-0000-000000000001');
+  const off = await exportWith(false);
+  assert.doesNotMatch(off.md, /_Link:/);
+  assert.equal(off.meta.url, undefined);
+});
+
+/**
  * The drift detector must flag the API change behind the duplicated-images
  * bug: claude.ai starting to list uploads as `image` blocks in content[].
  */
@@ -366,6 +389,7 @@ test('live catalog: expectations are valid and not satisfied by the prompt', () 
     assert.ok(!ids.has(f.id), `duplicate id ${f.id}`);
     ids.add(f.id);
     assert.ok(catalog.providers[f.provider], `${f.id}: unknown provider`);
+    assert.ok(f.refresh === undefined || f.refresh === 'each-run', `${f.id}: refresh must be "each-run"`);
     const e = f.expect || {};
     for (const key of ['mdMatches', 'mdNotMatches', 'assistantMatches', 'outputMatches']) {
       for (const re of e[key] || []) assert.doesNotThrow(() => new RegExp(re, 'm'), `${f.id}: bad regex ${re}`);

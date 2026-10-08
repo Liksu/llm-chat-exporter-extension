@@ -1,0 +1,15 @@
+{
+  "title": "Generative UI",
+  "sourceLLM": "chatgpt",
+  "model": "gpt-6-thinking",
+  "createdAt": "2026-10-08T12:00:00.000Z",
+  "updatedAt": "2026-10-08T12:01:40.000Z",
+  "url": "https://chatgpt.com/c/00000000-0000-0000-0000-000000000004",
+  "exportedAt": "2026-10-08T12:00:00.000Z",
+  "counts": {
+    "turns": 4,
+    "artifacts": 0,
+    "assets": 0,
+    "files": 0
+  }
+}

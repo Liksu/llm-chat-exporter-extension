@@ -8,6 +8,7 @@
   const helperText = document.getElementById('helperText');
   const includeReasoningEl = document.getElementById('includeReasoning');
   const includeDatesEl = document.getElementById('includeDates');
+  const includeLinkEl = document.getElementById('includeLink');
   const inlineImagesEl = document.getElementById('inlineImages');
   const inlineTextFilesEl = document.getElementById('inlineTextFiles');
   const attachmentsAsMarkdownEl = document.getElementById('attachmentsAsMarkdown');
@@ -174,6 +175,9 @@
     setMode(effectiveSettings.mode);
     includeReasoningEl.checked = !!effectiveSettings.includeReasoning;
     includeDatesEl.checked = !!effectiveSettings.includeDates;
+    // On by default -- anything but an explicit false (settings saved before
+    // the option existed have no value).
+    includeLinkEl.checked = effectiveSettings.includeLink !== false;
     // inlineImages is ON by default — treat anything that isn't explicit
     // false as enabled (covers pre-0.7.21 settings records).
     inlineImagesEl.checked = effectiveSettings.inlineImages !== false;
@@ -220,6 +224,7 @@
         mode,
         includeReasoning: !!includeReasoningEl.checked,
         includeDates: !!includeDatesEl.checked,
+        includeLink: !!includeLinkEl.checked,
         // dateFormat lives in options only -- pull it from the loaded
         // settings rather than any UI element.
         dateFormat: (effectiveSettings && effectiveSettings.dateFormat) || 'locale',

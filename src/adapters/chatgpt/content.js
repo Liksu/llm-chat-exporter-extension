@@ -12,7 +12,7 @@
   const { chatgptApi, chatgptNormalize, markdown, zip, download, utils } = ns;
   const { sanitizeFilename, todayStamp, utf8ToBytes, log } = utils;
 
-  const handleExport = async ({ mode, includeReasoning, includeDates, dateFormat, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
+  const handleExport = async ({ mode, includeReasoning, includeDates, link, dateFormat, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
     const convId = chatgptApi.parseConvIdFromUrl(location.href);
     if (!convId) {
       return { ok: false, error: 'Not on a chatgpt.com conversation page.' };
@@ -81,6 +81,24 @@
       }
     }
 
+    // md with inline images: sandbox pictures shown as `![alt](sandbox:…)`
+    // (generated charts) become data URLs, like any other inline image.
+    // Other sandbox files stay links -- md mode has nowhere to put them.
+    const sandboxRewriteMap = new Map();
+    if (mode !== 'zip' && inlineImages) {
+      for (const { turnIndex, attIndex } of binaryAttachmentRefs) {
+        const att = conversation.turns[turnIndex].attachments[attIndex];
+        if (!att.isSandbox || !att.asImage) continue;
+        try {
+          const r = await chatgptApi.fetchSandboxFile(convId, att.sandboxMessageId, att.sandboxPath, token);
+          const mime = utils.sniffImageMime(r.bytes);
+          if (mime) sandboxRewriteMap.set(att.sandboxPath, `data:${mime};base64,${utils.uint8ToBase64(r.bytes)}`);
+        } catch (err) {
+          log.warn('chatgpt sandbox image fetch failed', att.fileName, err);
+        }
+      }
+    }
+
     // Text files (only when inlineTextFiles is on): fetch content as UTF-8.
     if (inlineTextFiles) {
       for (const { turnIndex, attIndex } of textFileRefs) {
@@ -106,6 +124,7 @@
       const blob = await zip.build(conversation, {
         includeReasoning,
         includeDates,
+        link,
         dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
@@ -118,10 +137,12 @@
         mode: 'md',
         includeReasoning,
         includeDates,
+        link,
         dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
         sourceLabel: 'ChatGPT',
+        sandboxRewriteMap,
       });
       const blob = new Blob([utf8ToBytes(md)], { type: 'text/markdown;charset=utf-8' });
       download.triggerDownload(blob, filename);

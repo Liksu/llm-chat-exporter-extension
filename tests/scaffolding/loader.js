@@ -47,6 +47,7 @@ const SCRIPTS_BY_ADAPTER = {
     'src/core/export-entry.js',
     'src/core/dev-loader.js',
     'src/adapters/chatgpt/api.js',
+    'src/adapters/chatgpt/genui.js',
     'src/adapters/chatgpt/normalize.js',
     'src/adapters/chatgpt/content.js',
   ],

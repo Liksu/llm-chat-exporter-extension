@@ -32,6 +32,7 @@
    *   mode: 'md'|'zip',
    *   includeReasoning: boolean,
    *   sourceLabel?: string,
+   *   link?: string,          chat address, shown under the title
    *   assetsDir?: string,
    *   filesDir?: string,
    *   artifactsDir?: string,
@@ -58,6 +59,7 @@
     out.push(`# ${conv.title || 'Conversation'}`);
     const meta = [];
     if (opts.sourceLabel) meta.push(`Source: ${opts.sourceLabel}`);
+    if (opts.link) meta.push(`Link: <${opts.link}>`);
     if (conv.model) meta.push(`Model: ${conv.model}`);
     if (conv.createdAt) meta.push(`Created: ${conv.createdAt}`);
     if (conv.updatedAt) meta.push(`Updated: ${conv.updatedAt}`);

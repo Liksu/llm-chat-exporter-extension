@@ -250,6 +250,13 @@ const TEXT_MARKERS = [
     () => 'claude.ai "not supported on your device" placeholder leaked into the text'],
   ['private-use-chars', 'error', /[-]+/g,
     (m) => `private-use characters leaked (provider citation/entity markup?): ${showPua(m.input, m.index, m[0].length)}`],
+  // Component markup a provider's UI renders (ChatGPT generative UI:
+  // <Link url=…/>, <Cite ref=…/>, <box gap={2}>): a capitalized tag with
+  // attributes or self-closing, or any tag with a {…} attribute. Plain HTML
+  // in prose doesn't look like either.
+  ['component-markup', 'error',
+    /<\/?[A-Z][A-Za-z]+(?:\s+[\w-]+=(?:"[^"]*"|\{[^}]*\}+))+\s*\/?>|<[A-Z][A-Za-z]+\s*\/>|<[a-z][\w-]*\s[^<>\n]*=\{[^<>\n]*>/g,
+    (m) => `UI component markup leaked into the text: ${m[0].slice(0, 80)}`],
   ['object-object', 'error', /\[object Object\]/g,
     () => '"[object Object]" in output — something stringified an object'],
   ['mojibake', 'warn', /(?:Ã[\u0080-¿]|Ð[\u0080-¿]|Ñ[\u0080-¿]|â€)/g,

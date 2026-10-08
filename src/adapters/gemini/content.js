@@ -36,7 +36,7 @@
     return cleaned;
   };
 
-  const handleExport = async ({ mode, includeReasoning, includeDates, dateFormat, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
+  const handleExport = async ({ mode, includeReasoning, includeDates, link, dateFormat, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
     const locator = geminiApi.parseConvLocator(location.href);
     if (!locator) {
       return { ok: false, error: 'Not on a gemini.google.com conversation page.' };
@@ -125,6 +125,7 @@
       const blob = await zip.build(conversation, {
         includeReasoning,
         includeDates,
+        link,
         dateFormat,
         inlineImages,
         attachmentsAsMarkdown,
@@ -137,6 +138,7 @@
         mode: 'md',
         includeReasoning,
         includeDates,
+        link,
         dateFormat,
         inlineImages,
         attachmentsAsMarkdown,

@@ -28,6 +28,7 @@
    * @param {{
    *   includeReasoning: boolean,
    *   includeDates?: boolean,
+   *   link?: string,          chat address for the header / metadata.json
    *   dateFormat?: 'locale'|'iso'|'iso-offset'|'iso-utc',
    *   inlineImages?: boolean,
    *   attachmentsAsMarkdown?: boolean,
@@ -119,6 +120,7 @@
       mode: 'zip',
       includeReasoning: options.includeReasoning,
       includeDates: options.includeDates,
+      link: options.link,
       dateFormat: options.dateFormat,
       inlineImages,
       attachmentsAsMarkdown: options.attachmentsAsMarkdown,
@@ -145,6 +147,7 @@
       model: conv.model,
       createdAt: conv.createdAt,
       updatedAt: conv.updatedAt,
+      ...(options.link ? { url: options.link } : {}),
       exportedAt: new Date().toISOString(),
       counts: {
         turns: conv.turns.length,

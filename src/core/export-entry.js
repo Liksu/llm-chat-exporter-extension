@@ -17,11 +17,23 @@
   const ns = (self.__exporter = self.__exporter || {});
   const { log } = ns.utils;
 
+  /** The chat's address without query/hash (tracking params, UI state). */
+  const pageLink = () => {
+    try {
+      return `${location.origin}${location.pathname}`;
+    } catch (_) {
+      return '';
+    }
+  };
+
   /** Normalize a message payload into handleExport options. */
   const toOptions = (msg) => ({
     mode: msg.mode === 'zip' ? 'zip' : 'md',
     includeReasoning: !!msg.includeReasoning,
     includeDates: !!msg.includeDates,
+    // Off unless asked: the popup sends the setting (default on), and
+    // callers that predate the option keep their output unchanged.
+    link: msg.includeLink ? pageLink() : '',
     dateFormat: msg.dateFormat || 'locale',
     // Default to true so an older popup (or a programmatic caller that
     // forgets the field) still inlines images, matching the new default.
