@@ -1,5 +1,18 @@
 ﻿# LLM Chat Exporter — Release Log
 
+## v0.7.42 — 2026-10-08
+
+All chats
+• New "link" option: the export starts with a link back to the chat (on by default; can be set per AI on the Options page).
+
+Claude
+• Text files Claude creates for you (reports, code, CSV…) are exported as separate files in /artifacts, whatever the inline options are.
+
+ChatGPT
+• Answers from the new ChatGPT interface (cards, source chips, product names, pictures) are exported as clean Markdown: links, numbered sources with a Sources list, and the pictures shown in the chat, instead of raw tags.
+• Charts and pictures ChatGPT generates in its sandbox are embedded in Markdown exports when "Inline images" is on.
+• Images ChatGPT only looked at while working are no longer added as attachments.
+
 ## v0.7.39 — 2026-10-01
 
 Claude

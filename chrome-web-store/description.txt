@@ -73,6 +73,8 @@ A few toggles are available in the popup:
 
 - Include reasoning – include thinking blocks and tool calls when available. Off by default.
 
+- Include link – add a link back to the original chat at the top of the export. On by default.
+
 Defaults are configurable on the Options page, available from the gear icon in the popup. You can set different defaults for Claude, ChatGPT, and Gemini, and choose how message dates are formatted.
 
 PRIVACY
