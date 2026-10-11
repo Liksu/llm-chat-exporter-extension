@@ -1,5 +1,14 @@
 ﻿# LLM Chat Exporter — Release Log
 
+## v0.7.43 — 2026-10-10
+
+ChatGPT
+• Sources now appear right in the text, like the source chips in the chat (site name, with the page title on hover) — also in older answers, where they used to be dropped.
+• Tiles and repeated blocks from the new ChatGPT interface (for example a pin-out grid) are exported as a readable list instead of template code.
+
+Claude
+• Web-search answers show their sources right in the text. Research reports keep numbered references and a Sources list.
+
 ## v0.7.42 — 2026-10-08
 
 All chats
