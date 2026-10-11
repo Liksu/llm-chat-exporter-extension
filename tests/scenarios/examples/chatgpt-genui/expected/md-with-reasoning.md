@@ -19,7 +19,7 @@ _Updated: 2026-10-08T12:01:40.000Z_
 
 ```
 
-Короткий ответ: **резервируй детали заранее**. [[1]](https://example.com/forum/thread)
+Короткий ответ: **резервируй детали заранее**. ([Forum](https://example.com/forum/thread "Parts on hand"))
 
 ### [Parts on hand forum](https://example.com/forum/thread)
 
@@ -32,15 +32,16 @@ _Parts Manager → Order Parts_
 
 ↓
 
-**Есть на складе**
+- **Есть на складе** — Выкупаешь  
+- **Нет на складе** — Pre-order
 
-Выкупаешь
+Распиновка
 
-**Нет на складе**
+- **R** — _Reset_ — first  
+- **C** — _Clock_ — pin 1  
+- **G** — _Ground_ — pin 2
 
-Pre-order
-
-Замены: TPS63802 и TPS63070. [[1]](https://example.com/forum/thread)[[2]](https://example.org/datasheet.pdf)
+Замены: TPS63802 и TPS63070. ([Forum](https://example.com/forum/thread "Parts on hand"), [example.org](https://example.org/datasheet.pdf "Datasheet"))
 
 [![Slide switch](https://example.com/img/switch.jpg)](https://example.com/shop/switch)
 
@@ -60,11 +61,6 @@ _(Лучше для продажи)_
 <box gap={2}><Link url="x"/></box>
 ```
 
-**Sources**
-
-1. [Parts on hand](https://example.com/forum/thread)  
-2. [Datasheet](https://example.org/datasheet.pdf)
-
 ---
 
 ## Human
@@ -75,6 +71,6 @@ _(Лучше для продажи)_
 
 ## Assistant
 
-Есть TPS2116 и обсуждение [Forum thread](https://example.com/forum/thread).
+Есть TPS2116 и обсуждение [Forum thread](https://example.com/forum/thread). ([Forum](https://example.com/forum/thread "Parts on hand | Forum"), [Example](https://example.org/datasheet.pdf "Datasheet"))
 
 ---

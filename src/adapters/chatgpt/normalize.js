@@ -151,12 +151,60 @@
     return out;
   };
 
-  /** Pull plain text out of a `parts` array, ignoring non-string entries. */
-  const partsToText = (parts) => {
+  /** Drop the `utm_source=chatgpt.com` ChatGPT appends to source links. */
+  const cleanSourceUrl = (u) =>
+    u.replace(/([?&])utm_source=chatgpt\.com(&|$)/, (_, sep, next) => (next ? sep : ''));
+
+  /**
+   * Citation markers resolved to inline source links, like the chips in the
+   * chat: `([NATO](url "page title"), [Reuters](url))`. The message's
+   * `metadata.content_references` lists each marker (`matched_text`) with
+   * its sources (`items[]` {title, url, attribution, supporting_websites}).
+   * Markers without an entry are stripped later by stripCiteMarkers.
+   */
+  const resolveCiteMarkers = (text, meta) => {
+    const refs = isObject(meta) && Array.isArray(meta.content_references) ? meta.content_references : [];
+    let out = text;
+    for (const ref of refs) {
+      if (!isObject(ref) || typeof ref.matched_text !== 'string' || !ref.matched_text.includes('')) continue;
+      const items = Array.isArray(ref.items) && ref.items.length ? ref.items : Array.isArray(ref.fallback_items) ? ref.fallback_items : [];
+      const seen = new Set();
+      const links = [];
+      const addLink = (it, label) => {
+        if (!isObject(it) || typeof it.url !== 'string' || !it.url) return;
+        const url = cleanSourceUrl(it.url);
+        if (seen.has(url)) return;
+        seen.add(url);
+        let site = label;
+        if (!site) {
+          try {
+            site = new URL(url).hostname.replace(/^www\./, '');
+          } catch (_) {
+            site = url;
+          }
+        }
+        const title = typeof it.title === 'string' ? it.title.replace(/\s+/g, ' ').trim() : '';
+        const hover = title && title !== site ? ` "${title.replace(/"/g, "'")}"` : '';
+        links.push(`[${String(site).replace(/[[\]]/g, '')}](${url}${hover})`);
+      };
+      for (const it of items) {
+        addLink(it, typeof it.attribution === 'string' ? it.attribution.trim() : '');
+        for (const s of Array.isArray(it.supporting_websites) ? it.supporting_websites : []) addLink(s, typeof s.attribution === 'string' ? s.attribution.trim() : '');
+      }
+      if (!links.length) continue;
+      out = out.split(ref.matched_text).join(`(${links.join(', ')})`);
+    }
+    return out;
+  };
+
+  /**
+   * Pull plain text out of a `parts` array, ignoring non-string entries.
+   * With the message's metadata, citation markers become source links.
+   */
+  const partsToText = (parts, meta) => {
     if (!Array.isArray(parts)) return '';
-    return stripCiteMarkers(
-      parts.filter((p) => typeof p === 'string').join('\n\n').trim()
-    );
+    const text = parts.filter((p) => typeof p === 'string').join('\n\n').trim();
+    return stripCiteMarkers(meta ? resolveCiteMarkers(text, meta) : text);
   };
 
   /**
@@ -587,7 +635,7 @@
     }
 
     if (ct === 'text') {
-      let text = partsToText(content.parts);
+      let text = partsToText(content.parts, meta);
       if (!text) return out;
       // Generative-UI answers: components (<box>, <Link/>, <Cite/>…) → markdown.
       if (role === 'assistant' && ns.chatgptGenui && ns.chatgptGenui.isGenUi(meta)) {
@@ -620,7 +668,7 @@
       );
       for (const p of parts) {
         if (typeof p === 'string') {
-          const cleaned = stripCiteMarkers(p);
+          const cleaned = stripCiteMarkers(resolveCiteMarkers(p, meta));
           if (cleaned.trim()) out.push({ block: { kind: 'text', text: cleaned } });
           continue;
         }

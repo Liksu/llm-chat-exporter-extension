@@ -35,7 +35,7 @@ _(summary — claude.ai doesn't keep the full reasoning)_
 [search results]
 ```
 
-Node.js 24 is the current LTS line. [[1]](https://nodejs.org/en/about/previous-releases)
+Node.js 24 is the current LTS line. ([nodejs.org](https://nodejs.org/en/about/previous-releases "Node.js Releases"))
 
 🧩 [sun.svg](#artifact-widget-toolu-vw)
 

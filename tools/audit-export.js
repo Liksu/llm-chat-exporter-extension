@@ -257,6 +257,9 @@ const TEXT_MARKERS = [
   ['component-markup', 'error',
     /<\/?[A-Z][A-Za-z]+(?:\s+[\w-]+=(?:"[^"]*"|\{[^}]*\}+))+\s*\/?>|<[A-Z][A-Za-z]+\s*\/>|<[a-z][\w-]*\s[^<>\n]*=\{[^<>\n]*>/g,
     (m) => `UI component markup leaked into the text: ${m[0].slice(0, 80)}`],
+  // Svelte-style template blocks around such components ({#each … as p}).
+  ['template-markup', 'error', /\{[#:/](?:each|if|else|await|key)\b[^}\n]*\}/g,
+    (m) => `UI template markup leaked into the text: ${m[0].slice(0, 80)}`],
   ['object-object', 'error', /\[object Object\]/g,
     () => '"[object Object]" in output — something stringified an object'],
   ['mojibake', 'warn', /(?:Ã[\u0080-¿]|Ð[\u0080-¿]|Ñ[\u0080-¿]|â€)/g,

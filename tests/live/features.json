@@ -161,7 +161,7 @@
           "\\]\\(https?://"
         ]
       },
-      "notes": "Checks that a source link survives in the answer. When text blocks carry citations[] the export adds [[n]](url) markers and a Sources list (covered by claude.mixed / claude.research); when Claude writes the sources itself (citations: [] -- the 2026-10-01 chat) they are plain markdown links. Don't toggle tools in the composer -- if web search is off, the answer has no sources and that's fine to report.",
+      "notes": "Checks that a source link survives in the answer. When text blocks carry citations[] the export puts the sources inline, like the chips in the chat: ([site](url)) (covered by claude.mixed); Research reports keep [[n]] markers and a Sources list (claude.research); when Claude writes the sources itself (citations: [] -- the 2026-10-01 chat) they are plain markdown links. Don't toggle tools in the composer -- if web search is off, the answer has no sources and that's fine to report.",
       "refresh": "each-run"
     },
     {
@@ -437,7 +437,7 @@
           "<(Link|Cite|CodeCite|Entity|AsyncImage)\\b|<(box|row|grid|caption|badge)[\\s>]"
         ]
       },
-      "notes": "Old answers: private-use citation markers are stripped (url/entity markers keep their text). Generative-UI answers (gpt-6+): <Cite/> becomes [[n]](url) + a Sources list, <Link/> a link. Recreated every run: what the model writes only shows up in new answers.",
+      "notes": "Sources go inline, like the chips in the chat: ([NATO](url \"page title\")). Old answers: private-use cite markers resolved through metadata.content_references (url/entity markers keep their text). Generative-UI answers (gpt-6+): <Cite/> resolved through model_dil_v2 componentResults, <Link/> a link. Recreated every run: what the model writes only shows up in new answers.",
       "refresh": "each-run"
     },
     {

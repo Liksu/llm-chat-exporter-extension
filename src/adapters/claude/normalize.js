@@ -237,12 +237,15 @@
    * `citations` on text blocks -- each {url, title, metadata, start_index,
    * end_index}. Without this an export has no sources at all.
    *
-   * Inserts a ` [[n]](url)` marker at each citation's end_index (indices
-   * count code points -- Python-side strings) and records the source in
-   * `sources` (Map url → {n, title}), which numbers sources across calls so
-   * blocks of one turn share numbering.
+   * At each citation's end_index (indices count code points -- Python-side
+   * strings) inserts either
+   *   'numbered'  ` [[n]](url)` -- reports, which end with a Sources list;
+   *   'inline'    ` ([site](url "title"), …)` -- chat answers, like the
+   *               source chips in the chat; no list needed.
+   * Records each source in `sources` (Map url → {n, title}), which numbers
+   * sources across calls so blocks of one turn share numbering.
    */
-  const applyCitations = (text, citations, sources) => {
+  const applyCitations = (text, citations, sources, style = 'numbered') => {
     if (typeof text !== 'string' || !Array.isArray(citations) || citations.length === 0) return text;
     const chars = Array.from(text);
     const marks = [];
@@ -254,22 +257,43 @@
       if (!sources.has(url)) {
         const title =
           pick(c.metadata || {}, ['preview_title']) || pick(c, ['title']) || pick(src, ['title']) || url;
-        sources.set(url, { n: sources.size + 1, title });
+        sources.set(url, { n: sources.size + 1, title, site: pick(c.metadata || {}, ['site_name']) || pick(src, ['source']) });
       }
       const at = c.end_index;
       if (Number.isInteger(at) && at >= 0 && at <= chars.length) {
         marks.push({ at, n: sources.get(url).n, url });
       }
     }
-    const seen = new Set();
-    marks.sort((a, b) => b.at - a.at || b.n - a.n);
+    // One insertion per position; several sources at one spot share it.
+    const byPos = new Map();
     for (const m of marks) {
-      const key = `${m.at}:${m.n}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      chars.splice(m.at, 0, ` [[${m.n}]](${m.url})`);
+      const list = byPos.get(m.at) || [];
+      if (!list.some((x) => x.url === m.url)) list.push(m);
+      byPos.set(m.at, list);
+    }
+    for (const at of [...byPos.keys()].sort((a, b) => b - a)) {
+      const list = byPos.get(at).sort((a, b) => a.n - b.n);
+      const mark = style === 'inline'
+        ? ` (${list.map((m) => inlineSource(m.url, sources.get(m.url))).join(', ')})`
+        : list.map((m) => ` [[${m.n}]](${m.url})`).join('');
+      chars.splice(at, 0, mark);
     }
     return chars.join('');
+  };
+
+  /** `[site](url "page title")`: the site name, the title on hover. */
+  const inlineSource = (url, s) => {
+    let site = s.site;
+    if (!site) {
+      try {
+        site = new URL(url).hostname.replace(/^www\./, '');
+      } catch (_) {
+        site = url;
+      }
+    }
+    const title = String(s.title || '').replace(/\s+/g, ' ').trim();
+    const hover = title && title !== site && title !== url ? ` "${title.replace(/"/g, "'")}"` : '';
+    return `[${String(site).replace(/[[\]]/g, '')}](${url}${hover})`;
   };
 
   /** Numbered markdown list of sources; `only` limits it to those urls. */
@@ -503,7 +527,7 @@
     if (t === 'text') {
       const raw_text = typeof raw.text === 'string' ? raw.text : '';
       ctx.turnText.push(raw_text);
-      const cited = applyCitations(raw_text, raw.citations, ctx.turnSources);
+      const cited = applyCitations(raw_text, raw.citations, ctx.turnSources, 'inline');
       const cleaned = stripUnsupportedPlaceholder(cited);
       return cleaned.trim().length > 0 ? [{ block: { kind: 'text', text: cleaned } }] : [];
     }

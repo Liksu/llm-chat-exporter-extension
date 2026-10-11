@@ -89,7 +89,7 @@
         "content": {
           "content_type": "text",
           "parts": [
-            "Короткий ответ: **резервируй детали заранее**. <Cite ref=\"turn1search0\"/>\n\n### <Link url=\"https://example.com/forum/thread\" title=\"Parts on hand [forum]\"/>\n\n<box gap={2}>\n  <row align=\"center\" gap={2}>\n    <icon name=\"book-open\" color=\"secondary\"/>\n    **Официальные инструкции**\n  </row>\n  <text><Link url=\"https://example.com/help/library\" title=\"Parts library\"/> — как резервировать.</text>\n</box>\n\n<box border radius=\"lg\" padding={3} gap={2}>\n  <box background=\"surface-secondary\" padding={3} align=\"center\" gap={1}>\n    **Выбираешь компоненты**\n    <caption>Parts Manager → Order Parts</caption>\n  </box>\n  <row justify=\"center\">\n    <icon name=\"arrow-down\" color=\"tertiary\"/>\n  </row>\n  <grid columns={2} gap={2}>\n    <grid-item>\n      <box padding={3} gap={1}>\n        <icon name=\"package-check\" color=\"success\" size=\"lg\"/>\n        **Есть на складе**\n        <text size=\"xs\">Выкупаешь</text>\n      </box>\n    </grid-item>\n    <grid-item>\n      <box padding={3} gap={1}>\n        **Нет на складе**\n        <text size=\"xs\">Pre-order</text>\n      </box>\n    </grid-item>\n  </grid>\n</box>\n\nЗамены: <Entity category=\"product\" value=\"TPS63802\" disambig=\"buck-boost regulator\"/> и <Entity category=\"product\" value=\"TPS63070\" disambig=\"buck-boost regulator\"/>. <Cite refs={[\"turn1search0\",\"turn2view1\",\"turn9search9\"]}/> <CodeCite tool=\"container\" citation_id=\"a1\" line_range_start={1} line_range_end={5}/>\n\n<AsyncImage query=\"slide switch\" aspectRatio=\"1:1\" maxWidth=\"132px\"/>\n\n<box gap={3}>\n  <row align=\"start\" gap={3}>\n    <box flex=\"1\" gap={1}>\n      **Вариант 1**\n\n      <badge color=\"success\">Лучше для продажи</badge>\n\n      Язычок между батареей и контактом.\n    </box>\n  </row>\n  <divider color=\"subtle\"/>\n  <row align=\"start\" gap={3}>\n    <box flex=\"1\" gap={1}>\n      **Вариант 2**\n    </box>\n  </row>\n</box>\n\nКод и `<Link/>` в коде не трогаем:\n\n```jsx\n<box gap={2}><Link url=\"x\"/></box>\n```"
+            "Короткий ответ: **резервируй детали заранее**. <Cite ref=\"turn1search0\"/>\n\n### <Link url=\"https://example.com/forum/thread\" title=\"Parts on hand [forum]\"/>\n\n<box gap={2}>\n  <row align=\"center\" gap={2}>\n    <icon name=\"book-open\" color=\"secondary\"/>\n    **Официальные инструкции**\n  </row>\n  <text><Link url=\"https://example.com/help/library\" title=\"Parts library\"/> — как резервировать.</text>\n</box>\n\n<box border radius=\"lg\" padding={3} gap={2}>\n  <box background=\"surface-secondary\" padding={3} align=\"center\" gap={1}>\n    **Выбираешь компоненты**\n    <caption>Parts Manager → Order Parts</caption>\n  </box>\n  <row justify=\"center\">\n    <icon name=\"arrow-down\" color=\"tertiary\"/>\n  </row>\n  <grid columns={2} gap={2}>\n    <grid-item>\n      <box padding={3} gap={1}>\n        <icon name=\"package-check\" color=\"success\" size=\"lg\"/>\n        **Есть на складе**\n        <text size=\"xs\">Выкупаешь</text>\n      </box>\n    </grid-item>\n    <grid-item>\n      <box padding={3} gap={1}>\n        **Нет на складе**\n        <text size=\"xs\">Pre-order</text>\n      </box>\n    </grid-item>\n  </grid>\n</box>\n\n<box border radius=\"lg\" padding={3} gap={2}>\n  <text weight=\"medium\" size=\"xs\" color=\"secondary\">Распиновка</text>\n  <grid columns={3} gap={1}>\n    {#each [{a:\"R\",b:\"Reset\"},{a:\"C\",b:\"Clock\"},{a:\"G\",b:\"Ground\"}] as p, i}\n      <grid-item>\n        <box align=center gap={1}>\n          <title size=\"lg\">{p.a}</title>\n          <caption>{p.b}</caption>\n          {#if i}<text>pin {i}</text>{:else}<text>first</text>{/if}\n        </box>\n      </grid-item>\n    {/each}\n  </grid>\n</box>\n\nЗамены: <Entity category=\"product\" value=\"TPS63802\" disambig=\"buck-boost regulator\"/> и <Entity category=\"product\" value=\"TPS63070\" disambig=\"buck-boost regulator\"/>. <Cite refs={[\"turn1search0\",\"turn2view1\",\"turn9search9\"]}/> <CodeCite tool=\"container\" citation_id=\"a1\" line_range_start={1} line_range_end={5}/>\n\n<AsyncImage query=\"slide switch\" aspectRatio=\"1:1\" maxWidth=\"132px\"/>\n\n<box gap={3}>\n  <row align=\"start\" gap={3}>\n    <box flex=\"1\" gap={1}>\n      **Вариант 1**\n\n      <badge color=\"success\">Лучше для продажи</badge>\n\n      Язычок между батареей и контактом.\n    </box>\n  </row>\n  <divider color=\"subtle\"/>\n  <row align=\"start\" gap={3}>\n    <box flex=\"1\" gap={1}>\n      **Вариант 2**\n    </box>\n  </row>\n</box>\n\nКод и `<Link/>` в коде не трогаем:\n\n```jsx\n<box gap={2}><Link url=\"x\"/></box>\n```"
           ]
         },
         "status": "finished_successfully",
@@ -239,7 +239,36 @@
         "end_turn": true,
         "weight": 1,
         "metadata": {
-          "model_slug": "gpt-5"
+          "model_slug": "gpt-5",
+          "content_references": [
+            {
+              "matched_text": "citeturn1search0",
+              "start_idx": 0,
+              "end_idx": 0,
+              "type": "grouped_webpages",
+              "items": [
+                {
+                  "title": "Parts on hand | Forum",
+                  "url": "https://example.com/forum/thread?utm_source=chatgpt.com",
+                  "attribution": "Forum",
+                  "supporting_websites": [
+                    {
+                      "title": "Datasheet",
+                      "url": "https://example.org/datasheet.pdf?utm_source=chatgpt.com",
+                      "attribution": "Example"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "matched_text": " ",
+              "start_idx": 0,
+              "end_idx": 0,
+              "type": "sources_footnote",
+              "sources": []
+            }
+          ]
         },
         "recipient": "all",
         "channel": "final"

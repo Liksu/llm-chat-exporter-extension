@@ -23,9 +23,11 @@
  * render() turns all of it into plain markdown: layout tags go away (their
  * content stays, de-indented so it isn't read as a code block), arrow
  * icons stay as ↓ → (the edges of the little flow diagrams the model
- * draws), Link → [title](url), Entity → its text, Cite → [[n]](url) plus a
- * Sources list, AsyncImage → the image it showed, CodeCite and other
- * icons → nothing. Unknown tags
+ * draws), a grid → a list (one item per tile), Link → [title](url),
+ * Entity → its text, Cite → inline source links like the chips
+ * ([Reddit](url)), AsyncImage → the image it showed, CodeCite and other
+ * icons → nothing. {#each}/{#if} template blocks are expanded first.
+ * Unknown tags
  * are left as they are, and code (fenced or inline) is never touched.
  */
 (function () {
@@ -35,7 +37,7 @@
 
   // Layout containers: their content becomes its own paragraph.
   const BLOCKS = new Set([
-    'box', 'row', 'col', 'grid', 'grid-item', 'card', 'text', 'title', 'markdown',
+    'box', 'row', 'col', 'grid', 'grid-item', 'card', 'text', 'markdown',
     'list', 'list-item', 'list-view', 'list-view-item', 'label', 'form',
   ]);
   // Dropped with nothing in their place.
@@ -43,7 +45,7 @@
   // Rendered from their attributes / resolved data.
   const DATA = new Set(['Link', 'Cite', 'Entity', 'AsyncImage', 'image', 'Image', 'divider', 'Divider', 'icon', 'Icon']);
   // Inline wrappers: content kept, formatted.
-  const WRAPS = { caption: (s) => `_${s}_`, badge: (s) => `_(${s})_` };
+  const WRAPS = { caption: (s) => `_${s}_`, badge: (s) => `_(${s})_`, title: (s) => `**${s}**` };
 
   const isKnown = (name) => BLOCKS.has(name) || DROP.has(name) || DATA.has(name) || name in WRAPS;
 
@@ -139,9 +141,11 @@
       // rank: clean title 3 > site label 2 > flattened junk 1 > url 0
       const [t, rank] = !isMessy(title) ? [title, 3] : !isMessy(label) ? [label, 2] : title ? [oneLine(title), 1] : [url, 0];
       const s = sources.get(key);
-      if (!s || s.url !== url) {
-        if (!s) sources.set(key, { url, title: t, rank });
-      } else if (rank > s.rank) Object.assign(s, { title: t, rank });
+      if (!s) sources.set(key, { url, title: t, rank, label: !isMessy(label) ? oneLine(label) : '' });
+      else if (s.url === url) {
+        if (rank > s.rank) Object.assign(s, { title: t, rank });
+        if (!s.label && !isMessy(label)) s.label = oneLine(label);
+      }
     };
     const dil = isObject(meta) && isObject(meta.model_dil_v2) ? meta.model_dil_v2 : null;
     const gen = dil && isObject(dil.appData) && isObject(dil.appData.opGenui) ? dil.appData.opGenui : null;
@@ -177,9 +181,270 @@
 
   const linkText = (s) => oneLine(s).replace(/[[\]]/g, '');
 
+  /** Site name for an inline source link: the chip label, else the host. */
+  const siteName = (src) => {
+    if (src.label) return src.label;
+    try {
+      return new URL(src.url).hostname.replace(/^www\./, '');
+    } catch (_) {
+      return src.title;
+    }
+  };
+
+  /**
+   * Inline source links, like the chips in the chat: `([Reddit](url "page
+   * title"), [ti.com](url))`. The page title rides along as the link title
+   * (shown on hover) so the text stays short.
+   */
+  const inlineSources = (list) => {
+    const seen = new Set();
+    const links = [];
+    for (const src of list) {
+      if (!src || seen.has(src.url)) continue;
+      seen.add(src.url);
+      const hover = src.rank >= 2 && src.title !== siteName(src) ? ` "${oneLine(src.title).replace(/"/g, "'")}"` : '';
+      links.push(`[${linkText(siteName(src))}](${src.url}${hover})`);
+    }
+    return links.length ? `(${links.join(', ')})` : '';
+  };
+
+  /** Grid cells → a list, one item per cell, its lines joined by " — ". */
+  const gridList = (cells) => {
+    const items = cells
+      .map((c) => c.split('\n').map((l) => l.trim()).filter(Boolean).join(' — '))
+      .filter(Boolean);
+    return items.length ? `\n\n${items.map((x) => `- ${x}`).join('\n')}\n\n` : '';
+  };
+
   // Icons that carry meaning in a diagram (the flow arrows between boxes);
   // every other icon is decoration.
   const ARROWS = { 'arrow-down': '↓', 'arrow-up': '↑', 'arrow-right': '→', 'arrow-left': '←' };
+
+  // -- Templates ------------------------------------------------------------
+  // Besides tags the model writes Svelte-style blocks to repeat markup:
+  //   {#each [{a:"R",b:"Reset"},…] as p} <title>{p.a}</title> {/each}
+  //   {#if x} … {:else} … {/if}
+  // They are expanded before the tags are rendered. Only literal data and
+  // names bound by an enclosing #each are evaluated; anything else is left
+  // as written (the audit flags leftovers).
+
+  /** Parse a JS literal (array/object/string/number/bool/null, bare keys). */
+  const parseLiteral = (src) => {
+    let i = 0;
+    const ws = () => {
+      while (i < src.length && /\s/.test(src[i])) i++;
+    };
+    const fail = () => {
+      throw new Error('not a literal');
+    };
+    const value = () => {
+      ws();
+      const c = src[i];
+      if (c === '[') {
+        i++;
+        const arr = [];
+        ws();
+        if (src[i] === ']') return i++, arr;
+        for (;;) {
+          arr.push(value());
+          ws();
+          if (src[i] === ',') {
+            i++;
+            ws();
+            if (src[i] === ']') return i++, arr;
+          } else if (src[i] === ']') return i++, arr;
+          else fail();
+        }
+      }
+      if (c === '{') {
+        i++;
+        const obj = {};
+        ws();
+        if (src[i] === '}') return i++, obj;
+        for (;;) {
+          ws();
+          let key;
+          if (src[i] === '"' || src[i] === "'") key = value();
+          else {
+            const m = /^[A-Za-z_$][\w$]*/.exec(src.slice(i));
+            if (!m) fail();
+            key = m[0];
+            i += key.length;
+          }
+          ws();
+          if (src[i++] !== ':') fail();
+          obj[key] = value();
+          ws();
+          if (src[i] === ',') {
+            i++;
+            ws();
+            if (src[i] === '}') return i++, obj;
+          } else if (src[i] === '}') return i++, obj;
+          else fail();
+        }
+      }
+      if (c === '"' || c === "'") {
+        let out = '';
+        for (i++; i < src.length && src[i] !== c; i++) {
+          if (src[i] === '\\') {
+            const e = src[++i];
+            out += e === 'n' ? '\n' : e === 't' ? '\t' : e;
+          } else out += src[i];
+        }
+        if (src[i] !== c) fail();
+        i++;
+        return out;
+      }
+      const m = /^(-?\d+(?:\.\d+)?|true|false|null)/.exec(src.slice(i));
+      if (!m) fail();
+      i += m[0].length;
+      return JSON.parse(m[0]);
+    };
+    const v = value();
+    ws();
+    if (i !== src.length) fail();
+    return v;
+  };
+
+  const MISSING = Symbol('missing');
+
+  /** Evaluate a literal or a dotted path (p.a, p.items[0]) in scope. */
+  const evaluate = (expr, scope) => {
+    const e = expr.trim();
+    const path = /^([A-Za-z_$][\w$]*)((?:\.[\w$]+|\[\d+\])*)$/.exec(e);
+    if (path) {
+      if (!Object.prototype.hasOwnProperty.call(scope, path[1])) return MISSING;
+      let v = scope[path[1]];
+      for (const step of path[2].match(/\.[\w$]+|\[\d+\]/g) || []) {
+        if (v == null) return undefined;
+        v = v[step[0] === '.' ? step.slice(1) : Number(step.slice(1, -1))];
+      }
+      return v;
+    }
+    try {
+      return parseLiteral(e);
+    } catch (_) {
+      return MISSING;
+    }
+  };
+
+  /** Index just past the `}` closing the brace at `open` (strings respected). */
+  const braceEnd = (text, open) => {
+    let depth = 0;
+    let str = null;
+    for (let k = open; k < text.length; k++) {
+      const c = text[k];
+      if (str) {
+        if (c === '\\') k++;
+        else if (c === str) str = null;
+      } else if (c === '"' || c === "'") str = c;
+      else if (c === '{') depth++;
+      else if (c === '}' && --depth === 0) return k + 1;
+    }
+    return -1;
+  };
+
+  /**
+   * Find the block that `{#kind …}` at `at` opens: its header expression,
+   * the top-level `{:…}` branch markers and the matching `{/kind}`.
+   */
+  const scanBlock = (text, at, kind) => {
+    const headEnd = braceEnd(text, at);
+    if (headEnd < 0) return null;
+    const head = text.slice(at + 2 + kind.length, headEnd - 1);
+    const branches = [];
+    let depth = 0;
+    let k = headEnd;
+    let bodyAt = headEnd;
+    while (k < text.length) {
+      const j = text.indexOf('{', k);
+      if (j < 0) return null;
+      const tag = /^\{([#:/])(\w+)/.exec(text.slice(j, j + 16));
+      const end = braceEnd(text, j);
+      if (end < 0) return null;
+      if (tag && tag[1] === '#') depth++;
+      else if (tag && tag[1] === '/' && depth > 0) depth--;
+      else if (tag && tag[1] === '/' && tag[2] === kind) {
+        branches.push({ cond: null, body: text.slice(bodyAt, j) });
+        return { head, branches, end };
+      } else if (tag && tag[1] === ':' && depth === 0) {
+        branches.push({ cond: null, body: text.slice(bodyAt, j) });
+        branches[branches.length - 1].next = text.slice(j + 2, end - 1).trim();
+        bodyAt = end;
+      }
+      k = end;
+    }
+    return null;
+  };
+
+  const expandTemplates = (text, scope) => {
+    if (!/\{[#\w$]/.test(text)) return text;
+    let out = '';
+    let i = 0;
+    while (i < text.length) {
+      const j = text.indexOf('{', i);
+      if (j < 0) break;
+      out += text.slice(i, j);
+      const block = /^\{#(each|if)\s/.exec(text.slice(j, j + 8));
+      if (block) {
+        const b = scanBlock(text, j, block[1]);
+        if (!b) {
+          out += text.slice(j);
+          return out;
+        }
+        if (block[1] === 'each') {
+          const h = /^\s*([\s\S]+?)\s+as\s+([A-Za-z_$][\w$]*)(?:\s*,\s*([A-Za-z_$][\w$]*))?\s*$/.exec(b.head);
+          const list = h ? evaluate(h[1], scope) : MISSING;
+          if (!Array.isArray(list)) {
+            out += text.slice(j, b.end);
+          } else {
+            list.forEach((item, n) => {
+              const inner = { ...scope, [h[2]]: item };
+              if (h[3]) inner[h[3]] = n;
+              out += expandTemplates(b.branches[0].body, inner);
+            });
+          }
+        } else {
+          // {#if a}…{:else if b}…{:else}…{/if}
+          let cond = b.head;
+          let chosen = null;
+          let unknown = false;
+          for (const br of b.branches) {
+            const v = cond === null ? true : evaluate(cond, scope);
+            if (v === MISSING) {
+              unknown = true;
+              break;
+            }
+            if (v) {
+              chosen = br;
+              break;
+            }
+            cond = br.next === undefined ? false : br.next === 'else' ? null : br.next.replace(/^else\s+if\s+/, '');
+            if (cond === false) break;
+          }
+          if (unknown) out += text.slice(j, b.end);
+          else if (chosen) out += expandTemplates(chosen.body, scope);
+        }
+        i = b.end;
+        continue;
+      }
+      // {name.path} bound by an enclosing #each.
+      const end = braceEnd(text, j);
+      const expr = end > 0 ? text.slice(j + 1, end - 1) : '';
+      const v = /^[A-Za-z_$][\w$.[\]]*$/.test(expr) ? evaluate(expr, scope) : MISSING;
+      if (v === MISSING || end < 0) {
+        out += '{';
+        i = j + 1;
+        continue;
+      }
+      const s = v == null ? '' : String(v);
+      // As an attribute value (title={p.b}) it must stay one quoted token.
+      const inTag = out.lastIndexOf('<') > out.lastIndexOf('>');
+      out += inTag && out.endsWith('=') ? JSON.stringify(s) : s;
+      i = end;
+    }
+    return out + text.slice(i);
+  };
 
   /**
    * Render the components of one text (outside code) into markdown.
@@ -216,8 +481,27 @@
       const { name, attrs } = tag;
       if (BLOCKS.has(name)) {
         if (tag.selfClosing) continue;
-        state.depth = Math.max(0, state.depth + (tag.closing ? -1 : 1));
-        out += '\n\n';
+        // A grid's direct children are its cells; each becomes one list
+        // item with its lines joined (R — Reset), so a row of tiles stays
+        // a compact list instead of a column of one-word paragraphs.
+        const grid = state.grids[state.grids.length - 1];
+        if (tag.closing) {
+          if (grid && state.depth === grid.depth + 1 && grid.cellAt != null) {
+            grid.cells.push(out.slice(grid.cellAt));
+            out = out.slice(0, grid.cellAt);
+            grid.cellAt = null;
+          } else if (grid && name === 'grid' && state.depth === grid.depth) {
+            state.grids.pop();
+            out = out.slice(0, grid.at) + gridList(grid.cells) + out.slice(grid.at);
+          }
+          state.depth = Math.max(0, state.depth - 1);
+          out += '\n\n';
+        } else {
+          state.depth += 1;
+          out += '\n\n';
+          if (name === 'grid') state.grids.push({ depth: state.depth, cells: [], at: out.length, cellAt: null });
+          else if (grid && state.depth === grid.depth + 1) grid.cellAt = out.length;
+        }
       } else if (name === 'icon' || name === 'Icon') {
         if (ARROWS[attrs.name]) out += ARROWS[attrs.name];
       } else if (name in WRAPS) {
@@ -243,16 +527,7 @@
         const refs = [];
         if (typeof attrs.ref === 'string') refs.push(attrs.ref);
         if (Array.isArray(attrs.refs)) refs.push(...attrs.refs.filter((r) => typeof r === 'string'));
-        const marks = [];
-        for (const r of refs) {
-          const src = state.data.sources.get(r);
-          if (!src) continue;
-          if (!state.cited.has(src.url)) state.cited.set(src.url, { n: state.cited.size + 1, title: src.title });
-          const n = state.cited.get(src.url).n;
-          const mark = `[[${n}]](${src.url})`;
-          if (!marks.includes(mark)) marks.push(mark);
-        }
-        out += marks.join('');
+        out += inlineSources(refs.map((r) => state.data.sources.get(r)));
       } else if (name === 'AsyncImage') {
         const img = state.data.images[state.imageIndex++];
         if (img) {
@@ -276,7 +551,7 @@
    */
   const render = (text, meta) => {
     if (typeof text !== 'string' || !text.includes('<')) return text;
-    const state = { depth: 0, cited: new Map(), imageIndex: 0, data: resolvedData(meta) };
+    const state = { depth: 0, grids: [], imageIndex: 0, data: resolvedData(meta) };
     // Split off fenced code; protect inline code spans inside the rest.
     const lines = text.split('\n');
     const chunks = [];
@@ -309,10 +584,12 @@
         continue;
       }
       const spans = [];
-      const masked = c.text.replace(/(`+)[\s\S]*?\1/g, (s) => {
+      // Inline code is masked first, so neither templates nor tags in it
+      // are touched.
+      const masked = expandTemplates(c.text.replace(/(`+)[\s\S]*?\1/g, (s) => {
         spans.push(s);
         return `\u0000${spans.length - 1}\u0000`;
-      });
+      }), {});
       // Tidy the blank lines and stray hard breaks the removed tags left.
       const trailing = /\n*$/.exec(masked)[0];
       out += renderChunk(masked, state)
@@ -322,12 +599,7 @@
         .replace(/\n*$/, trailing)
         .replace(/\u0000(\d+)\u0000/g, (_, n) => spans[Number(n)]);
     }
-    out = out.trim();
-    if (state.cited.size) {
-      const rows = [...state.cited].map(([url, s]) => `${s.n}. [${linkText(s.title)}](${url})`);
-      out += `\n\n**Sources**\n\n${rows.join('\n')}`;
-    }
-    return out;
+    return out.trim();
   };
 
   /** True when the message was written for the generative UI renderer. */
