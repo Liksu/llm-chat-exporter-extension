@@ -71,6 +71,8 @@ _(Лучше для продажи)_
 
 ## Assistant
 
+[![Route map of the parks](https://example.com/img/route.jpg)](https://example.com/parks/route) [![Arches](https://thumbs.example.net/2)](https://example.org/arches)
+
 Есть TPS2116 и обсуждение [Forum thread](https://example.com/forum/thread). ([Forum](https://example.com/forum/thread "Parts on hand | Forum"), [Example](https://example.org/datasheet.pdf "Datasheet"))
 
 ---

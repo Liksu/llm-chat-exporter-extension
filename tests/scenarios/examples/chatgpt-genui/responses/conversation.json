@@ -232,7 +232,7 @@
         "content": {
           "content_type": "text",
           "parts": [
-            "Есть entity[\"product\",\"TPS2116\",\"power mux\"] и обсуждение urlForum threadhttps://example.com/forum/thread. citeturn1search0"
+            "iturn3image0turn3image1Есть entity[\"product\",\"TPS2116\",\"power mux\"] и обсуждение urlForum threadhttps://example.com/forum/thread. citeturn1search0"
           ]
         },
         "status": "finished_successfully",
@@ -241,6 +241,25 @@
         "metadata": {
           "model_slug": "gpt-5",
           "content_references": [
+            {
+              "matched_text": "iturn3image0turn3image1",
+              "start_idx": 0,
+              "end_idx": 27,
+              "type": "image_v2",
+              "images": [
+                {
+                  "url": "https://example.com/parks/route?utm_source=chatgpt.com",
+                  "content_url": "https://example.com/img/route.jpg",
+                  "thumbnail_url": "https://thumbs.example.net/1",
+                  "title": "Route [map] of the parks"
+                },
+                {
+                  "url": "https://example.org/arches",
+                  "thumbnail_url": "https://thumbs.example.net/2",
+                  "title": "Arches"
+                }
+              ]
+            },
             {
               "matched_text": "citeturn1search0",
               "start_idx": 0,

@@ -167,6 +167,19 @@
     let out = text;
     for (const ref of refs) {
       if (!isObject(ref) || typeof ref.matched_text !== 'string' || !ref.matched_text.includes('')) continue;
+      // `image_v2` (marker `i`): the web pictures shown above an answer -- a
+      // headline image or a row of four. Each links to the page it's from.
+      if (ref.type === 'image_v2') {
+        const pics = (Array.isArray(ref.images) ? ref.images : [])
+          .filter((im) => isObject(im) && (im.content_url || im.thumbnail_url))
+          .map((im) => {
+            const title = String(im.title || 'image').replace(/\s+/g, ' ').replace(/[[\]]/g, '').trim();
+            const pic = `![${title}](${im.content_url || im.thumbnail_url})`;
+            return typeof im.url === 'string' && im.url ? `[${pic}](${cleanSourceUrl(im.url)})` : pic;
+          });
+        if (pics.length) out = out.split(ref.matched_text).join(`\n\n${pics.join(' ')}\n\n`);
+        continue;
+      }
       const items = Array.isArray(ref.items) && ref.items.length ? ref.items : Array.isArray(ref.fallback_items) ? ref.fallback_items : [];
       const seen = new Set();
       const links = [];
@@ -204,7 +217,7 @@
   const partsToText = (parts, meta) => {
     if (!Array.isArray(parts)) return '';
     const text = parts.filter((p) => typeof p === 'string').join('\n\n').trim();
-    return stripCiteMarkers(meta ? resolveCiteMarkers(text, meta) : text);
+    return stripCiteMarkers(meta ? resolveCiteMarkers(text, meta).trim() : text);
   };
 
   /**
