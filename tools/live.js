@@ -44,6 +44,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // Overridable so tests can run collect against temp dirs.
 const LIVE_DIR = process.env.LIVE_DIR || path.join(REPO_ROOT, 'tests', 'live');
 const CATALOG = path.join(REPO_ROOT, 'tests', 'live', 'features.json');
+const SCENARIOS = path.join(REPO_ROOT, 'tests', 'live', 'scenarios.json');
 const CONFIG = path.join(LIVE_DIR, 'config.local.json');
 const FIXTURES = path.join(LIVE_DIR, 'fixtures.local.json');
 const RUNS_DIR = path.join(LIVE_DIR, 'runs');
@@ -231,6 +232,54 @@ const renderPlan = (plan) => {
     out.push('');
   }
   return out.join('\n');
+};
+
+// -- day ----------------------------------------------------------------------
+
+/**
+ * One provider's day (tests/live/TASK.md): research, re-exports of its
+ * known test chats, the scenario dialogs from scenarios.json.
+ */
+const day = (args) => {
+  const provider = args.provider;
+  const catalog = readJson(CATALOG);
+  if (!provider || !catalog.providers[provider]) {
+    console.error(`--provider must be one of: ${Object.keys(catalog.providers).join(', ')}`);
+    process.exit(2);
+  }
+  const cfg = loadConfig();
+  const project = cfg.projects && cfg.projects[provider];
+  if (!project) {
+    console.error(`No ${provider} test project in ${path.relative(REPO_ROOT, CONFIG)} ("projects").`);
+    process.exit(2);
+  }
+  const liveDay = require('./live-day');
+  const date = new Intl.DateTimeFormat('sv-SE', { timeZone: SYSTEM_TZ }).format(new Date());
+  let runDir = path.join(RUNS_DIR, `${date}-${provider}`);
+  for (let n = 2; fs.existsSync(runDir); n++) runDir = path.join(RUNS_DIR, `${date}-${n}-${provider}`);
+  const plan = liveDay.planDay({
+    provider,
+    scenarios: readJson(SCENARIOS),
+    catalog,
+    fixtures: readJson(FIXTURES, {}),
+    project,
+    uploadsDir: UPLOADS_DIR,
+    runsDir: RUNS_DIR,
+    today: date,
+    chatUrlPattern: catalog.providers[provider].chatUrlPattern,
+    snippetFor,
+  });
+  plan.createdAt = new Date().toISOString();
+  plan.runDir = runDir;
+  writeJson(path.join(runDir, 'plan.json'), plan);
+  fs.writeFileSync(path.join(runDir, 'plan.md'), liveDay.renderDayPlan(plan, POLL_SNIPPET));
+  const notes = path.join(runDir, 'notes.md');
+  if (!fs.existsSync(notes)) fs.writeFileSync(notes, '# Notes\n\n<task id> | <url> | <model used> | <result> | <observations>\n\n');
+  const count = (k) => plan.tasks.filter((t) => t.kind === k).length;
+  console.log(`Day: ${path.relative(REPO_ROOT, runDir)} (research since ${plan.since})`);
+  console.log(`  research 1, re-export ${count('reexport')}, scenarios ${count('scenario')}`);
+  console.log(`  Plan: ${path.relative(REPO_ROOT, path.join(runDir, 'plan.md'))}`);
+  console.log('  After the browser part: node tools/live.js collect');
 };
 
 // -- collect ------------------------------------------------------------------
@@ -455,6 +504,59 @@ const replayMatches = (recorded, exportPath) => {
   return fs.readFileSync(exportPath, 'utf8') === recorded.output;
 };
 
+/** Visible text of the user's turns only. */
+const humanText = (visible) => {
+  const out = [];
+  let inHuman = false;
+  for (const line of visible.split('\n')) {
+    if (/^## Human/.test(line)) inHuman = true;
+    else if (/^## /.test(line)) inHuman = false;
+    else if (inHuman) out.push(line);
+  }
+  return out.join('\n');
+};
+
+/**
+ * Scenario / research export: complete when exported? everything the page
+ * showed is in it? evidence for each capability the dialog exercised?
+ * Sets r.complete, r.screen, r.capabilities, r.status.
+ */
+const checkDialog = (task, r, exp, harLog) => {
+  const liveDay = require('./live-day');
+  const scenarios = readJson(SCENARIOS);
+  const md = visibleText(exp.md || '');
+  r.complete = liveDay.completeness(task.provider, harLog);
+  const screen = harLog._exporter && harLog._exporter.screen;
+  r.screen = screen ? liveDay.compareScreen(screen, exp) : null;
+  r.capabilities = liveDay.checkCapabilities(task.exercises || [], task.provider, scenarios.capabilities, exp, assistantText(md), humanText(md));
+  const auditErrors = r.audit.filter((f) => f.severity === 'error');
+  const screenErrors = r.screen ? r.screen.errors : [];
+  // Something the page showed is missing from the export, or the export
+  // itself is damaged. Which capability it belongs to is for the reader of
+  // the report: capabilities without evidence are listed next to it (the
+  // model may simply not have used that tool).
+  if (r.complete && r.complete.complete === false) r.status = 'PREMATURE';
+  else r.status = auditErrors.length || screenErrors.length ? 'BROKEN' : 'OK';
+};
+
+/** Record the regression scenario and remember the chat (keeping history). */
+const recordAndRemember = async ({ task, r, harPath, exportPath, meta, plan, fixtures, auditErrorCodes }) => {
+  try {
+    const rec = await recordScenario(task.featureId, harPath, auditErrorCodes);
+    r.scenario = path.relative(REPO_ROOT, rec.dir);
+    if (rec.error) r.replay = rec.error;
+    else r.replayIdentical = replayMatches(rec, exportPath);
+  } catch (e) {
+    r.replay = `recording failed: ${e.message}`;
+  }
+  if (meta.location && new RegExp(task.chatUrlPattern).test(meta.location) && meta.location !== task.url) {
+    const prev = fixtures[task.featureId] || {};
+    // Every day makes a fresh chat; older ones are listed for cleanup.
+    const history = prev.url && prev.url !== meta.location ? [...(prev.history || []), { url: prev.url, lastRun: prev.lastRun }] : prev.history;
+    fixtures[task.featureId] = { ...prev, url: meta.location, lastRun: plan.createdAt.slice(0, 10), lastStatus: r.status, ...(history ? { history } : {}) };
+  }
+};
+
 const collectRun = async (args) => {
   const runDir = args.positional[0] ? path.resolve(args.positional[0]) : latestRun();
   if (!runDir || !fs.existsSync(path.join(runDir, 'plan.json'))) {
@@ -524,6 +626,15 @@ const collectRun = async (args) => {
     r.export = path.relative(REPO_ROOT, exportPath);
     const exp = /\.zip$/i.test(exportName) ? loadZip(exportPath) : loadMd(exportPath);
     r.audit = audit(exp).map((f) => ({ severity: f.severity, code: f.code, message: f.message }));
+    if (task.kind === 'scenario' || task.kind === 'research') {
+      // Provider day: judged by what the page showed, not by features.json.
+      r.kind = task.kind;
+      checkDialog(task, r, exp, JSON.parse(fs.readFileSync(harPath, 'utf8')).log);
+      const auditErrorCodes = r.audit.filter((f) => f.severity === 'error').map((f) => f.code);
+      await recordAndRemember({ task, r, harPath, exportPath, meta, plan, fixtures, auditErrorCodes });
+      results.push(r);
+      continue;
+    }
     r.expect = checkExpectations(feature || {}, exp);
     // Control: a check that also passes on a chat without the feature
     // tests nothing specific. (Checks satisfied by the prompt itself are
@@ -587,6 +698,7 @@ const collectRun = async (args) => {
     skipped: plan.skipped,
     drift: driftReport,
     baselineExists,
+    oldChats: plan.provider ? oldChats(fixtures, plan.provider) : [],
   };
   writeJson(path.join(runDir, 'report.json'), report);
   const md = renderReport(report);
@@ -596,15 +708,41 @@ const collectRun = async (args) => {
   process.exit(results.some((r) => r.status === 'BROKEN' || r.status === 'EXPORT_FAILED') ? 1 : 0);
 };
 
-const STATUS_ORDER = ['BROKEN', 'EXPORT_FAILED', 'GAP', 'NEWLY_WORKING', 'NOT_RUN', 'OK'];
+const STATUS_ORDER = ['BROKEN', 'EXPORT_FAILED', 'PREMATURE', 'GAP', 'NEWLY_WORKING', 'NOT_RUN', 'OK'];
 const STATUS_TITLE = {
-  BROKEN: 'Broken — supported features that fail',
+  BROKEN: 'Broken — the export lost or damaged something',
   EXPORT_FAILED: 'Export failed',
+  PREMATURE: 'Exported too early — the last reply was not finished; re-export these chats',
   GAP: 'Gaps — not supported yet',
   NEWLY_WORKING: 'Newly working — marked unsupported/unknown in features.json, but pass',
   NOT_RUN: 'Not run — no export found for these tasks',
   OK: 'OK',
 };
+
+/** Scenario / research lines: page vs export, capabilities, completeness. */
+const renderDialogDetails = (r, out, status) => {
+  if (r.complete && r.complete.complete === false) out.push(`  - ✗ not finished when exported: ${r.complete.why}`);
+  if (!r.screen) out.push('  - ⚠ no page inventory in the export (run the plan\'s EXPORT snippet, not an old one)');
+  else {
+    const sc = r.screen;
+    out.push(`  - page vs export: text ${Math.round(sc.textCoverage * 100)}% · pictures ${sc.images.export}/${sc.images.screen} · links missing ${sc.missingLinks.length}`);
+    for (const e of sc.errors) out.push(`  - ✗ ${e}`);
+    if (status !== 'OK') for (const w of sc.warnings) out.push(`  - ⚠ ${w}`);
+    if (status !== 'OK' && sc.missingText.length) out.push(`  - text not in the export (first ${Math.min(5, sc.missingText.length)}):`, ...sc.missingText.slice(0, 5).map((l) => `    - "${l}"`));
+  }
+  const caps = r.capabilities || [];
+  const seen = caps.filter((c) => c.seen === true).map((c) => c.id);
+  const unseen = caps.filter((c) => c.seen === false);
+  const pageOnly = caps.filter((c) => c.seen === null).map((c) => c.id);
+  if (seen.length) out.push(`  - in the export: ${seen.join(', ')}`);
+  if (unseen.length) out.push(`  - no trace in the export (model didn't use it, or it was lost — check notes.md): ${unseen.map((c) => `${c.id}${c.support === 'supported' ? '' : ` (${c.support})`}`).join(', ')}`);
+  if (pageOnly.length) out.push(`  - checked only through the page: ${pageOnly.join(', ')}`);
+};
+
+/** Earlier chats of the day's scenarios the user may delete. */
+const oldChats = (fixtures, provider) => Object.entries(fixtures)
+  .filter(([id, f]) => id.startsWith(`${provider}.`) && Array.isArray(f.history))
+  .flatMap(([id, f]) => f.history.map((h) => ({ id, ...h })));
 
 const renderReport = (rep) => {
   const out = [];
@@ -631,6 +769,7 @@ const renderReport = (rep) => {
           for (const f of r.matrix.findings) out.push(`    - ✗ ${f.problem} — ${f.count} combination(s), e.g. ${f.examples.slice(0, 2).join(' | ')}`);
         }
       }
+      if (r.kind) renderDialogDetails(r, out, s);
       if (s === 'OK' || s === 'NOT_RUN') continue;
       if (r.error) out.push(`  - ${r.error}`);
       for (const x of (r.expect && r.expect.results) || []) if (!x.ok) out.push(`  - ✗ expected ${x.check}`);
@@ -658,6 +797,10 @@ const renderReport = (rep) => {
     for (const p of d.newPaths.slice(0, 30)) out.push(`  - new field \`${p.path}\` : ${p.types.join('|')}`);
     if (d.newPaths.length > 30) out.push(`  - … +${d.newPaths.length - 30} more fields`);
     for (const t of d.newTypes) out.push(`  - type change \`${t.path}\`: now also ${t.types.join('|')}`);
+  }
+  if (rep.oldChats && rep.oldChats.length) {
+    out.push('', '## Old test chats you may delete', '', 'Earlier chats of the same scenarios (newer ones replaced them). Deleting is up to you.', '');
+    for (const c of rep.oldChats) out.push(`- ${c.id} · ${c.lastRun || '?'} · ${c.url}`);
   }
   if (rep.skipped && rep.skipped.length) {
     out.push('', '## Skipped', '');
@@ -688,6 +831,7 @@ const parseArgs = (argv) => {
     else if (x === '--recreate-all') a.recreateAll = true;
     else if (x === '--recreate') a.recreate = argv[++i];
     else if (x === '--only') a.only = argv[++i];
+    else if (x === '--provider') a.provider = argv[++i];
     else if (x === '--keep-downloads') a.keepDownloads = true;
     else if (x.startsWith('--')) throw new Error(`Unknown option: ${x}`);
     else a.positional.push(x);
@@ -699,6 +843,7 @@ const main = async () => {
   const [cmd, ...rest] = process.argv.slice(2);
   const args = parseArgs(rest);
   if (cmd === 'prepare') return prepare(args);
+  if (cmd === 'day') return day(args);
   if (cmd === 'collect') return collectRun(args);
   if (cmd === 'status') return status();
   console.error('Usage: node tools/live.js prepare|collect|status  (see the header of tools/live.js)');
@@ -712,4 +857,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { checkExpectations, findDownloads, snippetFor, renderPlan, renderReport, compareOp, visibleText };
+module.exports = { checkExpectations, findDownloads, snippetFor, renderPlan, renderReport, compareOp, visibleText, checkDialog };

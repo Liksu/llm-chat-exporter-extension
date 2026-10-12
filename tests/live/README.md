@@ -6,17 +6,53 @@ export **real chats** on claude.ai, chatgpt.com and Gemini every few weeks
 and check what comes out.
 
 ```
-features.json        catalog: what to test, how to create it, what the export must contain
-fixtures/            synthetic files the test chats upload (images, PDF, md, csv)
-TASK.md              instructions Claude Desktop follows for a run
-../../tools/live.js  prepare (plan a run) · collect (evaluate it) · status
+scenarios.json       catalog v2: capabilities (input / output / dialog, per provider)
+                     + multi-turn dialog scenarios + the research prompt
+features.json        catalog v1: one chat per feature; its chats are re-exported
+fixtures/            files the test chats upload (photos, PDF, md, csv, js)
+TASK.md              instructions Claude Desktop follows for a provider day
+../../tools/live.js  day (plan a provider day) · collect (evaluate it) · prepare (v1 run) · status
+../../tools/live-day.js  page snippets, page-vs-export check, capability checks
 ```
 
 Local and gitignored: `config.local.json` (your downloads folder),
 `fixtures.local.json` (URLs of your test chats), `runs/` (plans, downloaded
 exports, reports).
 
-## How a run works
+## Provider day (current)
+
+A test window is three days in a row — Claude, ChatGPT, Gemini, one a day —
+every 3–4 weeks, so no day burns through every provider's quota at once.
+
+```bash
+node tools/live.js day --provider claude   # → runs/<date>-claude/plan.md
+node tools/live.js collect                 # after the browser part
+```
+
+The day, in `TASK.md` order:
+
+1. **Research** in the provider's test project on its top model: "what's
+   new in <provider> chats since the previous day", with prepared answers
+   to its clarifying questions. Started first, collected last. Its report
+   tests research export and feeds discovery: features it finds become
+   capability candidates once a dialog shows them.
+2. **Re-export** of the provider's known test chats (features.json) —
+   free, catches API changes.
+3. **Scenarios**: fresh multi-turn dialogs in the test project (no
+   approval needed there), on the tier each scenario names. Each export
+   carries an inventory of what the page showed (text, pictures, links,
+   code blocks, tables); `collect` checks that all of it is in the export.
+   A reply is waited for by the page (stop button gone, text stable), and
+   `collect` checks from the exported data that it really was finished.
+
+Statuses for scenarios: **BROKEN** (the page showed something the export
+lost, or an audit error) · **PREMATURE** (exported before the reply
+finished) · **EXPORT_FAILED** · **NOT_RUN** · **OK**. The report lists
+which exercised capabilities left a trace in the export, and earlier
+scenario chats you may delete (each day makes new ones; nothing is
+deleted automatically).
+
+## How a v1 run works
 
 1. `npm run live:prepare` plans the run: known test chats are re-exported;
    features without a test chat get a "create" task with setup, uploads and
@@ -86,14 +122,15 @@ only appeared in new answers. So features marked `"refresh": "each-run"`
 
 ## Scheduling
 
-In Claude Desktop create a scheduled task (e.g. every 2 weeks or monthly),
-working folder = this repo, prompt:
+In Claude Desktop create three scheduled tasks on consecutive days of the
+month (e.g. the 1st, 2nd and 3rd), working folder = this repo, prompt:
 
-> Run the live test of LLM Chat Exporter: follow
-> `tests/live/TASK.md` in this repo. Ask me before creating new chats.
+> Run the live test day of LLM Chat Exporter for provider `claude`
+> (`chatgpt`, `gemini`): follow `tests/live/TASK.md` in this repo.
 
-You approve the new-chat list, any download prompts, and anything it
-proposes at the end (bug fixes, `features.json` edits, accepting drift).
+New chats in the test projects need no approval; you approve download
+prompts and anything it proposes at the end (bug fixes, catalog edits,
+accepting drift).
 
 ## Manual use
 

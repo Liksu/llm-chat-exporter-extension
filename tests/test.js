@@ -422,3 +422,104 @@ test('live checks: scopes of md / assistant / output matches', () => {
   assert.deepEqual(check({ outputMatches: ['REPLY-TOKEN', 'UPLOAD-TOKEN', 'PROMPT-TOKEN', 'DUMP-TOKEN'] }), [true, true, false, false]);
   assert.deepEqual(check({ reasoning: true }), [true]);
 });
+
+/**
+ * Provider day: the plan follows scenarios.json (research first, provider
+ * filter, paste text embedded, every dialog export carries the page
+ * inventory), and the scenario catalog stays consistent.
+ */
+test('live day: plan and scenario catalog', () => {
+  const liveDay = require('../tools/live-day');
+  const scenarios = JSON.parse(fs.readFileSync(path.join(__dirname, 'live', 'scenarios.json'), 'utf8'));
+  const catalog = JSON.parse(fs.readFileSync(path.join(__dirname, 'live', 'features.json'), 'utf8'));
+  const { snippetFor } = require('../tools/live');
+  const caps = new Set(scenarios.capabilities.map((c) => c.id));
+  for (const s of scenarios.scenarios) {
+    for (const t of s.turns) for (const x of t.exercises || []) assert.ok(caps.has(x), `${s.id}: unknown capability ${x}`);
+    const files = [...(s.uploads || []), ...s.turns.flatMap((t) => [...(t.attach || []), ...(t.paste ? [t.paste] : [])])];
+    for (const f of files) assert.ok(fs.existsSync(path.join(__dirname, 'live', 'fixtures', f)), `${s.id}: missing fixture ${f}`);
+  }
+  for (const c of scenarios.capabilities) {
+    const used = scenarios.scenarios.some((s) => s.turns.some((t) => (t.exercises || []).includes(c.id)));
+    assert.ok(used || c.incidental || c.coveredBy, `capability ${c.id} is not exercised by any scenario`);
+  }
+
+  const runsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'live-day-'));
+  try {
+    fs.mkdirSync(path.join(runsDir, '2026-09-01-claude'));
+    fs.mkdirSync(path.join(runsDir, '2026-09-20-chatgpt'));
+    const plan = liveDay.planDay({
+      provider: 'claude', scenarios, catalog,
+      fixtures: { 'claude.web-search': { url: 'https://claude.ai/chat/x' }, 'chatgpt.kitchen-sink': { url: 'https://chatgpt.com/c/y' } },
+      project: 'https://claude.ai/project/p', uploadsDir: path.join(__dirname, 'live', 'fixtures'), runsDir,
+      today: '2026-10-12', chatUrlPattern: catalog.providers.claude.chatUrlPattern, snippetFor,
+    });
+    assert.equal(plan.since, '2026-09-01', 'research covers the time since this provider\'s previous day');
+    assert.equal(plan.tasks[0].kind, 'research');
+    assert.match(plan.tasks[0].prompt, /Claude chat product .* between 2026-09-01 and today/);
+    assert.deepEqual(plan.tasks.filter((t) => t.kind === 'reexport').map((t) => t.featureId), ['claude.web-search']);
+    const scn = plan.tasks.filter((t) => t.kind === 'scenario');
+    assert.ok(!scn.some((t) => t.scenario === 'images'), 'image generation is not a Claude scenario');
+    for (const t of [plan.tasks[0], ...scn]) assert.match(t.exportSnippet, /screen/, `${t.featureId}: export without page inventory`);
+    const paste = scn.find((t) => t.scenario === 'reading').turns.find((t) => t.paste);
+    assert.match(paste.pasteSnippet, /ClipboardEvent\('paste'/);
+    assert.ok(paste.pasteSnippet.length > 10000, 'the long article is embedded in the paste snippet');
+    const md = liveDay.renderDayPlan({ ...plan, createdAt: '2026-10-12T10:00:00Z' }, 'POLL');
+    assert.match(md, /RESEARCH — start first/);
+    assert.match(md, /Scenario `road-trip`/);
+  } finally {
+    fs.rmSync(runsDir, { recursive: true, force: true });
+  }
+});
+
+/** Page inventory vs export: lost text, pictures and links are errors. */
+test('live day: what the page showed vs the export', () => {
+  const { compareScreen, completeness } = require('../tools/live-day');
+  const exp = {
+    md: [
+      '## Assistant', '',
+      'Arches National Park needs at least half a day, more with kids in the August heat.',
+      '([NPS](https://www.nps.gov/arch/index.htm "Arches"))', '',
+      '[![Delicate Arch](https://img.example.com/arch.jpg)](https://example.com/arch)', '',
+    ].join('\n'),
+    files: new Map(),
+  };
+  const screen = {
+    text: [
+      'Arches National Park needs at least half a day, more with kids in the August heat.',
+      'Copy', 'Share',
+      'Moab hotels in mid-August usually cost between 180 and 260 dollars per night for a family room.',
+    ].join('\n'),
+    images: [
+      { src: 'https://img.example.com/arch.jpg' },
+      { src: 'https://img.example.com/canyonlands.jpg' },
+    ],
+    links: ['https://www.nps.gov/arch/index.htm?utm_source=chatgpt.com', 'https://chatgpt.com/c/abc', 'https://booking.example.com/moab'],
+    counts: { codeBlocks: 0, tables: 0 },
+  };
+  const r = compareScreen(screen, exp);
+  assert.deepEqual(r.missingText, ['Moab hotels in mid-August usually cost between 180 and 260 dollars per night for a family room.']);
+  assert.deepEqual(r.missingImages, ['https://img.example.com/canyonlands.jpg']);
+  assert.deepEqual(r.missingLinks, ['https://booking.example.com/moab'], 'utm-tagged and provider links are not losses');
+  assert.equal(r.errors.length, 3);
+
+  const all = compareScreen({ ...screen, text: screen.text.split('\n')[0], images: screen.images.slice(0, 1), links: screen.links.slice(0, 2) }, exp);
+  assert.deepEqual(all.errors, []);
+
+  const har = (status) => ({ entries: [{ request: { url: 'https://chatgpt.com/backend-api/conversation/00000000-0000-0000-0000-000000000001' }, response: { content: { text: JSON.stringify({ current_node: 'm', mapping: { m: { message: { status } } } }) } } }] });
+  assert.deepEqual(completeness('chatgpt', har('finished_successfully')), { complete: true });
+  assert.equal(completeness('chatgpt', har('in_progress')).complete, false);
+  assert.equal(completeness('gemini', har('x')), null);
+});
+
+/** The export snippet's page inventory lands in the debug HAR. */
+test('debug capture: keeps the page inventory sent with the export', async () => {
+  const dir = path.join(SCENARIOS_DIR, 'examples', 'chatgpt-basic-text');
+  const scenario = JSON.parse(fs.readFileSync(path.join(dir, 'scenario.json'), 'utf8'));
+  const base = scenario.exports.find((e) => e.message.mode === 'md').message;
+  const screen = { text: 'hello', images: [], links: [], counts: {} };
+  const r = await executeExport(dir, scenario, { ...base, debugCapture: true, tag: 'x', screen }, { dev: true });
+  assert.ok(r.response && r.response.ok);
+  const har = JSON.parse(await r.captured.downloads[1].blob.text());
+  assert.deepEqual(har.log._exporter.screen, screen);
+});

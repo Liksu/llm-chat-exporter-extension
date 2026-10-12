@@ -139,9 +139,10 @@
    * afterwards -- also when the export failed, since that is when it is
    * needed most. Returns whatever `fn` returns / rethrows what it throws.
    *
-   * @param {{ enabled: boolean, adapter: string, options: object, tag?: string }} meta
+   * @param {{ enabled: boolean, adapter: string, options: object, tag?: string, screen?: object }} meta
    *   tag: caller's label for this export (live tests pass the feature id),
-   *   stored as log._exporter.tag.
+   *   stored as log._exporter.tag. screen: inventory of what the page
+   *   showed, stored as log._exporter.screen.
    * @param {() => Promise<{ok:boolean, filename?:string, error?:string}>} fn
    */
   const run = async (meta, fn) => {
@@ -186,6 +187,9 @@
             tzOffsetMinutes: new Date().getTimezoneOffset(),
             options: meta.options,
             tag: meta.tag || null,
+            // What the page showed when the export ran (live tests' export
+            // snippet sends it): compared with the export by tools/live.js.
+            ...(meta.screen ? { screen: meta.screen } : {}),
             result: outcome || null,
           },
         },
@@ -209,7 +213,8 @@
         ? ctx.msg.debugCapture
         : !!(ns.dev.readSettings && (await ns.dev.readSettings()).debugCapture);
       const tag = typeof ctx.msg.tag === 'string' ? ctx.msg.tag.slice(0, 200) : null;
-      return run({ enabled, adapter: ctx.adapter, options: ctx.options, tag }, exec);
+      const screen = ctx.msg.screen && typeof ctx.msg.screen === 'object' ? ctx.msg.screen : null;
+      return run({ enabled, adapter: ctx.adapter, options: ctx.options, tag, screen }, exec);
     },
   });
 })();
