@@ -1,0 +1,819 @@
+{
+  "about": "Live test catalog, v2 (draft). capabilities = what a chat can contain (input / output / dialog), per provider. scenarios = multi-turn dialogs that exercise several capabilities at once; the same dialog runs on every provider (unless `providers` limits it). A run is one provider per day: research first, re-export of old test chats (features.json), fresh scenario chats in the test project, then the research result. Primary check: everything the chat shows on screen is in the export; plus audit, schema drift and the capability checks below. Prompts are in English (fewer tokens; nobody reads these chats).",
+  "modelTiers": {
+    "about": "Scenarios name a tier, not a model. TASK.md maps the tier to what the model picker shows on the day (names change); the report records the model that actually answered (from the export).",
+    "claude": {
+      "mid": "the default Sonnet-class model",
+      "reasoning": "same model with extended thinking on",
+      "top": "the largest Opus-class model"
+    },
+    "chatgpt": {
+      "mid": "the default fast model",
+      "reasoning": "the Thinking model",
+      "top": "the Thinking model at its highest effort / Pro"
+    },
+    "gemini": {
+      "mid": "Flash",
+      "reasoning": "Flash with thinking",
+      "top": "Pro"
+    }
+  },
+  "capabilities": [
+    {
+      "id": "in.short-text",
+      "axis": "input",
+      "title": "Short message typed by the user",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "the user's text is in the Human turn as text"
+    },
+    {
+      "id": "in.long-paste",
+      "axis": "input",
+      "title": "Long pasted text (the chat may turn it into an attachment chip)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "shown as a chip on screen → exported as an attachment, not as message text; shown inline → message text"
+    },
+    {
+      "id": "in.image",
+      "axis": "input",
+      "title": "Uploaded photos",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "every image shown in the user's message is in the export (assets/ in ZIP), once"
+    },
+    {
+      "id": "in.pdf",
+      "axis": "input",
+      "title": "Uploaded PDF (multi-page, with diagrams and images)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "listed as an attachment; the file is in files/ (ZIP)"
+    },
+    {
+      "id": "in.text-file",
+      "axis": "input",
+      "title": "Uploaded md / csv / code files",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "attachment; inlined as text with 'Inline text uploads'"
+    },
+    {
+      "id": "in.edit",
+      "axis": "input",
+      "title": "Edited earlier message (branch)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "only the branch shown on screen is exported"
+    },
+    {
+      "id": "in.regenerate",
+      "axis": "input",
+      "title": "Regenerated answer (branch)",
+      "providers": {
+        "claude": "unknown",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "the answer shown on screen is the one exported"
+    },
+    {
+      "id": "out.formatting",
+      "axis": "output",
+      "title": "Headings, lists, tables, non-Latin text, emoji",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "tables survive with all rows; headings and lists intact"
+    },
+    {
+      "id": "out.math",
+      "axis": "output",
+      "title": "Formulas (LaTeX)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "formulas kept as $…$ / $$…$$ source"
+    },
+    {
+      "id": "out.code-block",
+      "axis": "output",
+      "title": "Code in the reply itself (fenced block)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "fenced block with its language; nested backticks don't break the fence"
+    },
+    {
+      "id": "out.code-document",
+      "axis": "output",
+      "title": "Code as a separate file in the side panel (artifact / canvas / code block panel)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "the file, in its final version, in artifacts/ with the right extension"
+    },
+    {
+      "id": "out.code-run",
+      "axis": "output",
+      "title": "Code executed by the model, with its output",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "the code and its output with 'Include reasoning'; the result the reply talks about is visible"
+    },
+    {
+      "id": "out.code-chart",
+      "axis": "output",
+      "title": "Chart drawn by executed code",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "the chart image is in the export"
+    },
+    {
+      "id": "out.diagram",
+      "axis": "output",
+      "title": "Diagram (mermaid / drawn SVG / HTML widget)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "drawn in the chat → saved as a file (svg/html) or kept as mermaid source"
+    },
+    {
+      "id": "out.reasoning",
+      "axis": "output",
+      "title": "Thinking / reasoning",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "present with 'Include reasoning', absent without"
+    },
+    {
+      "id": "out.web-sources",
+      "axis": "output",
+      "title": "Web search with source chips",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "every source chip on screen → an inline ([site](url)) link next to the same sentence"
+    },
+    {
+      "id": "out.web-images",
+      "axis": "output",
+      "title": "Pictures found on the web (headline image, image rows, image search)",
+      "providers": {
+        "claude": "unsupported",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "every picture on screen is an image link in the export"
+    },
+    {
+      "id": "out.entities",
+      "axis": "output",
+      "title": "Entity chips (product / place names that open a side panel)",
+      "providers": {
+        "claude": "n/a",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "the name stays in the sentence"
+    },
+    {
+      "id": "out.cards",
+      "axis": "output",
+      "title": "Generative-UI cards, grids, badges, templates",
+      "providers": {
+        "claude": "unknown",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "no raw tags / templates; card text kept; tiles as a list"
+    },
+    {
+      "id": "out.places",
+      "axis": "output",
+      "title": "Places on a map",
+      "providers": {
+        "claude": "unsupported",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "each place named on the map card is in the export (name + link)"
+    },
+    {
+      "id": "out.route",
+      "axis": "output",
+      "title": "Route / directions (map with a route, legs with time and distance)",
+      "providers": {
+        "claude": "unknown",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "legs (from, to, time, distance) and the map link"
+    },
+    {
+      "id": "out.weather",
+      "axis": "output",
+      "title": "Weather widget",
+      "providers": {
+        "claude": "unknown",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "the forecast numbers shown in the widget are in the export"
+    },
+    {
+      "id": "out.shopping",
+      "axis": "output",
+      "title": "Product / hotel cards (price, store, rating)",
+      "providers": {
+        "claude": "unknown",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "name, price, store/provider and link of each card"
+    },
+    {
+      "id": "out.flights",
+      "axis": "output",
+      "title": "Flights / car rental offers",
+      "providers": {
+        "claude": "n/a",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "each offer's route, date, price and link"
+    },
+    {
+      "id": "out.image-gen",
+      "axis": "output",
+      "title": "Generated image",
+      "providers": {
+        "claude": "n/a",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "the picture is in the export (assets/ in ZIP, data URL in md with inline images)"
+    },
+    {
+      "id": "out.file",
+      "axis": "output",
+      "title": "File created for download (csv, ics, md, py…)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "the file is in artifacts/ or files/ (ZIP), linked from the turn"
+    },
+    {
+      "id": "out.document",
+      "axis": "output",
+      "title": "Text document in the side panel (artifact / canvas / writing block)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "the document is in artifacts/ as .md, linked from the turn"
+    },
+    {
+      "id": "out.document-edit",
+      "axis": "output",
+      "title": "Document or code file changed in a follow-up",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "the export has the final version, not the first"
+    },
+    {
+      "id": "out.interactive",
+      "axis": "output",
+      "title": "Interactive widget (quiz, options to pick, draft variants)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "questions / options / variants as text"
+    },
+    {
+      "id": "out.memory",
+      "axis": "output",
+      "title": "Answer that uses saved memory / personal context",
+      "incidental": true,
+      "providers": {
+        "claude": "unknown",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "no leaked memory markers (checked in every chat)"
+    },
+    {
+      "id": "out.ui-only",
+      "axis": "output",
+      "title": "UI-only elements (suggested automations, follow-up chips, feedback)",
+      "incidental": true,
+      "providers": {
+        "claude": "unknown",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "not in the export, and nothing leaks in their place (checked in every chat)"
+    },
+    {
+      "id": "out.research",
+      "axis": "output",
+      "title": "Deep Research / Research report",
+      "coveredBy": "research",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "the full report in artifacts/ with numbered sources and a Sources list"
+    },
+    {
+      "id": "dlg.clarify",
+      "axis": "dialog",
+      "title": "The model asks clarifying questions, the user answers",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "question and answer turns both present, in order"
+    },
+    {
+      "id": "dlg.tool-chain",
+      "axis": "dialog",
+      "title": "Follow-ups that make the model switch tools within one chat",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "supported"
+      },
+      "check": "every turn present, in order; tool results attached to the right turn"
+    },
+    {
+      "id": "dlg.branch",
+      "axis": "dialog",
+      "title": "Edit / regenerate in the middle of a dialog",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "supported",
+        "gemini": "unknown"
+      },
+      "check": "only the visible branch"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "road-trip",
+      "title": "Las Vegas → Boston road trip with kids: constraints → map and photos → weather → hotels and car → day-by-day plan → shorter variants → plan document and calendar file",
+      "tier": "mid",
+      "turns": [
+        {
+          "say": "Plan a road trip by car from Las Vegas to Boston for mid-August, 10-14 days. We're 2 adults and 2 kids, so at most 6-8 hours of driving a day. Nature first; cities only if they're really worth it. We've already seen Zion and the Grand Canyon (Bryce again is fine). Don't route through Yellowstone, stay in the US, and avoid the 100-mile border zone. Ask me questions if you need to.",
+          "onQuestion": "If it asks: we start August 12, prefer motels or hotels under $250/night, kids are 8 and 11, we like short hikes and viewpoints.",
+          "exercises": [
+            "dlg.clarify",
+            "out.web-sources"
+          ]
+        },
+        {
+          "say": "What about Arches? Does it fit? Be realistic about time: a 'quick stop' at a park like that is half a day for us.",
+          "exercises": [
+            "out.web-sources",
+            "out.web-images"
+          ]
+        },
+        {
+          "say": "Show the main stops on a map, with a photo of each.",
+          "exercises": [
+            "out.places",
+            "out.web-images",
+            "out.cards"
+          ]
+        },
+        {
+          "say": "What's the weather usually like at Arches and in Colorado in mid-August? And what's the forecast for Moab for the next few days?",
+          "exercises": [
+            "out.weather",
+            "out.web-sources"
+          ]
+        },
+        {
+          "say": "Find 3 hotels near Moab for 2 nights, August 14-16, 2 adults and 2 kids, with prices. Also check one-way car rental prices Las Vegas to Boston.",
+          "exercises": [
+            "out.shopping",
+            "out.flights",
+            "out.web-sources"
+          ]
+        },
+        {
+          "say": "Now give me a day-by-day plan as a table: overnight town, leg in miles and hours, what we see that day. Then a table of all stops: photo, name, short description, Google Maps link, time needed. And a Google Maps route link with the stops.",
+          "exercises": [
+            "out.formatting",
+            "out.route",
+            "out.web-images"
+          ]
+        },
+        {
+          "say": "What if we only have 8 days? Short version, and where would we sleep if we just drive to Boston as fast as possible?",
+          "exercises": [
+            "out.formatting"
+          ]
+        },
+        {
+          "say": "Put the final 13-day plan into a document I can edit (in the document/canvas panel, not in the chat), and give me an .ics calendar file with the overnight stays.",
+          "exercises": [
+            "out.document",
+            "out.file",
+            "dlg.tool-chain"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "proposal",
+      "title": "A real text document: write in the document panel → add a table → rewrite a section",
+      "tier": "mid",
+      "turns": [
+        {
+          "say": "Write a one-page proposal for a loyalty program for a small neighborhood coffee shop. Put it in a document in the side panel (artifact / canvas), not in the chat.",
+          "exercises": [
+            "out.document",
+            "out.formatting"
+          ]
+        },
+        {
+          "say": "Add a section 'Budget' with a table: item, monthly cost, notes.",
+          "exercises": [
+            "out.document-edit",
+            "out.formatting"
+          ]
+        },
+        {
+          "say": "Make the introduction two sentences shorter and add a 'Risks' section with three bullets.",
+          "exercises": [
+            "out.document-edit"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code both ways: a function in the reply → a module with tests as a file → run the tests → change the file → download",
+      "tier": "mid",
+      "turns": [
+        {
+          "say": "Write a Python function that parses durations like '1h30m' or '45s' into seconds. Just put the code in your reply.",
+          "exercises": [
+            "out.code-block"
+          ]
+        },
+        {
+          "say": "Now turn it into a module with unit tests, as a separate file in the code panel (artifact / canvas), not in the chat.",
+          "exercises": [
+            "out.code-document"
+          ]
+        },
+        {
+          "say": "Run the tests and show me the output.",
+          "exercises": [
+            "out.code-run"
+          ]
+        },
+        {
+          "say": "Add support for days ('2d4h') and update the file.",
+          "exercises": [
+            "out.document-edit",
+            "out.code-document"
+          ]
+        },
+        {
+          "say": "Give me the final module as a file to download.",
+          "exercises": [
+            "out.file",
+            "dlg.tool-chain"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hardware",
+      "title": "A device from photos: identify → what the pins are → where to buy a programmer, as cards → wiring diagram",
+      "tier": "mid",
+      "uploads": [
+        "vape-board-front.jpg",
+        "vape-board-back.jpg",
+        "vape-board-pins.jpg"
+      ],
+      "turns": [
+        {
+          "say": "I took apart this device. What is it, and what are the main parts on the board?",
+          "attach": [
+            "vape-board-front.jpg",
+            "vape-board-back.jpg"
+          ],
+          "exercises": [
+            "in.image",
+            "out.entities"
+          ]
+        },
+        {
+          "say": "Here is the other side of the board. Describe the pinout of the pads on it and what I could do with them.",
+          "attach": [
+            "vape-board-pins.jpg"
+          ],
+          "exercises": [
+            "in.image",
+            "out.cards",
+            "out.web-sources"
+          ]
+        },
+        {
+          "say": "Where can I buy a cheap programmer for it with delivery to Europe? Compare 3 options as cards with prices.",
+          "exercises": [
+            "out.shopping",
+            "out.cards",
+            "out.web-images",
+            "out.web-sources"
+          ]
+        },
+        {
+          "say": "Draw a diagram of how to wire those pins to the programmer.",
+          "exercises": [
+            "out.diagram",
+            "dlg.tool-chain"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Sales data: numbers → chart → report file → fix the report",
+      "tier": "mid",
+      "uploads": [
+        "sales.csv"
+      ],
+      "turns": [
+        {
+          "say": "Here are sales by region. Compute the totals and each region's share, as a table.",
+          "attach": [
+            "sales.csv"
+          ],
+          "exercises": [
+            "in.text-file",
+            "out.formatting",
+            "out.code-run"
+          ]
+        },
+        {
+          "say": "Plot a bar chart by region.",
+          "exercises": [
+            "out.code-chart"
+          ]
+        },
+        {
+          "say": "Make a report.md file with the table and conclusions that I can download.",
+          "exercises": [
+            "out.file"
+          ]
+        },
+        {
+          "say": "Add a 'Recommendations' section with three bullets to the report.",
+          "exercises": [
+            "out.document-edit",
+            "dlg.tool-chain"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "design",
+      "title": "Landing page: HTML in the panel → change it → flow diagram",
+      "tier": "mid",
+      "turns": [
+        {
+          "say": "Make a one-page landing for a coffee shop called 'Zerno': header, menu with prices, contacts. One HTML file, shown in the panel with a preview.",
+          "exercises": [
+            "out.code-document"
+          ]
+        },
+        {
+          "say": "Switch to a dark color scheme and add a reviews section.",
+          "exercises": [
+            "out.document-edit"
+          ]
+        },
+        {
+          "say": "Draw a diagram of how a visitor gets from the home page to placing an order.",
+          "exercises": [
+            "out.diagram"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "study",
+      "title": "Physics homework: formulas step by step → picture → quiz",
+      "tier": "reasoning",
+      "turns": [
+        {
+          "say": "Explain how to compute how far a ball goes if thrown at 30 degrees at 15 m/s. Formulas, step by step.",
+          "exercises": [
+            "out.math",
+            "out.reasoning",
+            "out.formatting"
+          ]
+        },
+        {
+          "say": "Draw a picture of the trajectory with the quantities labeled.",
+          "exercises": [
+            "out.image-gen",
+            "out.diagram"
+          ]
+        },
+        {
+          "say": "Give me a short quiz: 3 questions on this topic with answer options.",
+          "exercises": [
+            "out.interactive",
+            "out.cards"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reading",
+      "title": "Documents: real PDF + notes + long pasted article + code → answers → summary → translation → code review",
+      "tier": "mid",
+      "uploads": [
+        "job-description-guide.pdf",
+        "meeting-notes.md",
+        "long-article.md",
+        "app.js"
+      ],
+      "turns": [
+        {
+          "say": "From the PDF: which HR activities does the diagram on page 4 list, and what are the before/after examples on page 9? From the notes: what action items are on me?",
+          "attach": [
+            "job-description-guide.pdf",
+            "meeting-notes.md"
+          ],
+          "exercises": [
+            "in.pdf",
+            "in.text-file",
+            "out.formatting"
+          ]
+        },
+        {
+          "say": "Summarize this article in 5 bullets:",
+          "paste": "long-article.md",
+          "exercises": [
+            "in.long-paste"
+          ]
+        },
+        {
+          "say": "Translate bullet 5 into Ukrainian and German.",
+          "exercises": [
+            "out.formatting"
+          ]
+        },
+        {
+          "say": "Review this code and find the bug.",
+          "attach": [
+            "app.js"
+          ],
+          "exercises": [
+            "in.text-file",
+            "out.code-block"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "branch",
+      "title": "Change of mind: edit an earlier question, regenerate an answer",
+      "tier": "mid",
+      "turns": [
+        {
+          "say": "Recommend a beginner's book on the history of Rome.",
+          "exercises": [
+            "in.short-text"
+          ]
+        },
+        {
+          "say": "Something shorter?",
+          "exercises": []
+        },
+        {
+          "action": "edit-turn-1",
+          "say": "Recommend a beginner's book on the history of Byzantium.",
+          "exercises": [
+            "in.edit",
+            "dlg.branch"
+          ]
+        },
+        {
+          "action": "regenerate-last",
+          "exercises": [
+            "in.regenerate",
+            "dlg.branch"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "images",
+      "title": "Picture making: generate → change",
+      "tier": "mid",
+      "providers": [
+        "chatgpt",
+        "gemini"
+      ],
+      "turns": [
+        {
+          "say": "Draw a cozy coffee shop on a rainy evening, in watercolor.",
+          "exercises": [
+            "out.image-gen"
+          ]
+        },
+        {
+          "say": "Same scene in the morning, with a cat on the windowsill.",
+          "exercises": [
+            "out.image-gen"
+          ]
+        }
+      ]
+    }
+  ],
+  "research": {
+    "tier": "top",
+    "about": "One per provider day, started first and collected at the end of the day. The provider researches its own chat features: the report tests research export, and its findings feed discovery. A finding becomes a capability only after a dialog shows it on screen and in the export.",
+    "prompt": "Research everything that changed in the {providerName} chat product (the web app at {appUrl}) between {since} and today.\n\nContext: I maintain a browser extension that exports a conversation to Markdown. I need every change that affects what can appear INSIDE a conversation, so I can test that it is exported correctly.\n\nLook for:\n1. Response elements: cards and widgets (maps, places, routes, weather, products/shopping, hotels, flights, sports, finance), image results, source/citation chips, entity chips, quizzes, buttons, any interactive UI rendered in a reply.\n2. Tools that put content into a chat: code execution and its output, charts, files created for download, documents / canvas / artifacts / side panels, image generation and editing, deep research reports, agents, apps and connectors whose results show up in the chat.\n3. Inputs: new attachment types, how long pastes are handled, screenshots, camera, screen sharing.\n4. Conversation structure: editing and branching, memory or personal-context references, projects, temporary chats.\n5. Model or formatting changes that change how replies look (new markup, new layouts).\n\nFor each feature give: name; what the user sees in the chat; an example prompt that triggers it; availability (plan, region, platform) and the date it shipped; a source link. Prefer official release notes, help center articles and the official blog; mark third-party sources as such. Skip pricing, API-only and enterprise-admin changes.\n\nEnd with one table: feature | what appears in the chat | example prompt | shipped | source.",
+    "since": "the date of this provider's previous test window (tests/live/runs/); 3 months back on the first run",
+    "clarify": {
+      "about": "Deep research often asks questions or shows a plan before it starts. Answer from here; never leave it waiting.",
+      "answers": {
+        "scope / product": "The consumer web app (chat), all plans including free and paid. Not the API, not enterprise admin.",
+        "region": "Europe and the US.",
+        "time window": "From {since} until today. Older features only if they changed in that window.",
+        "depth vs breadth": "Breadth: list every relevant change, a short paragraph each.",
+        "format / language": "A report in English, ending with the table described in the prompt.",
+        "anything else": "Use your best judgment and proceed."
+      },
+      "planApproval": "If it shows a research plan with a Start / Edit button (Gemini) or asks to confirm the plan, start it without edits."
+    }
+  },
+  "fixtures": {
+    "about": "Upload files live in tests/live/fixtures/ (public repo, kept byte-identical by .gitattributes). Only files that may be published.",
+    "vape-board-front.jpg": "Disposable vape taken apart: board with display, heater, battery leads.",
+    "vape-board-back.jpg": "Same device, back: wireless charging coil.",
+    "vape-board-pins.jpg": "Back of the board: pads R V C D G, B+/B-, AC1/AC2, marking SY-DM4038.",
+    "job-description-guide.pdf": "14-page HR guide (slides): diagram on page 4, before/after examples on page 9.",
+    "long-article.md": "~14 thousand characters about the Linux file system layout, for the long-paste turn."
+  }
+}

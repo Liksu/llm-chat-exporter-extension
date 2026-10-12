@@ -256,7 +256,7 @@
         ],
         "assistantMatches": [
           "E ?= ?mc",
-          "\\[\\[\\d+\\]\\]\\(https?://"
+          "\\(\\[[^\\]]+\\]\\(https?://"
         ],
         "outputMatches": [
           "Next steps",
