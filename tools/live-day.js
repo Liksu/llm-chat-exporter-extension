@@ -21,18 +21,28 @@ const path = require('node:path');
  * the same way everywhere (no extra API requests); if a selector stops
  * matching, STATUS says so instead of waiting forever.
  */
+// No aria-labels: the UI language is the user's (uk, ru, en…). Checked on
+// the live sites 2026-10-12.
 const PAGE = {
   claude: {
-    reply: '[data-is-streaming], .font-claude-response',
-    streaming: '[data-is-streaming="true"], button[aria-label*="Stop" i]',
+    // the transcript (not the sidebar, header, composer or artifact panel)
+    root: '[data-testid="transcript-list"]',
+    turns: '[data-testid="user-message"], [data-testid="assistant-message"]',
+    reply: '[data-testid="assistant-message"], [data-is-streaming]',
+    streaming: '[data-is-streaming="true"]',
   },
   chatgpt: {
-    reply: '[data-message-author-role="assistant"]',
-    streaming: '[data-testid="stop-button"], button[aria-label*="Stop" i]',
+    root: null,
+    turns: '[data-user-message-bubble], [data-talvt-turn-state], [data-message-author-role]',
+    reply: '[data-talvt-turn-state], [data-message-author-role="assistant"]',
+    streaming: '[data-talvt-turn-state]:not([data-talvt-turn-state="complete"]), [data-testid="stop-button"]',
   },
   gemini: {
+    root: '#chat-history',
+    turns: 'user-query, model-response',
     reply: 'model-response',
-    streaming: 'button[aria-label*="Stop" i], .stop-icon',
+    // the composer's send button turns into a stop button while it writes
+    streaming: 'mat-icon[fonticon="stop"], [aria-busy="true"]',
   },
 };
 
@@ -61,12 +71,31 @@ const statusSnippet = (provider) => `(() => {
  * counts. Runs in the page; the result rides along with the export
  * (log._exporter.screen in the debug HAR).
  */
-const INVENTORY_JS = `const root = document.querySelector('main') || document.body;
+const inventoryJs = (provider) => `const sel = ${JSON.stringify(PAGE[provider] || {})};
+  // The conversation only: the provider's transcript element, else the
+  // closest element holding every turn, else <main>.
+  const lca = (els) => {
+    if (!els.length) return null;
+    let a = els[0];
+    while (a && !els.every((e) => a.contains(e))) a = a.parentElement;
+    return a;
+  };
+  const root = (sel.root && document.querySelector(sel.root)) ||
+    (sel.turns && lca([...document.querySelectorAll(sel.turns)])) ||
+    document.querySelector('main') || document.body;
   const big = (el) => { const r = el.getBoundingClientRect(); return Math.max(r.width, el.naturalWidth || 0) >= 64 && Math.max(r.height, el.naturalHeight || 0) >= 64; };
+  // What a reader sees: without screen-reader-only hints ("Claude replied:",
+  // keyboard help) and button labels (copy, retry, collapsed tool groups).
+  const readText = (el) => {
+    const hide = [...el.querySelectorAll('[class*="sr-only"], [class*="visually-hidden"], button, [role="button"]')];
+    const prev = hide.map((h) => h.style.display);
+    hide.forEach((h) => { h.style.display = 'none'; });
+    try { return el.innerText || ''; } finally { hide.forEach((h, i) => { h.style.display = prev[i]; }); }
+  };
   const screen = {
     url: location.href,
     at: new Date().toISOString(),
-    text: (root.innerText || '').slice(0, 400000),
+    text: readText(root).slice(0, 400000),
     images: [...root.querySelectorAll('img')].filter(big).map((i) => ({ src: (i.currentSrc || i.src || '').slice(0, 2000), alt: (i.alt || '').slice(0, 300) })).slice(0, 300),
     links: [...new Set([...root.querySelectorAll('a[href^="http"]')].map((a) => a.href))].slice(0, 1000),
     counts: {
@@ -79,8 +108,8 @@ const INVENTORY_JS = `const root = document.querySelector('main') || document.bo
   };`;
 
 /** Inventory + export (+ wait up to 30 s for the result, like snippetFor). */
-const exportWithScreenSnippet = (detail) => `(async () => {
-  ${INVENTORY_JS}
+const exportWithScreenSnippet = (detail, provider) => `(async () => {
+  ${inventoryJs(provider)}
   const detail = Object.assign(${JSON.stringify(detail)}, { screen });
   const el = document.documentElement;
   delete el.dataset.llmExporterResult;
@@ -171,7 +200,7 @@ const planDay = ({ provider, scenarios, catalog, fixtures, project, uploadsDir, 
     planApproval: research.clarify.planApproval,
     exercises: ['out.research'],
     exportDetail: researchDetail,
-    exportSnippet: exportWithScreenSnippet(researchDetail),
+    exportSnippet: exportWithScreenSnippet(researchDetail, provider),
   });
 
   for (const f of catalog.features) {
@@ -220,7 +249,7 @@ const planDay = ({ provider, scenarios, catalog, fixtures, project, uploadsDir, 
       })),
       exercises: [...new Set(s.turns.flatMap((t) => t.exercises || []))],
       exportDetail: detail,
-      exportSnippet: exportWithScreenSnippet(detail),
+      exportSnippet: exportWithScreenSnippet(detail, provider),
     });
   }
 
@@ -308,8 +337,9 @@ const normUrl = (u) => {
 
 /** Text for comparison: no markdown syntax, link targets or case. */
 const flatten = (s) => String(s)
-  .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-  .replace(/<[^>]+>/g, ' ')
+  .replace(/!?\[([^\]\n]*)\]\([^)\n]*\)/g, '$1')
+  // Only tag-looking things: `i < n; … >` in code is not a tag.
+  .replace(/<\/?[A-Za-z][^<>\n]{0,300}>/g, ' ')
   .replace(/[*_`#>|~\\]/g, ' ')
   .replace(/\s+/g, ' ')
   .toLowerCase()
@@ -374,7 +404,11 @@ const compareScreen = (screen, exp) => {
     return !mdUrls.has(n) && !exportText.includes(u) && !exportText.includes(n);
   });
 
-  const fences = (md.match(/^\s*(`{3,}|~{3,})/gm) || []).length / 2;
+  // Code blocks the reader sees: not the reasoning's tool-call dumps.
+  const visibleMd = md
+    .replace(/<details><summary>Thinking<\/summary>[\s\S]*?<\/details>\n?/g, '')
+    .replace(/^\*\*(?:Tool call: `[^`\n]*`|Tool result|Tool error)\*\*\n\n(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\1[ \t]*$/gm, '');
+  const fences = (visibleMd.match(/^\s*(`{3,}|~{3,})/gm) || []).length / 2;
   const tables = (md.match(/^\|.*\|\s*\n\|[\s:|-]+\|/gm) || []).length;
   const counts = {
     codeBlocks: { screen: (screen.counts || {}).codeBlocks || 0, export: Math.floor(fences) },
