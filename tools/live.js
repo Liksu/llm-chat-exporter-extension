@@ -629,7 +629,29 @@ const collectRun = async (args) => {
     if (task.kind === 'scenario' || task.kind === 'research') {
       // Provider day: judged by what the page showed, not by features.json.
       r.kind = task.kind;
-      checkDialog(task, r, exp, JSON.parse(fs.readFileSync(harPath, 'utf8')).log);
+      const harLog = JSON.parse(fs.readFileSync(harPath, 'utf8')).log;
+      checkDialog(task, r, exp, harLog);
+      // The second export (.md, everything inline) against the same page,
+      // then every option combination replayed from both HARs.
+      const mdHar = hars.find((h) => h.meta.tag === `${task.featureId}#md`);
+      const mdName = mdHar && mdHar.meta.result && mdHar.meta.result.filename;
+      const mdFile = mdName && local.find((n) => n.startsWith(mdName.replace(/\.md$/i, '')) && /\.md$/i.test(n));
+      if (mdFile && harLog._exporter && harLog._exporter.screen) {
+        const mdExp = loadMd(path.join(dest, mdFile));
+        r.screenMd = require('./live-day').compareScreen(harLog._exporter.screen, mdExp);
+        const mdAudit = audit(mdExp).filter((f) => f.severity === 'error');
+        r.audit.push(...mdAudit.map((f) => ({ severity: f.severity, code: f.code, message: `(.md) ${f.message}` })));
+        if (r.status === 'OK' && (r.screenMd.errors.length || mdAudit.length)) r.status = 'BROKEN';
+      } else if (!mdHar) r.noMdExport = true;
+      if (hars.length > 1) {
+        const { runMatrix, summarize } = require('./settings-matrix');
+        try {
+          r.matrix = summarize(await runMatrix({ hars: hars.map((h) => path.join(dest, h.name)) }));
+          if (r.matrix.failed && r.status === 'OK') r.status = 'BROKEN';
+        } catch (e) {
+          r.matrix = { error: e.message };
+        }
+      }
       const auditErrorCodes = r.audit.filter((f) => f.severity === 'error').map((f) => f.code);
       await recordAndRemember({ task, r, harPath, exportPath, meta, plan, fixtures, auditErrorCodes });
       results.push(r);
@@ -727,6 +749,11 @@ const renderDialogDetails = (r, out, status) => {
     const sc = r.screen;
     out.push(`  - page vs export: text ${Math.round(sc.textCoverage * 100)}% · pictures ${sc.images.export}/${sc.images.screen} · links missing ${sc.missingLinks.length}`);
     for (const e of sc.errors) out.push(`  - ✗ ${e}`);
+    if (r.screenMd) {
+      out.push(`  - page vs .md export: text ${Math.round(r.screenMd.textCoverage * 100)}% · pictures ${r.screenMd.images.export}/${r.screenMd.images.screen}`);
+      for (const e of r.screenMd.errors) out.push(`  - ✗ (.md) ${e}`);
+    }
+    if (r.noMdExport) out.push('  - ⚠ no second (.md) export — the settings matrix and the md path were not checked');
     if (status !== 'OK') for (const w of sc.warnings) out.push(`  - ⚠ ${w}`);
     if (status !== 'OK' && sc.missingText.length) out.push(`  - text not in the export (first ${Math.min(5, sc.missingText.length)}):`, ...sc.missingText.slice(0, 5).map((l) => `    - "${l}"`));
   }

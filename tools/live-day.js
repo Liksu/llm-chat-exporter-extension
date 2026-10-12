@@ -165,6 +165,17 @@ const monthsBack = (iso, n) => {
   return d.toISOString().slice(0, 10);
 };
 
+/**
+ * Second export of every dialog: md with images and text files inline.
+ * The .md path fetches differently (image previews as data URLs, sandbox
+ * pictures, text uploads); with both HARs collect replays all option
+ * combinations offline (tools/settings-matrix.js).
+ */
+const mdExport = (detail, snippetFor) => {
+  const tag = `${detail.tag}#md`;
+  return { tag, snippet: snippetFor({ ...detail, mode: 'md', inlineImages: true, inlineTextFiles: true, tag }) };
+};
+
 const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
 
 /**
@@ -201,6 +212,7 @@ const planDay = ({ provider, scenarios, catalog, fixtures, project, uploadsDir, 
     exercises: ['out.research'],
     exportDetail: researchDetail,
     exportSnippet: exportWithScreenSnippet(researchDetail, provider),
+    extraExports: [mdExport(researchDetail, snippetFor)],
   });
 
   for (const f of catalog.features) {
@@ -250,11 +262,18 @@ const planDay = ({ provider, scenarios, catalog, fixtures, project, uploadsDir, 
       exercises: [...new Set(s.turns.flatMap((t) => t.exercises || []))],
       exportDetail: detail,
       exportSnippet: exportWithScreenSnippet(detail, provider),
+      extraExports: [mdExport(detail, snippetFor)],
     });
   }
 
   return { provider, since, tasks, skipped: [], tiers };
 };
+
+/** The second export of the same chat, as one .md with everything inline. */
+const extraLines = (t) => (t.extraExports || []).flatMap((x) => [
+  `Then, on the same page, the second export (\`${x.tag}\`: one .md with images and text files inline):`, '',
+  '```js', x.snippet, '```', '',
+]);
 
 const renderDayPlan = (plan, pollSnippet) => {
   const out = [];
@@ -283,6 +302,7 @@ const renderDayPlan = (plan, pollSnippet) => {
       out.push('', `${t.planApproval}`, '');
       out.push('Then move on. When it has finished (STATUS, every 2 min), run:', '');
       out.push('```js', t.exportSnippet, '```', '');
+      out.push(...extraLines(t));
       return;
     }
     if (t.kind === 'reexport') {
@@ -316,6 +336,7 @@ const renderDayPlan = (plan, pollSnippet) => {
     });
     out.push('', 'Scroll to the top and back down once, then run:', '');
     out.push('```js', t.exportSnippet, '```', '');
+    out.push(...extraLines(t));
   });
   return out.join('\n') + '\n';
 };
@@ -445,7 +466,8 @@ const CAPABILITY_EVIDENCE = {
   'out.web-images': (x) => /!\[[^\]]*\]\(https?:\/\//.test(x.assistant),
   'out.math': (x) => /\$[^$\n]+\$|\$\$/.test(x.assistant),
   'out.diagram': (x) => /```mermaid/.test(x.assistant) || x.artifacts.some((k) => /\.(svg|html|mermaid|mmd)$/i.test(k)) || /!\[[^\]]*\]\((assets\/|data:image)/.test(x.assistant),
-  'out.formatting': (x) => /^\|.*\|$/m.test(x.assistant) || /^#{1,6} /m.test(x.assistant) || /^\s*[-*] /m.test(x.assistant),
+  // table rows end in "|  " (the renderer's line breaks)
+  'out.formatting': (x) => /^\|.*\|[ \t]*$/m.test(x.assistant) || /^#{1,6} /m.test(x.assistant) || /^\s*[-*] /m.test(x.assistant),
   'out.reasoning': (x) => /<details><summary>Thinking<\/summary>/.test(x.md),
   'out.research': (x) => x.artifacts.length > 0 || x.assistant.length > 3000,
   'in.image': (x) => /!\[[^\]]*\]\(/.test(x.human),

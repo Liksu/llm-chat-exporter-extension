@@ -133,7 +133,9 @@ For each scenario, in plan order, in a **new chat in the test project**:
    the scenario's `EXPORT` snippet. It records an inventory of what the
    page shows (text, images, links, code blocks, tables, widgets) together
    with the export, so the tools can check that everything visible made it
-   into the export.
+   into the export. Then run the second export snippet (`#md`) on the same
+   page: one .md with images and text files inline. The two exports
+   together let `collect` check every combination of export options.
 4. Look at the page yourself too: anything the chat shows that looks new
    or unusual (a map, a card, a chart, a button, a side panel) goes into
    `notes.md` — that's gap-hunting, it matters.
@@ -157,7 +159,7 @@ off after ~45 s.
 ## 5. Collect the research
 
 Go back to the research chat. When `STATUS` says it's done, run its
-`EXPORT` snippet. If it's still running, do something else and check back;
+`EXPORT` snippet, then its second (`#md`) export. If it's still running, do something else and check back;
 after 45 minutes note it as unfinished and export what is there.
 
 ## 6. Evaluate

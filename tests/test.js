@@ -460,7 +460,11 @@ test('live day: plan and scenario catalog', () => {
     assert.deepEqual(plan.tasks.filter((t) => t.kind === 'reexport').map((t) => t.featureId), ['claude.web-search']);
     const scn = plan.tasks.filter((t) => t.kind === 'scenario');
     assert.ok(!scn.some((t) => t.scenario === 'images'), 'image generation is not a Claude scenario');
-    for (const t of [plan.tasks[0], ...scn]) assert.match(t.exportSnippet, /screen/, `${t.featureId}: export without page inventory`);
+    for (const t of [plan.tasks[0], ...scn]) {
+      assert.match(t.exportSnippet, /screen/, `${t.featureId}: export without page inventory`);
+      assert.deepEqual(t.extraExports.map((x) => x.tag), [`${t.featureId}#md`], `${t.featureId}: no second (.md) export`);
+      assert.match(t.extraExports[0].snippet, /\\"mode\\":\\"md\\".*\\"inlineImages\\":true/);
+    }
     const paste = scn.find((t) => t.scenario === 'reading').turns.find((t) => t.paste);
     assert.match(paste.pasteSnippet, /ClipboardEvent\('paste'/);
     assert.ok(paste.pasteSnippet.length > 10000, 'the long article is embedded in the paste snippet');
