@@ -214,8 +214,9 @@
   };
 
   /** A Google Maps search for a place: what clicking it on the map shows. */
+  // Parentheses are escaped too: a bare `)` would end the markdown link.
   const mapLink = (p) =>
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([p.name, p.address].filter(Boolean).join(', '))}`;
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([p.name, p.address].filter(Boolean).join(', ')).replace(/[()']/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`;
 
   const linkText = (s) => oneLine(s).replace(/[[\]]/g, '');
 

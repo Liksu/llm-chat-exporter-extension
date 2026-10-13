@@ -139,7 +139,9 @@
     locations.forEach((l, i) => {
       const e = isObject(enriched[str(l.place_id)]) ? enriched[str(l.place_id)] : {};
       const coords = l.latitude != null && l.longitude != null ? `${l.latitude},${l.longitude}` : '';
-      const query = encodeURIComponent(coords || [str(l.name), str(l.address)].filter(Boolean).join(', '));
+      // Parentheses escaped too: a bare `)` would end the markdown link.
+      const query = encodeURIComponent(coords || [str(l.name), str(l.address)].filter(Boolean).join(', '))
+        .replace(/[()']/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
       const maps = str(e.maps_url) ||
         `https://www.google.com/maps/search/?api=1&query=${query}${str(l.place_id) ? `&query_place_id=${encodeURIComponent(str(l.place_id))}` : ''}`;
       const parts = [`**[${linkText(str(l.name) || 'place')}](${maps})**`];
