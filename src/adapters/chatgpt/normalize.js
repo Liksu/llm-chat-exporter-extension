@@ -214,6 +214,23 @@
    * Pull plain text out of a `parts` array, ignoring non-string entries.
    * With the message's metadata, citation markers become source links.
    */
+  /**
+   * A reply to a selected piece of an answer (the "quote" button; the chat
+   * shows the selection as a collapsed chip above the message). ChatGPT
+   * sends it as
+   *   # Selected text:\n\n## Selection 1\n<text>\n\n## My request:\n<message>
+   * (metadata.targeted_reply_source_message_id). Each selection becomes a
+   * quote above the message, as in the chat; anything else is unchanged.
+   */
+  const quoteSelections = (text) => {
+    const m = /^# Selected text:\s*\n([\s\S]*?)\n## My request:[ \t]*\n?([\s\S]*)$/.exec(text);
+    if (!m) return text;
+    const selections = m[1].split(/^## Selection \d+[ \t]*$/m).map((s) => s.trim()).filter(Boolean);
+    if (!selections.length) return text;
+    const quotes = selections.map((s) => s.split('\n').map((l) => (l.trim() ? `> ${l}` : '>')).join('\n'));
+    return [...quotes, m[2].trim()].filter(Boolean).join('\n\n');
+  };
+
   const partsToText = (parts, meta) => {
     if (!Array.isArray(parts)) return '';
     const text = parts.filter((p) => typeof p === 'string').join('\n\n').trim();
@@ -650,6 +667,7 @@
     if (ct === 'text') {
       let text = partsToText(content.parts, meta);
       if (!text) return out;
+      if (role === 'user') text = quoteSelections(text);
       // Generative-UI answers: components (<box>, <Link/>, <Cite/>…) → markdown.
       if (role === 'assistant' && ns.chatgptGenui && ns.chatgptGenui.isGenUi(meta)) {
         text = ns.chatgptGenui.render(text, meta);
@@ -681,7 +699,8 @@
       );
       for (const p of parts) {
         if (typeof p === 'string') {
-          const cleaned = stripCiteMarkers(resolveCiteMarkers(p, meta));
+          let cleaned = stripCiteMarkers(resolveCiteMarkers(p, meta));
+          if (role === 'user') cleaned = quoteSelections(cleaned.trim());
           if (cleaned.trim()) out.push({ block: { kind: 'text', text: cleaned } });
           continue;
         }

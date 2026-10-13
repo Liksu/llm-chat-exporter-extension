@@ -312,10 +312,12 @@
         "content": {
           "content_type": "text",
           "parts": [
-            "Где сдать аккумулятор и купить хлеб?"
+            "# Selected text:\n\n## Selection 1\nПринимают опасные отходы.\n\n## Selection 2\nПекут ржаной хлеб.\nВторая строка.\n\n## My request:\nГде сдать аккумулятор и купить хлеб?"
           ]
         },
-        "metadata": {}
+        "metadata": {
+          "targeted_reply_source_message_id": "msg-5"
+        }
       }
     },
     "msg-7": {

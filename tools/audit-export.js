@@ -262,6 +262,9 @@ const TEXT_MARKERS = [
   // value={turn7business0.name}) left as its name.
   ['unresolved-binding', 'error', /\bturn\d+(?:business|search|news|image|view|product|entity)\d+(?:\.\w+)?/g,
     (m) => `UI data reference left unresolved: ${m[0]}`],
+  // ChatGPT's reply-to-selection wrapper (the chat shows a quote chip).
+  ['selection-markup', 'error', /^# Selected text:\s*$|^## (?:Selection \d+|My request:)\s*$/g,
+    (m) => `reply-to-selection wrapper leaked into the text: ${m[0]}`],
   // Svelte-style template blocks around such components ({#each … as p}).
   ['template-markup', 'error', /\{[#:/](?:each|if|else|await|key)\b[^}\n]*\}/g,
     (m) => `UI template markup leaked into the text: ${m[0].slice(0, 80)}`],
