@@ -34,7 +34,8 @@
  * draws), a grid → a list (one item per tile), Link → [title](url),
  * Entity → its text, Cite → inline source links like the chips
  * ([Reddit](url)), AsyncImage → the image it showed, a map → a list of its
- * places with map links, WritingBlock → a quote, CodeCite and other icons
+ * places with map links, WritingBlock → a ```text block (a draft to copy
+ * and send as is, like the card's copy button), CodeCite and other icons
  * → nothing. {#each}/{#if} template blocks and {place.field} values are
  * expanded first; a place the chat never resolved renders as nothing (as
  * on the page). Unknown tags are left as they are, and code (fenced or
@@ -57,12 +58,12 @@
     'Link', 'Cite', 'Entity', 'AsyncImage', 'MapWidgetV2', 'MapWidget', 'image', 'Image',
     'divider', 'Divider', 'icon', 'Icon',
   ]);
-  // Containers whose content becomes a quote.
-  const QUOTES = new Set(['WritingBlock']);
+  // Containers whose content becomes a text block (drafts to copy).
+  const DRAFTS = new Set(['WritingBlock']);
   // Inline wrappers: content kept, formatted.
   const WRAPS = { caption: (s) => `_${s}_`, badge: (s) => `_(${s})_`, title: (s) => `**${s}**` };
 
-  const isKnown = (name) => BLOCKS.has(name) || DROP.has(name) || DATA.has(name) || QUOTES.has(name) || name in WRAPS;
+  const isKnown = (name) => BLOCKS.has(name) || DROP.has(name) || DATA.has(name) || DRAFTS.has(name) || name in WRAPS;
 
   // A data binding the model refers to: turn620995business0(.name).
   const BINDING_RE = /^turn\d+[a-z_]+\d+\b/;
@@ -503,7 +504,7 @@
       out += s;
     };
     const wraps = [];
-    const quotes = [];
+    const drafts = [];
     while (i < text.length) {
       const lt = text.indexOf('<', i);
       if (lt < 0) {
@@ -519,14 +520,17 @@
       }
       i = tag.end;
       const { name, attrs } = tag;
-      if (QUOTES.has(name)) {
+      if (DRAFTS.has(name)) {
         if (tag.selfClosing) continue;
         if (!tag.closing) {
-          quotes.push(out.length);
-        } else if (quotes.length) {
-          const at = quotes.pop();
+          drafts.push(out.length);
+        } else if (drafts.length) {
+          const at = drafts.pop();
           const inner = out.slice(at).trim();
-          out = out.slice(0, at) + (inner ? `\n\n${inner.split('\n').map((l) => (l.trim() ? `> ${l}` : '>')).join('\n')}\n\n` : '');
+          // Longer than any backtick run inside, so the draft can't close it.
+          const run = Math.max(0, ...(inner.match(/`+/g) || []).map((r) => r.length));
+          const fence = '`'.repeat(Math.max(3, run + 1));
+          out = out.slice(0, at) + (inner ? `\n\n${fence}text\n${inner}\n${fence}\n\n` : '');
         }
       } else if (BLOCKS.has(name)) {
         if (tag.selfClosing) continue;

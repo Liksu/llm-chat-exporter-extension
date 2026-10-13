@@ -112,9 +112,11 @@ _(Лучше для продажи)_
 
 Я бы отправил такое сообщение:
 
-> The seller has agreed to send a replacement.  
->
-> However, **this does not resolve** the safety issue.
+```text
+The seller has agreed to send a replacement.
+
+However, **this does not resolve** the safety issue.
+```
 
 Готово.
 
