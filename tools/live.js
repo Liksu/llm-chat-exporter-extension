@@ -339,6 +339,34 @@ const findDownloads = (downloadsDir, since, featureIds) => {
   return byFeature;
 };
 
+/**
+ * The export of `tag` already in a run's feature folder: its HAR and export
+ * file names, whether it succeeded, and the HAR's time. null when none.
+ */
+const collectedExport = (dir, tag) => {
+  if (!fs.existsSync(dir)) return null;
+  const names = fs.readdirSync(dir);
+  for (const name of names.filter((n) => /\.har$/i.test(n))) {
+    let meta;
+    try {
+      meta = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')).log._exporter || {};
+    } catch (_) {
+      continue;
+    }
+    if (meta.tag !== tag) continue;
+    const fname = meta.result && meta.result.filename;
+    const stem = fname ? fname.replace(/\.(zip|md)$/i, '') : null;
+    const ext = fname ? path.extname(fname) : null;
+    const exportName = stem && names.find((n) => n.startsWith(stem) && n.endsWith(ext) && !/\.har$/i.test(n));
+    return {
+      files: [name, ...(exportName ? [exportName] : [])],
+      ok: !!(meta.result && meta.result.ok && exportName),
+      mtime: fs.statSync(path.join(dir, name)).mtimeMs,
+    };
+  }
+  return null;
+};
+
 const compareOp = (spec, actual) => {
   const m = /^(==|>=|<=|>|<)?\s*(\d+)$/.exec(String(spec));
   if (!m) return { ok: false, text: `bad spec ${spec}` };
@@ -580,17 +608,26 @@ const collectRun = async (args) => {
   const results = [];
   const harPaths = [];
   const controls = new Map(); // provider → control export (see findControlExport)
+  const moved = new Set(); // tags already taken from Downloads in this collect
   for (const task of plan.tasks) {
     const feature = featureById.get(task.featureId);
     const dest = path.join(runDownloads, task.featureId);
-    const hits = [found.get(task.featureId), ...(task.extraExports || []).map((x) => found.get(x.tag))].filter(Boolean);
-    if (hits.length) {
-      fs.rmSync(dest, { recursive: true, force: true });
-      const move = args.keepDownloads ? (a, b) => { fs.mkdirSync(path.dirname(b), { recursive: true }); fs.copyFileSync(a, b); } : moveFile;
-      for (const hit of hits) {
-        move(hit.har.full, path.join(dest, hit.har.name));
-        if (hit.exportFile) move(hit.exportFile.full, path.join(dest, hit.exportFile.name));
+    const hits = [found.get(task.featureId), ...(task.extraExports || []).map((x) => found.get(x.tag))]
+      .filter((h) => h && !moved.has(h.meta.tag));
+    const move = args.keepDownloads ? (a, b) => { fs.mkdirSync(path.dirname(b), { recursive: true }); fs.copyFileSync(a, b); } : moveFile;
+    for (const hit of hits) {
+      moved.add(hit.meta.tag);
+      // A collect re-run must not swap a good export already in the run dir
+      // for an older or failed one left behind in Downloads.
+      const have = collectedExport(dest, hit.meta.tag);
+      const hitOk = !!(hit.meta.result && hit.meta.result.ok);
+      if (have && ((have.ok && !hitOk) || have.mtime >= hit.har.mtime)) {
+        console.log(`  ${hit.meta.tag}: kept the export already collected; ${hit.har.name} stays in Downloads (older or failed)`);
+        continue;
       }
+      if (have) for (const f of have.files) fs.rmSync(path.join(dest, f), { force: true });
+      move(hit.har.full, path.join(dest, hit.har.name));
+      if (hit.exportFile) move(hit.exportFile.full, path.join(dest, hit.exportFile.name));
     }
     const local = fs.existsSync(dest) ? fs.readdirSync(dest) : [];
     // The main export is the one tagged with the bare feature id; extra
@@ -767,8 +804,10 @@ const renderDialogDetails = (r, out, status) => {
 };
 
 /** Earlier chats of the day's scenarios the user may delete. */
+// A fixture with a "note" is a chat the user cares about (often their own),
+// never offered for deletion.
 const oldChats = (fixtures, provider) => Object.entries(fixtures)
-  .filter(([id, f]) => id.startsWith(`${provider}.`) && Array.isArray(f.history))
+  .filter(([id, f]) => id.startsWith(`${provider}.`) && Array.isArray(f.history) && !f.note)
   .flatMap(([id, f]) => f.history.map((h) => ({ id, ...h })));
 
 const renderReport = (rep) => {

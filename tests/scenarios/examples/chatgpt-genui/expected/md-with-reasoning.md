@@ -76,3 +76,46 @@ _(Лучше для продажи)_
 Есть TPS2116 и обсуждение [Forum thread](https://example.com/forum/thread). ([Forum](https://example.com/forum/thread "Parts on hand | Forum"), [Example](https://example.org/datasheet.pdf "Datasheet"))
 
 ---
+
+## Human
+
+Где сдать аккумулятор и купить хлеб?
+
+---
+
+## Assistant
+
+Ближайший вариант:
+
+**Republic Services**
+
+333 W Gowan Rd, North Las Vegas, NV 89032
+
+Принимают опасные отходы.
+
+[![Rye Bakery](https://images.example.com/bakery.jpg?purpose=preview)](https://bakery.example.com/)
+
+**[Rye Bakery](https://bakery.example.com/)**
+
+1 Rye St, Las Vegas, NV 89148, United States
+
+Пекут ржаной хлеб.
+
+---
+
+Место, которое чат так и не нашёл.
+
+🗺️ **Map**
+
+- 📍 [Republic Services](https://www.google.com/maps/search/?api=1&query=Republic%20Services%2C%20333%20W%20Gowan%20Rd%2C%20North%20Las%20Vegas%2C%20NV%2089032) — 333 W Gowan Rd, North Las Vegas, NV 89032  
+- 📍 [Rye Bakery](https://www.google.com/maps/search/?api=1&query=Rye%20Bakery%2C%201%20Rye%20St%2C%20Las%20Vegas%2C%20NV%2089148%2C%20United%20States) — 1 Rye St, Las Vegas, NV 89148, United States
+
+Я бы отправил такое сообщение:
+
+> The seller has agreed to send a replacement.  
+>
+> However, **this does not resolve** the safety issue.
+
+Готово.
+
+---

@@ -217,8 +217,15 @@ unasked.
   often goes nowhere (the page re-renders). Navigate, then click the
   composer and type in a separate step; check with a zoomed screenshot
   that the text is in the box before sending.
+  On claude.ai chat pages focusing the composer from the JavaScript tool
+  (`document.querySelector('[data-testid="chat-input"]').focus()`) and
+  then typing works; on a project page a real click on the composer is
+  needed. The model picker may need two clicks right after a navigation.
 - After attaching files the composer moves and its element reference may
   stop working: click the visible placeholder line instead.
+- Never leave a failed export's `.debug.har` in the downloads folder after
+  re-exporting the chat: `collect` keeps the newest successful export per
+  tag, but delete the stale file anyway so a later run can't pick it up.
 - On a claude.ai project page there are two file inputs: the composer's
   "Upload files" and the project's Context "Add files". Use only the
   composer one — the other adds files to the project.

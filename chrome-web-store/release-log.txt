@@ -1,9 +1,19 @@
 ﻿# LLM Chat Exporter — Release Log
 
-## v0.7.44 — 2026-10-10
+## v0.7.46 — 2026-10-12
+
+All chats
+• Fixed: in ZIP exports, uploaded images with the same name (for example several "image.png") all showed the last one. Each now links to its own file.
 
 ChatGPT
 • Pictures ChatGPT shows above its answers (a headline image or a row of photos) are now in the export, each linking to the page it came from.
+• Places in answers (shops, drop-off points, bakeries) keep their name, address and website; a map becomes a list of its places with Google Maps links.
+• Message drafts ChatGPT writes for you to copy are exported as a quote instead of raw tags.
+
+Claude
+• Cards Claude shows in its replies are now in the export as text: charts (as a table), quizzes (answers folded), recipes, product comparisons, maps of places (with notes, ratings and photos) and weather forecasts.
+• Documents Claude writes in Claude Docs are exported as Markdown files in /artifacts, with all later edits.
+• Slide decks: every slide is exported, not just the first file.
 
 ## v0.7.43 — 2026-10-10
 

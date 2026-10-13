@@ -4,8 +4,8 @@
     "about": "Scenarios name a tier, not a model. TASK.md maps the tier to what the model picker shows on the day (names change); the report records the model that actually answered (from the export).",
     "claude": {
       "mid": "the default Sonnet-class model",
-      "reasoning": "same model with extended thinking on",
-      "top": "the largest Opus-class model"
+      "reasoning": "same model with effort set to High (no separate thinking toggle since Oct 2026)",
+      "top": "the largest model in the picker (2026-10-12: Fable 5.1, above Opus 5.5)"
     },
     "chatgpt": {
       "mid": "the default fast model",
@@ -163,6 +163,17 @@
       "check": "the chart image is in the export"
     },
     {
+      "id": "out.chart-widget",
+      "axis": "output",
+      "title": "Chart drawn as a built-in widget (no code run)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "the chart's numbers as a table, with its title"
+    },
+    {
       "id": "out.diagram",
       "axis": "output",
       "title": "Diagram (mermaid / drawn SVG / HTML widget)",
@@ -233,8 +244,8 @@
       "axis": "output",
       "title": "Places on a map",
       "providers": {
-        "claude": "unsupported",
-        "chatgpt": "unknown",
+        "claude": "supported",
+        "chatgpt": "supported",
         "gemini": "unknown"
       },
       "check": "each place named on the map card is in the export (name + link)"
@@ -255,18 +266,29 @@
       "axis": "output",
       "title": "Weather widget",
       "providers": {
-        "claude": "unknown",
+        "claude": "supported",
         "chatgpt": "unknown",
         "gemini": "unknown"
       },
       "check": "the forecast numbers shown in the widget are in the export"
     },
     {
+      "id": "out.recipe",
+      "axis": "output",
+      "title": "Recipe card (ingredients, steps with timers, photos)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "ingredients with amounts and every step, in order"
+    },
+    {
       "id": "out.shopping",
       "axis": "output",
       "title": "Product / hotel cards (price, store, rating)",
       "providers": {
-        "claude": "unknown",
+        "claude": "supported",
         "chatgpt": "unknown",
         "gemini": "unknown"
       },
@@ -315,6 +337,28 @@
         "gemini": "unknown"
       },
       "check": "the document is in artifacts/ as .md, linked from the turn"
+    },
+    {
+      "id": "out.docs-artifact",
+      "axis": "output",
+      "title": "Claude Docs document (editable doc in the side panel, written through the Docs connector)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "n/a",
+        "gemini": "n/a"
+      },
+      "check": "the doc's final text (all sections, later edits applied) in artifacts/ as .md, linked from the turn"
+    },
+    {
+      "id": "out.slides",
+      "axis": "output",
+      "title": "Slide deck in the side panel (Claude Slides, Canvas slides)",
+      "providers": {
+        "claude": "supported",
+        "chatgpt": "unknown",
+        "gemini": "unknown"
+      },
+      "check": "every slide of the deck is in artifacts/ (its file or its text)"
     },
     {
       "id": "out.document-edit",
@@ -485,7 +529,8 @@
           "say": "Write a one-page proposal for a loyalty program for a small neighborhood coffee shop. Put it in a document in the side panel (artifact / canvas), not in the chat.",
           "exercises": [
             "out.document",
-            "out.formatting"
+            "out.formatting",
+            "out.docs-artifact"
           ]
         },
         {
@@ -614,7 +659,8 @@
         {
           "say": "Plot a bar chart by region.",
           "exercises": [
-            "out.code-chart"
+            "out.code-chart",
+            "out.chart-widget"
           ]
         },
         {
@@ -654,6 +700,12 @@
           "exercises": [
             "out.diagram"
           ]
+        },
+        {
+          "say": "Make a 3-slide deck that presents this landing page to the owner: the idea, the page, next steps.",
+          "exercises": [
+            "out.slides"
+          ]
         }
       ]
     },
@@ -682,6 +734,26 @@
           "exercises": [
             "out.interactive",
             "out.cards"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "recipe",
+      "title": "Recipe card: a simple recipe → scale it",
+      "tier": "mid",
+      "turns": [
+        {
+          "say": "Give me a simple recipe for pancakes.",
+          "exercises": [
+            "out.recipe",
+            "out.web-images"
+          ]
+        },
+        {
+          "say": "Make it for 8 people and without eggs.",
+          "exercises": [
+            "out.recipe"
           ]
         }
       ]

@@ -3,7 +3,7 @@
   "create_time": 1791460800,
   "update_time": 1791460900,
   "default_model_slug": "gpt-6-thinking",
-  "current_node": "msg-5",
+  "current_node": "msg-7",
   "mapping": {
     "root": {
       "id": "root",
@@ -293,7 +293,104 @@
         "channel": "final"
       },
       "parent": "msg-4",
-      "children": []
+      "children": [
+        "msg-6"
+      ]
+    },
+    "msg-6": {
+      "id": "msg-6",
+      "parent": "msg-5",
+      "children": [
+        "msg-7"
+      ],
+      "message": {
+        "id": "msg-6",
+        "author": {
+          "role": "user"
+        },
+        "create_time": 1791460850,
+        "content": {
+          "content_type": "text",
+          "parts": [
+            "Где сдать аккумулятор и купить хлеб?"
+          ]
+        },
+        "metadata": {}
+      }
+    },
+    "msg-7": {
+      "id": "msg-7",
+      "parent": "msg-6",
+      "children": [],
+      "message": {
+        "id": "msg-7",
+        "author": {
+          "role": "assistant"
+        },
+        "create_time": 1791460860,
+        "content": {
+          "content_type": "text",
+          "parts": [
+            "Ближайший вариант:\n\n<row align=start gap={3}>\n  <box flex=\"1\" gap={1}>\n    **<Entity ref=\"turn7business0\" value={turn7business0.name} />**\n\n    <text color=\"secondary\" size=\"sm\">{turn7business0.address}</text>\n\n    Принимают опасные отходы.\n  </box>\n</row>\n\n<box gap={3}>\n  <row align=start gap={3}>\n    <AsyncImage ref=\"turn8business1\" aspectRatio=\"1:1\" maxWidth=\"112px\"/>\n    <box flex=\"1\" gap={1}>\n      **<Entity ref=\"turn8business1\" value={turn8business1.name}/>**\n\n      <text color=\"secondary\" size=\"xs\">{turn8business1.address}</text>\n\n      Пекут ржаной хлеб.\n    </box>\n  </row>\n  <divider color=\"subtle\"/>\n  <row align=start gap={3}>\n    <box flex=\"1\" gap={1}>\n      **<Entity ref=\"turn8business2\" value={turn8business2.name}/>**\n\n      <text color=\"secondary\" size=\"xs\">{turn8business2.address}</text>\n\n      Место, которое чат так и не нашёл.\n    </box>\n  </row>\n</box>\n\n<MapWidgetV2 points={[{\"ref\":\"turn7business0\"},{\"ref\":\"turn8business1\"},{\"ref\":\"turn8business2\"}]} carousel={{visibility:\"hidden\"}}/>\n\nЯ бы отправил такое сообщение:\n\n<WritingBlock id=\"73521\" variant=\"chat_message\">The seller has agreed to send a replacement.\n\nHowever, **this does not resolve** the safety issue.</WritingBlock>\n\nГотово."
+          ]
+        },
+        "status": "finished_successfully",
+        "end_turn": true,
+        "metadata": {
+          "model_slug": "gpt-6-thinking",
+          "model_dil_v2": {
+            "fallbackMarkdown": "(not used)",
+            "appData": {
+              "opGenui": {
+                "componentResults": {
+                  "aaaaaaaa-0000-0000-0000-000000000001": {
+                    "componentName": "AsyncImage",
+                    "status": "resolved",
+                    "state": {
+                      "images": [
+                        {
+                          "url": "https://bakery.example.com/",
+                          "content_url": "https://images.example.com/bakery.jpg?purpose=preview",
+                          "title": "Rye Bakery",
+                          "refs": [
+                            {
+                              "turn_index": 8,
+                              "ref_type": "business",
+                              "ref_index": 1
+                            }
+                          ],
+                          "source_ref_type": "business"
+                        }
+                      ],
+                      "default_on_click_action": {
+                        "handler": "client",
+                        "type": "open_entity_detail",
+                        "payload": {
+                          "category": "local_business",
+                          "query": "Rye Bakery",
+                          "extraParams": {
+                            "address": "1 Rye St, Las Vegas, NV 89148, United States"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "modelDataBindings": {
+                  "turn7business0": {
+                    "name": "Republic Services",
+                    "address": "333 W Gowan Rd, North Las Vegas, NV 89032",
+                    "rating": {
+                      "$type": "business_rating"
+                    },
+                    "is_open": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

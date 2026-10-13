@@ -36,8 +36,8 @@
    *   assetsDir?: string,
    *   filesDir?: string,
    *   artifactsDir?: string,
-   *   imagePathByName?: Map<string,string>,
-   *   filePathByName?: Map<string,string>,
+   *   imagePathByName?: Map<object,string>,   image block → its asset path
+   *   filePathByName?: Map<object,string>,    attachment → its file path
    *   artifactFileById?: Map<string,string>,
    * }} options
    * @returns {string}
@@ -184,7 +184,7 @@
         // the historical behavior.
         const inline = opts.inlineImages ?? (opts.mode !== 'zip');
         if (opts.mode === 'zip' && !inline) {
-          const path = opts.imagePathByName.get(block.name) ?? `${opts.assetsDir}/${alt}`;
+          const path = opts.imagePathByName.get(block) ?? `${opts.assetsDir}/${alt}`;
           return `![${alt}](${path})`;
         }
         const b64 = uint8ToBase64(block.bytes);
@@ -267,7 +267,7 @@
       return `📎 ~~${escapeMdInline(att.fileName)}~~ _(no longer available)_`;
     }
     if (opts.mode === 'zip') {
-      const path = opts.filePathByName.get(att.fileName) ?? `${opts.filesDir}/${att.fileName}`;
+      const path = opts.filePathByName.get(att) ?? `${opts.filesDir}/${att.fileName}`;
       return `📎 [${escapeMdInline(att.fileName)}](${path})`;
     }
     return `📎 [${escapeMdInline(att.fileName)}](#${anchorId})`;
@@ -307,6 +307,7 @@
         const anchorId = `att-${nextId++}`;
         items.push({
           anchorId,
+          att,
           fileName: att.fileName,
           mime: att.mime,
           size: att.size,
@@ -328,7 +329,7 @@
           let label;
           if (opts.mode === 'zip') {
             const path =
-              opts.filePathByName.get(item.fileName) ?? `${opts.filesDir}/${item.fileName}`;
+              opts.filePathByName.get(item.att) ?? `${opts.filesDir}/${item.fileName}`;
             label = `[${escapeMdInline(item.fileName)}](${path})`;
           } else {
             label = `**${escapeMdInline(item.fileName)}**`;

@@ -301,8 +301,9 @@
           .map((seg, j) => {
             if (j % 2 === 1) return seg;
             // Single \n that is NOT part of a paragraph break gets a trailing
-            // double-space to render as a hard line-break in markdown.
-            return seg.replace(/(?<!\n)\n(?!\n)/g, '  \n');
+            // double-space to render as a hard line-break in markdown. A bare
+            // `>` line is already a paragraph break inside a quote.
+            return seg.replace(/(?<!\n)(?<!(?:^|\n)>)\n(?!\n)/g, '  \n');
           })
           .join('');
       })

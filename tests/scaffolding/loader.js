@@ -61,6 +61,7 @@ const SCRIPTS_BY_ADAPTER = {
     'src/core/export-entry.js',
     'src/core/dev-loader.js',
     'src/adapters/claude/api.js',
+    'src/adapters/claude/widgets.js',
     'src/adapters/claude/normalize.js',
     'src/adapters/claude/content.js',
   ],

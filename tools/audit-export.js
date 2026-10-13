@@ -251,12 +251,17 @@ const TEXT_MARKERS = [
   ['private-use-chars', 'error', /[-]+/g,
     (m) => `private-use characters leaked (provider citation/entity markup?): ${showPua(m.input, m.index, m[0].length)}`],
   // Component markup a provider's UI renders (ChatGPT generative UI:
-  // <Link url=…/>, <Cite ref=…/>, <box gap={2}>): a capitalized tag with
-  // attributes or self-closing, or any tag with a {…} attribute. Plain HTML
-  // in prose doesn't look like either.
+  // <Link url=…/>, <Cite ref=…/>, <box gap={2}>, <MapWidgetV2 points={[…]}/>):
+  // a capitalized tag (digits allowed) with a quoted or {…} attribute, or
+  // self-closing, or any tag with a {…} attribute. Plain HTML in prose
+  // doesn't look like either.
   ['component-markup', 'error',
-    /<\/?[A-Z][A-Za-z]+(?:\s+[\w-]+=(?:"[^"]*"|\{[^}]*\}+))+\s*\/?>|<[A-Z][A-Za-z]+\s*\/>|<[a-z][\w-]*\s[^<>\n]*=\{[^<>\n]*>/g,
+    /<[A-Z][A-Za-z0-9]*\s+[\w-]+=["{][^\n]*?>|<[A-Z][A-Za-z0-9]*\s*\/>|<\/[A-Z][A-Za-z0-9]*>|<[a-z][\w-]*\s[^<>\n]*=\{[^<>\n]*>/g,
     (m) => `UI component markup leaked into the text: ${m[0].slice(0, 80)}`],
+  // A data binding the UI fills in (ChatGPT places: {turn7business0.address},
+  // value={turn7business0.name}) left as its name.
+  ['unresolved-binding', 'error', /\bturn\d+(?:business|search|news|image|view|product|entity)\d+(?:\.\w+)?/g,
+    (m) => `UI data reference left unresolved: ${m[0]}`],
   // Svelte-style template blocks around such components ({#each … as p}).
   ['template-markup', 'error', /\{[#:/](?:each|if|else|await|key)\b[^}\n]*\}/g,
     (m) => `UI template markup leaked into the text: ${m[0].slice(0, 80)}`],

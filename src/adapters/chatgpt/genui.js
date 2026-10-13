@@ -13,22 +13,32 @@
  *              <CodeCite tool="container" …/>      points at a code run
  *              <Entity category="product" value="TPS63802" disambig="…"/>
  *              <AsyncImage query="…" aspectRatio="5:3"/>  web image search
+ *              <AsyncImage ref="turnNbusinessM"/>  photo of a place
+ *              <MapWidgetV2 points={[{"ref":"turnNbusinessM"},…]}/>  map
+ *              <WritingBlock variant="chat_message">…</WritingBlock>  draft
+ *                                                   to copy (a card)
+ *              {turnNbusinessM.address}            a place's field
  *
  * What the tags resolved to sits in model_dil_v2.appData.opGenui
  * .componentResults (keyed by an opaque id, not by position): Cite items
  * carry {ref_id, refs[], url, title, source_label}, AsyncImage carries the
- * found images. The layout vocabulary mirrors OpenAI's ChatKit widgets;
- * the data components are undocumented.
+ * found images. Places (local businesses) the answer names are bound in
+ * opGenui.modelDataBindings ({name, address, …} by ref) or, when that is
+ * empty, known only from their photo's AsyncImage result (name and address
+ * in its click action). The layout vocabulary mirrors OpenAI's ChatKit
+ * widgets; the data components are undocumented.
  *
  * render() turns all of it into plain markdown: layout tags go away (their
  * content stays, de-indented so it isn't read as a code block), arrow
  * icons stay as ↓ → (the edges of the little flow diagrams the model
  * draws), a grid → a list (one item per tile), Link → [title](url),
  * Entity → its text, Cite → inline source links like the chips
- * ([Reddit](url)), AsyncImage → the image it showed, CodeCite and other
- * icons → nothing. {#each}/{#if} template blocks are expanded first.
- * Unknown tags
- * are left as they are, and code (fenced or inline) is never touched.
+ * ([Reddit](url)), AsyncImage → the image it showed, a map → a list of its
+ * places with map links, WritingBlock → a quote, CodeCite and other icons
+ * → nothing. {#each}/{#if} template blocks and {place.field} values are
+ * expanded first; a place the chat never resolved renders as nothing (as
+ * on the page). Unknown tags are left as they are, and code (fenced or
+ * inline) is never touched.
  */
 (function () {
   const ns = (self.__exporter = self.__exporter || {});
@@ -43,11 +53,19 @@
   // Dropped with nothing in their place.
   const DROP = new Set(['CodeCite', 'spacer', 'Spacer']);
   // Rendered from their attributes / resolved data.
-  const DATA = new Set(['Link', 'Cite', 'Entity', 'AsyncImage', 'image', 'Image', 'divider', 'Divider', 'icon', 'Icon']);
+  const DATA = new Set([
+    'Link', 'Cite', 'Entity', 'AsyncImage', 'MapWidgetV2', 'MapWidget', 'image', 'Image',
+    'divider', 'Divider', 'icon', 'Icon',
+  ]);
+  // Containers whose content becomes a quote.
+  const QUOTES = new Set(['WritingBlock']);
   // Inline wrappers: content kept, formatted.
   const WRAPS = { caption: (s) => `_${s}_`, badge: (s) => `_(${s})_`, title: (s) => `**${s}**` };
 
-  const isKnown = (name) => BLOCKS.has(name) || DROP.has(name) || DATA.has(name) || name in WRAPS;
+  const isKnown = (name) => BLOCKS.has(name) || DROP.has(name) || DATA.has(name) || QUOTES.has(name) || name in WRAPS;
+
+  // A data binding the model refers to: turn620995business0(.name).
+  const BINDING_RE = /^turn\d+[a-z_]+\d+\b/;
 
   const decodeEntities = (s) =>
     s.replace(/&(quot|amp|lt|gt|#39|apos);/g, (_, e) =>
@@ -136,6 +154,14 @@
   const resolvedData = (meta) => {
     const sources = new Map();
     const images = [];
+    // Places by ref: {name, address, url?} (+ whatever else the binding has).
+    const places = new Map();
+    const addPlace = (key, fields) => {
+      if (!key || !isObject(fields)) return;
+      const p = places.get(key) || {};
+      for (const [k, v] of Object.entries(fields)) if (p[k] == null && v != null && v !== '') p[k] = v;
+      places.set(key, p);
+    };
     const add = (key, url, title, label) => {
       if (!key || typeof url !== 'string' || !url) return;
       // rank: clean title 3 > site label 2 > flattened junk 1 > url 0
@@ -150,6 +176,8 @@
     const dil = isObject(meta) && isObject(meta.model_dil_v2) ? meta.model_dil_v2 : null;
     const gen = dil && isObject(dil.appData) && isObject(dil.appData.opGenui) ? dil.appData.opGenui : null;
     const results = gen && isObject(gen.componentResults) ? gen.componentResults : {};
+    const bindings = gen && isObject(gen.modelDataBindings) ? gen.modelDataBindings : {};
+    for (const [key, b] of Object.entries(bindings)) addPlace(key, b);
     for (const r of Object.values(results)) {
       if (!isObject(r) || r.status !== 'resolved' || !isObject(r.state)) continue;
       if (r.componentName === 'Cite' && Array.isArray(r.state.items)) {
@@ -163,11 +191,16 @@
         // original_content_url (its site) or content_url (OpenAI's copy).
         const img = r.state.images.find((x) => isObject(x) && (x.original_content_url || x.content_url));
         if (img) {
-          images.push({
-            src: img.original_content_url || img.content_url,
-            page: typeof img.url === 'string' ? img.url : '',
-            title: img.title || '',
-          });
+          const src = img.original_content_url || img.content_url;
+          // A place's photo links to the place's site, or to the photo itself.
+          const page = typeof img.url === 'string' && img.url !== src && img.url !== img.content_url ? img.url : '';
+          const ref = refKey(Array.isArray(img.refs) ? img.refs[0] : null);
+          images.push({ src, page, title: img.title || '', ref });
+          const action = isObject(r.state.default_on_click_action) ? r.state.default_on_click_action.payload : null;
+          if (ref && isObject(action) && action.category === 'local_business') {
+            const extra = isObject(action.extraParams) ? action.extraParams : {};
+            addPlace(ref, { name: action.query || img.title, address: extra.address, url: page });
+          }
         }
       }
     }
@@ -176,8 +209,12 @@
         if (isObject(e)) add(refKey(e.ref_id), e.url, e.title, e.attribution);
       }
     }
-    return { sources, images };
+    return { sources, images, places };
   };
+
+  /** A Google Maps search for a place: what clicking it on the map shows. */
+  const mapLink = (p) =>
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([p.name, p.address].filter(Boolean).join(', '))}`;
 
   const linkText = (s) => oneLine(s).replace(/[[\]]/g, '');
 
@@ -431,7 +468,9 @@
       // {name.path} bound by an enclosing #each.
       const end = braceEnd(text, j);
       const expr = end > 0 ? text.slice(j + 1, end - 1) : '';
-      const v = /^[A-Za-z_$][\w$.[\]]*$/.test(expr) ? evaluate(expr, scope) : MISSING;
+      let v = /^[A-Za-z_$][\w$.[\]]*$/.test(expr) ? evaluate(expr, scope) : MISSING;
+      // A place the chat never resolved shows nothing on the page either.
+      if (v === MISSING && BINDING_RE.test(expr)) v = undefined;
       if (v === MISSING || end < 0) {
         out += '{';
         i = j + 1;
@@ -464,6 +503,7 @@
       out += s;
     };
     const wraps = [];
+    const quotes = [];
     while (i < text.length) {
       const lt = text.indexOf('<', i);
       if (lt < 0) {
@@ -479,7 +519,16 @@
       }
       i = tag.end;
       const { name, attrs } = tag;
-      if (BLOCKS.has(name)) {
+      if (QUOTES.has(name)) {
+        if (tag.selfClosing) continue;
+        if (!tag.closing) {
+          quotes.push(out.length);
+        } else if (quotes.length) {
+          const at = quotes.pop();
+          const inner = out.slice(at).trim();
+          out = out.slice(0, at) + (inner ? `\n\n${inner.split('\n').map((l) => (l.trim() ? `> ${l}` : '>')).join('\n')}\n\n` : '');
+        }
+      } else if (BLOCKS.has(name)) {
         if (tag.selfClosing) continue;
         // A grid's direct children are its cells; each becomes one list
         // item with its lines joined (R — Reset), so a row of tiles stays
@@ -522,18 +571,32 @@
         const title = typeof attrs.title === 'string' && attrs.title ? attrs.title : url;
         out += url ? `[${linkText(title)}](${url})` : title;
       } else if (name === 'Entity') {
-        out += String(attrs.value || attrs.name || '');
+        const place = typeof attrs.ref === 'string' ? state.data.places.get(attrs.ref) : null;
+        const value = [attrs.value, attrs.name].find((v) => typeof v === 'string' && v && !BINDING_RE.test(v));
+        const label = (place && place.name) || value || '';
+        out += label && place && typeof place.url === 'string' && place.url ? `[${linkText(label)}](${place.url})` : label;
       } else if (name === 'Cite') {
         const refs = [];
         if (typeof attrs.ref === 'string') refs.push(attrs.ref);
         if (Array.isArray(attrs.refs)) refs.push(...attrs.refs.filter((r) => typeof r === 'string'));
         out += inlineSources(refs.map((r) => state.data.sources.get(r)));
       } else if (name === 'AsyncImage') {
-        const img = state.data.images[state.imageIndex++];
+        // A place's photo is found by its ref; other images go in order.
+        const ref = typeof attrs.ref === 'string' ? attrs.ref : '';
+        const free = state.data.images.filter((x) => !state.usedImages.has(x));
+        const img = ref ? free.find((x) => x.ref === ref) : free.find((x) => !x.ref) || free[0];
         if (img) {
+          state.usedImages.add(img);
           const pic = `![${linkText(img.title || attrs.query || 'image')}](${img.src})`;
           out += `\n\n${img.page ? `[${pic}](${img.page})` : pic}\n\n`;
         }
+      } else if (name === 'MapWidgetV2' || name === 'MapWidget') {
+        const points = Array.isArray(attrs.points) ? attrs.points : [];
+        const items = points
+          .map((pt) => (isObject(pt) ? (typeof pt.ref === 'string' && state.data.places.get(pt.ref)) || pt : null))
+          .filter((p) => p && typeof p.name === 'string' && p.name)
+          .map((p) => `- 📍 [${linkText(p.name)}](${mapLink(p)})${p.address ? ` — ${oneLine(p.address)}` : ''}`);
+        if (items.length) out += `\n\n🗺️ **Map**\n\n${items.join('\n')}\n\n`;
       } else if (name === 'image' || name === 'Image') {
         const src = typeof attrs.src === 'string' ? attrs.src : '';
         if (src) out += `![${linkText(attrs.alt || '')}](${src})`;
@@ -551,7 +614,10 @@
    */
   const render = (text, meta) => {
     if (typeof text !== 'string' || !text.includes('<')) return text;
-    const state = { depth: 0, grids: [], imageIndex: 0, data: resolvedData(meta) };
+    const data = resolvedData(meta);
+    const state = { depth: 0, grids: [], usedImages: new Set(), data };
+    // {turnNbusinessM.address} reads the place's fields.
+    const scope = Object.fromEntries(data.places);
     // Split off fenced code; protect inline code spans inside the rest.
     const lines = text.split('\n');
     const chunks = [];
@@ -589,10 +655,12 @@
       const masked = expandTemplates(c.text.replace(/(`+)[\s\S]*?\1/g, (s) => {
         spans.push(s);
         return `\u0000${spans.length - 1}\u0000`;
-      }), {});
+      }), scope);
       // Tidy the blank lines and stray hard breaks the removed tags left.
       const trailing = /\n*$/.exec(masked)[0];
       out += renderChunk(masked, state)
+        // **<Entity/>** of a place the chat never resolved.
+        .replace(/^[ \t]*\*\*[ \t]*\*\*[ \t]*$/gm, '')
         .replace(/[ \t]+\n(?=[ \t]*\n)/g, '\n')
         .replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, '\n\n')
         .replace(/[ \t]+$/, '')

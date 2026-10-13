@@ -193,7 +193,9 @@ const planDay = ({ provider, scenarios, catalog, fixtures, project, uploadsDir, 
   const tasks = [];
 
   const research = scenarios.research;
-  const researchId = `${provider}.research`;
+  // Not `${provider}.research`: that catalog feature re-exports a chat of
+  // the user's own; sharing its id made collect mix the two up.
+  const researchId = `${provider}.day.research`;
   const researchDetail = { ...exportOptions, tag: researchId };
   tasks.push({
     kind: 'research',
@@ -374,9 +376,15 @@ const flatten = (s) => String(s)
  * Returns { missingText[], textCoverage, images:{screen, export}, missingLinks[],
  *           counts:{…}, errors[], warnings[] }.
  */
+// The reasoning's tool-call / tool-result dumps: JSON the reader never saw
+// as such (a widget's input is not the widget), so they don't count as
+// "in the export".
+const TOOL_DUMP_RE = /^\*\*(?:Tool call: `[^`\n]*`|Tool result|Tool error)\*\*\n\n(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\1[ \t]*$/gm;
+
 const compareScreen = (screen, exp) => {
   const files = exp.files ? [...exp.files.entries()] : [];
-  const exportText = [exp.md || '', ...files.filter(([k]) => /^(artifacts|files)\//.test(k) && !/\.(png|jpe?g|gif|webp|pdf|zip)$/i.test(k)).map(([, b]) => b.toString('utf8'))].join('\n');
+  const md = (exp.md || '').replace(TOOL_DUMP_RE, '');
+  const exportText = [md, ...files.filter(([k]) => /^(artifacts|files)\//.test(k) && !/\.(png|jpe?g|gif|webp|pdf|zip)$/i.test(k)).map(([, b]) => b.toString('utf8'))].join('\n');
   // Both sides reduced the same way: words of 3+ letters (short words and
   // punctuation differ between the page and markdown).
   const words = (s) => s.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3);
@@ -406,7 +414,6 @@ const compareScreen = (screen, exp) => {
   const textCoverage = lines.length ? present / lines.length : 1;
 
   // Pictures: web pictures by URL; the rest (uploads, generated) by count.
-  const md = exp.md || '';
   const exportImageCount = (md.match(/!\[[^\]]*\]\(/g) || []).length;
   const screenImages = (screen.images || []).filter((i) => i.src && !/^data:image\/svg/i.test(i.src));
   const mdUrls = new Set((md.match(/\]\((https?:\/\/[^)\s]+)/g) || []).map((m) => normUrl(m.slice(2))));
@@ -426,9 +433,7 @@ const compareScreen = (screen, exp) => {
   });
 
   // Code blocks the reader sees: not the reasoning's tool-call dumps.
-  const visibleMd = md
-    .replace(/<details><summary>Thinking<\/summary>[\s\S]*?<\/details>\n?/g, '')
-    .replace(/^\*\*(?:Tool call: `[^`\n]*`|Tool result|Tool error)\*\*\n\n(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\1[ \t]*$/gm, '');
+  const visibleMd = md.replace(/<details><summary>Thinking<\/summary>[\s\S]*?<\/details>\n?/g, '');
   const fences = (visibleMd.match(/^\s*(`{3,}|~{3,})/gm) || []).length / 2;
   const tables = (md.match(/^\|.*\|\s*\n\|[\s:|-]+\|/gm) || []).length;
   const counts = {
@@ -461,6 +466,13 @@ const CAPABILITY_EVIDENCE = {
   'out.document': (x) => x.artifacts.some((k) => /\.(md|txt)$/i.test(k)) || /🧩 \[/.test(x.md),
   'out.file': (x) => x.artifacts.length + x.files.length > 0 || /📎 \[/.test(x.assistant),
   'out.code-chart': (x) => /!\[[^\]]*\]\((assets\/|data:image)/.test(x.assistant),
+  'out.chart-widget': (x) => /^\*\*📊 /m.test(x.assistant),
+  'out.docs-artifact': (x) => /🧩 \[[^\]]*\]\([^)]*\) · \[online\]\(https:\/\/claude\.ai\/code\/artifact\//.test(x.md),
+  'out.slides': (x) => x.artifacts.filter((k) => /\.html$/i.test(k)).length >= 2,
+  'out.recipe': (x) => /^\*\*🍳 /m.test(x.assistant),
+  'out.places': (x) => /^\*\*🗺️ /m.test(x.assistant) || /📍 \[/.test(x.assistant),
+  'out.weather': (x) => /^\*\*🌤️ Weather/m.test(x.assistant),
+  'out.interactive': (x) => /^\*\*(?:📝 |Questions\*\*)/m.test(x.assistant) || /<details><summary>Answer<\/summary>/.test(x.assistant),
   'out.image-gen': (x) => /!\[[^\]]*\]\((assets\/|data:image)/.test(x.assistant),
   'out.web-sources': (x) => /\]\(https?:\/\//.test(x.assistant),
   'out.web-images': (x) => /!\[[^\]]*\]\(https?:\/\//.test(x.assistant),

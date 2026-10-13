@@ -92,14 +92,15 @@
           }
           const finalName = uniqueName(sanitizeFilename(baseName), usedAssets);
           entries[`${ASSETS}/${finalName}`] = block.bytes;
-          imagePathByName.set(block.name || finalName, `${ASSETS}/${finalName}`);
+          // Keyed by the block: uploads often share a name ("image.png").
+          imagePathByName.set(block, `${ASSETS}/${finalName}`);
         }
       }
       for (const att of turn.attachments) {
         if (att.category !== 'binary' || !att.bytes) continue;
         const finalName = uniqueName(sanitizeFilename(att.fileName || 'file.bin'), usedFiles);
         entries[`${FILES}/${finalName}`] = att.bytes;
-        filePathByName.set(att.fileName, `${FILES}/${finalName}`);
+        filePathByName.set(att, `${FILES}/${finalName}`);
         // Sandbox files double-register: the inline `sandbox:/path` link
         // also needs to resolve to the same `files/<name>` entry.
         if (att.isSandbox && att.sandboxPath) {

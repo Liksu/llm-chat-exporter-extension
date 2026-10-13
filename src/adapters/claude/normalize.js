@@ -437,29 +437,55 @@
    * goes in the body), null otherwise.
    */
   const applyArtifactPublish = (input, ctx) => {
-    const path = pick(input || {}, ['file_path', 'path']);
-    if (!path || !ctx.files.has(path)) return null;
-    const id = `artifact:${path}`;
-    const existing = ctx.artifactMap.get(id);
-    const content = ctx.files.get(path);
-    const { fileName, title, language } = describeFile(path);
-    const htmlTitle = /<title>([^<]{1,200})<\/title>/i.exec(content);
-    ctx.artifactMap.set(id, {
-      id,
-      title: (htmlTitle && htmlTitle[1].trim()) || pick(input, ['title']) || title,
-      language,
-      mime: undefined,
-      content,
-      fileName,
-      url: existing ? existing.url : undefined,
-    });
-    return existing ? null : id;
+    const made = [];
+    for (const path of publishedPaths(input)) {
+      if (!ctx.files.has(path)) continue;
+      const id = `artifact:${path}`;
+      const existing = ctx.artifactMap.get(id);
+      const content = ctx.files.get(path);
+      const { fileName, title, language } = describeFile(path);
+      const htmlTitle = /<title>([^<]{1,200})<\/title>/i.exec(content);
+      ctx.artifactMap.set(id, {
+        id,
+        title: (htmlTitle && htmlTitle[1].trim()) || pick(input, ['title']) || title,
+        language,
+        mime: undefined,
+        content,
+        fileName,
+        url: existing ? existing.url : undefined,
+      });
+      if (!existing) made.push(id);
+    }
+    return made;
+  };
+
+  /**
+   * Local paths one `Artifact` publish sends: its `file_path` plus the
+   * supporting `files` (a Slides deck sends its slides this way), whose
+   * sources are relative to `root` unless absolute.
+   */
+  const publishedPaths = (input) => {
+    const out = [];
+    const main = pick(input || {}, ['file_path', 'path']);
+    if (main) out.push(main);
+    const root = typeof input.root === 'string' ? input.root.replace(/\/+$/, '') : '';
+    const add = (src) => {
+      if (typeof src !== 'string' || !src) return;
+      const path = src.startsWith('/') || !root ? src : `${root}/${src.replace(/^\.\//, '')}`;
+      if (!out.includes(path)) out.push(path);
+    };
+    const files = input && input.files;
+    if (Array.isArray(files)) files.forEach((f) => add(isObject(f) ? f.path : f));
+    else if (isObject(files)) Object.values(files).forEach((v) => add(isObject(v) ? v.from : v));
+    return out;
   };
 
   /** "Published <path> at https://claude.ai/artifact/<id> (Version N…" */
   const PUBLISHED_RE = /Published (\S+) at (https:\/\/claude\.ai\/artifact\/[A-Za-z0-9_-]+)/;
   /** "Created a new Artifact at https://claude.ai/artifact/<id> (…) from the Artifact type …" */
   const TYPED_CREATED_RE = /Created a new Artifact at (https:\/\/claude\.ai\/artifact\/[A-Za-z0-9_-]+)/;
+  /** "Updated the Artifact at https://claude.ai/artifact/<id> (Version N…) with <path>" */
+  const UPDATED_RE = /Updated the Artifact at (https:\/\/claude\.ai\/artifact\/[A-Za-z0-9_-]+)/;
 
   /**
    * Content-bearing tool output kept as an artifact: `show_widget` draws an
@@ -558,7 +584,10 @@
       const name = typeof raw.name === 'string' ? raw.name : 'tool';
       const input = isObject(raw.input) ? raw.input : {};
       const asCall = { block: { kind: 'tool_call', name, input: safeStringify(raw.input) } };
-      if (raw.id) ctx.toolInputs.set(raw.id, input);
+      if (raw.id) {
+        ctx.toolInputs.set(raw.id, input);
+        ctx.toolNames.set(raw.id, name);
+      }
       if (name === 'artifacts') {
         const id = applyArtifactsCall(raw.input, artifactMap);
         const command = (pick(raw.input || {}, ['command', 'operation']) || 'create').toLowerCase();
@@ -594,8 +623,8 @@
         return [asCall];
       }
       if (name === 'Artifact' && pick(input, ['file_path'])) {
-        const id = applyArtifactPublish(input, ctx);
-        return id ? [asCall, { block: { kind: 'artifact_ref', artifactId: id } }] : [asCall];
+        const ids = applyArtifactPublish(input, ctx);
+        return [asCall, ...ids.map((id) => ({ block: { kind: 'artifact_ref', artifactId: id } }))];
       }
       if (/(^|:)show_widget$/.test(name)) {
         const id = applyWidgetCall(raw, ctx);
@@ -633,22 +662,44 @@
       } else {
         text = safeStringify(raw.content);
       }
+      const callName = ctx.toolNames.get(raw.tool_use_id) || raw.name;
+      const call = ctx.toolInputs.get(raw.tool_use_id);
+      const asResult = { block: { kind: 'tool_result', text, isError: raw.is_error === true } };
       if (raw.name === 'Artifact') {
         const m = PUBLISHED_RE.exec(text);
         const art = m && artifactMap.get(`artifact:${m[1]}`);
         if (art) art.url = m[2];
+        // An update of a typed artifact (Slides…): "Updated the Artifact at
+        // <url> … with <path>"; every file of the publish lives there.
+        const updated = UPDATED_RE.exec(text);
+        if (updated && call) {
+          for (const path of publishedPaths(call)) {
+            const a = artifactMap.get(`artifact:${path}`);
+            if (a && !a.url) a.url = updated[1];
+          }
+        }
         // Docs / Slides / Design artifacts are created from an Artifact type;
-        // their content lives in that type's own service and is edited via
-        // its tools, so all an export can carry is the link.
+        // their content is written later (Docs connector calls, or files
+        // published to the artifact) and follows below as its own artifact.
         const typed = TYPED_CREATED_RE.exec(text);
-        const call = ctx.toolInputs.get(raw.tool_use_id);
         if (typed && call && call.type_url) {
           const title = pick(call, ['title']) || 'claude.ai document';
-          return [
-            { block: { kind: 'text', text: `📄 **${title}** — made on claude.ai; its content isn't included in this export: [open](${typed[1]})` } },
-            { block: { kind: 'tool_result', text, isError: raw.is_error === true } },
-          ];
+          return [{ block: { kind: 'text', text: `📄 **${title}** — made on claude.ai: [open](${typed[1]})` } }, asResult];
         }
+      }
+      // Built-in widgets (chart, quiz, recipe, map…): the card the reader saw.
+      if (ns.claudeWidgets.widgetName(callName) && raw.is_error !== true) {
+        const md = ns.claudeWidgets.render(callName, call, raw.content);
+        if (md) return [{ block: { kind: 'text', text: md } }, asResult];
+      }
+      // Claude Docs: the document's text, rebuilt from the calls that wrote it.
+      if (ns.claudeWidgets.isDocsTool(callName) && raw.is_error !== true) {
+        const art = ctx.docs.apply(callName, call, text, (id) => {
+          const a = { id, title: '', language: 'markdown', mime: undefined, content: '', fileName: '' };
+          artifactMap.set(id, a);
+          return a;
+        });
+        if (art) return [{ block: { kind: 'artifact_ref', artifactId: art.id } }, asResult];
       }
       return [
         {
@@ -852,7 +903,10 @@
     const viewHarvest = opts.inlineTextFiles ? harvestViewToolContent(ordered) : null;
     // Shared across blocks: sandbox files by path (create_file / Write and
     // their edits). Per turn: citation sources and the raw text they number.
-    const ctx = { artifactMap, files: new Map(), toolInputs: new Map(), turnSources: new Map(), turnText: [] };
+    const ctx = {
+      artifactMap, files: new Map(), toolInputs: new Map(), toolNames: new Map(), turnSources: new Map(), turnText: [],
+      docs: ns.claudeWidgets.createDocs(),
+    };
 
     const turns = [];
     const imageRefs = [];
