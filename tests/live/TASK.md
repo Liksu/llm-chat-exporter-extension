@@ -98,18 +98,39 @@ all before starting) and `plan.json`. The plan has, in this order:
 5. Once it is researching, note the chat URL in `notes.md` and **move
    on** — come back in step 5.
 
-## 3. Re-export the old test chats
+## 3. Keep the day short for the user
 
-For each re-export task: open the URL, wait until the conversation is
-visible, run its `EXPORT` snippet. These chats are read-only: don't type
-anything.
+The user works on this computer while the day runs: every finished reply
+can pop a notification and every export is two downloads. Most of the
+day is waiting for replies, so **run all scenarios at once**, one tab
+each, and **do all exports in one pass at the end** (step 5). Aim for
+the browser part to take well under an hour.
 
-## 4. The scenarios
+- Work in the tab group / window the Chrome tools give you; don't touch
+  the user's own tabs.
+- If the site refuses a parallel message (a "too many messages / wait"
+  banner, a rate-limit error), note it and continue with fewer tabs at a
+  time (3, then 1).
 
-For each scenario, in plan order, in a **new chat in the test project**:
+## 4. The scenarios — all in parallel
 
-1. Select the scenario's tier model (and thinking for `reasoning`).
-2. For each turn:
+1. **Open one new tab per scenario** in the plan, each with a **new chat
+   in the test project**. The model picker is usually remembered between
+   chats: start all chats of one tier first (select the tier in the first
+   one, then open the rest), then switch the tier and start the next
+   group. Send each chat's first turn right after opening it — don't wait
+   for replies in between.
+2. **Round-robin:** go through the tabs in order; in each, run `STATUS`
+   (switch to the tab first). Done → do that scenario's next turn (rules
+   below) and move to the next tab. Not done → move to the next tab. One
+   round over all tabs takes long enough that you don't need extra waits;
+   if every tab is still writing, wait 20 s before the next round.
+   Check the research tab every few rounds too.
+3. A scenario is finished after its last turn's reply. Keep cycling the
+   others until all are finished (or timed out, see "Is the reply
+   finished?").
+
+Rules for a turn (in its own tab):
    - `attach`: attach the files with the file-upload tool (absolute paths
      in the plan); wait until the upload chips stop spinning.
    - `paste`: click into the composer, run the turn's `PASTE` snippet
@@ -121,24 +142,37 @@ For each scenario, in plan order, in a **new chat in the test project**:
      (pencil) button, replace the text with the turn's text, submit.
      `action: regenerate-last`: use the regenerate / retry button under the
      last reply. If the control isn't there, note it and skip the turn.
-   - Wait for the reply (see "Is the reply finished?").
+   - Then move on to the next tab; the round-robin brings you back when
+     the reply is done (see "Is the reply finished?").
    - If the model answered with clarifying questions instead of doing the
      task, reply with the turn's `onQuestion` text if it has one, otherwise
-     "Use your best judgment and go ahead.", and wait again. This counts
-     as the same turn.
+     "Use your best judgment and go ahead." This counts as the same turn.
    - If the model refused or failed (an error banner, "something went
      wrong"), retry the turn once; if it fails again, note it and go on.
-3. After the last turn, scroll to the top of the conversation and back
-   down once (so lazy-loaded images and widgets are on the page), then run
-   the scenario's `EXPORT` snippet. It records an inventory of what the
-   page shows (text, images, links, code blocks, tables, widgets) together
-   with the export, so the tools can check that everything visible made it
-   into the export. Then run the second export snippet (`#md`) on the same
-   page: one .md with images and text files inline. The two exports
+   - When a reply shows something new or unusual (a map, a card, a chart,
+     a button, a side panel), write it into `notes.md` right away —
+     that's gap-hunting, it matters.
+
+## 5. The export pass (all downloads at once)
+
+When every scenario is finished and the research is done (or timed out),
+export everything in one go, tab after tab, so the downloads come as one
+short burst instead of all day long:
+
+1. **Scenario tabs:** in each, scroll to the top of the conversation and
+   back down once (so lazy-loaded images and widgets are on the page),
+   run its `EXPORT` snippet, then its second (`#md`) export. `EXPORT`
+   records an inventory of what the page shows (text, images, links, code
+   blocks, tables, widgets) together with the export, so the tools can
+   check that everything visible made it into the export; the two exports
    together let `collect` check every combination of export options.
-4. Look at the page yourself too: anything the chat shows that looks new
-   or unusual (a map, a card, a chart, a button, a side panel) goes into
-   `notes.md` — that's gap-hunting, it matters.
+2. **Research tab:** its `EXPORT` and `#md` snippets. If it is still
+   running at this point, wait for it (check every 2 min); after 45
+   minutes from its start, note it as unfinished and export what is there.
+3. **Re-exports:** open each old test chat's URL from the plan in one of
+   the tabs, wait until the conversation is visible, run its export
+   snippet(s). These chats are read-only: don't type anything.
+4. Close the tabs you opened.
 
 ### Is the reply finished?
 
@@ -155,12 +189,6 @@ note it, and go on.
 
 Never run long waiting loops inside the JavaScript tool — scripts are cut
 off after ~45 s.
-
-## 5. Collect the research
-
-Go back to the research chat. When `STATUS` says it's done, run its
-`EXPORT` snippet, then its second (`#md`) export. If it's still running, do something else and check back;
-after 45 minutes note it as unfinished and export what is there.
 
 ## 6. Evaluate
 
