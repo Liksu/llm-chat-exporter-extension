@@ -2,6 +2,12 @@
 
 ## v0.7.50 — 2026-10-14
 
+ChatGPT
+• Fixed: a table row broke apart when a cell had colored text.
+• Charts are now exported as tables of their numbers, and drawings ChatGPT makes (SVG) are kept as pictures, cleaned of anything that could run code.
+
+## v0.7.49 — 2026-10-12
+
 All chats
 • Fixed: in ZIP exports, uploaded images with the same name (for example several "image.png") all showed the last one. Each now links to its own file.
 
@@ -10,7 +16,6 @@ ChatGPT
 • Places in answers (shops, drop-off points, bakeries) keep their name, address and website; a map becomes a list of its places with Google Maps links.
 • Message drafts ChatGPT writes for you to copy are exported as a text block, ready to copy, instead of raw tags.
 • When you reply to a selected part of an answer, the selection is shown as a quote above your message instead of "Selected text" headings.
-• Fixed: a table row broke apart when a cell had colored text. Charts are now exported as tables of their numbers, and drawings ChatGPT makes (SVG) are kept as pictures.
 
 Claude
 • Cards Claude shows in its replies are now in the export as text: charts (as a table), quizzes (answers folded), recipes, product comparisons, maps of places (with notes, ratings and photos) and weather forecasts.

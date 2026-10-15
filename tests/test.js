@@ -453,6 +453,17 @@ test('chatgpt genui: table cells, svg drawings, charts', () => {
   assert.match(md, /\n\n<svg viewBox="0 0 10 10"[^\n]*>\n<rect [^\n]*fill-opacity="0.13" stroke-width="1.2"\/>\n<g font-size="12" text-anchor="middle"><text x="5" y="5">Hi<\/text><\/g>\n<\/svg>\n\n/);
   assert.match(md, /📊 _Chart \(bar\)_\n\n\| education \| Median \|\n\|---\|---\|\n\| High school \| \$40684 \|\n\| Graduate \| \$90191 \|\n\n_Source: ACS\._/);
   assert.match(md, /\n\nBlock$/);
+  // Nothing that runs code survives; JSX style objects become CSS.
+  const unsafe = render([
+    '<svg viewBox="0 0 10 10">',
+    '<script>alert(1)</script><foreignObject><div>x</div></foreignObject>',
+    '<rect onClick="steal()" onmouseover={go} style={{fillOpacity: 0.5, stroke: "red"}}/>',
+    '<a href="javascript:alert(1)"><text>t</text></a>',
+    '</svg>',
+  ].join('\n'), { model_dil_v2: {} });
+  assert.doesNotMatch(unsafe, /script|foreignObject|on-?click|onmouseover|javascript:/i);
+  assert.match(unsafe, /<rect style="fill-opacity:0.5;stroke:red"\/>/);
+  assert.match(unsafe, /<a href="#"><text>t<\/text><\/a>/);
   const { audit } = require('../tools/audit-export');
   assert.deepEqual(audit({ md: `# C\n\n## Assistant\n\n${md}\n`, files: new Map() }).filter((f) => f.severity === 'error'), []);
   const broken = '# C\n\n## Assistant\n\n| a | b |\n|---|---|\n| x |\n\ny\n\n |\n';

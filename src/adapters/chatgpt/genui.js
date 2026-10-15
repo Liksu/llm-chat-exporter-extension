@@ -42,8 +42,9 @@
  * data (the numbers the bars stood for), <svg> → kept as an inline SVG with
  * its attributes made valid SVG, CodeCite and other icons → nothing. A
  * layout tag opened in the middle of a line and closed on it (a table cell
- * written as `| <text>…</text> |`) stays inline, so the row isn't split. {#each}/{#if} template blocks and {place.field} values are
- * expanded first; a place the chat never resolved renders as nothing (as
+ * written as `| <text>…</text> |`) stays inline, so the row isn't split.
+ * {#each}/{#if} template blocks and {place.field} values are expanded
+ * first; a place the chat never resolved renders as nothing (as
  * on the page). Unknown tags are left as they are, and code (fenced or
  * inline) is never touched.
  */
@@ -309,15 +310,40 @@
         : SVG_CAMEL.has(name) ? name
           : name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
+  /** style={{fontSize: 12, fill: "red"}} → style="font-size:12;fill:red" ('' if not a literal). */
+  const cssFromObject = (src) => {
+    let obj;
+    try {
+      obj = parseLiteral(src);
+    } catch (_) {
+      return '';
+    }
+    if (!isObject(obj)) return '';
+    return Object.entries(obj)
+      .filter(([, v]) => typeof v === 'string' || typeof v === 'number')
+      .map(([k, v]) => `${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}:${String(v).replace(/["<>]/g, '')}`)
+      .join(';');
+  };
+
   /**
    * An <svg> the model drew, as markdown can show it: an HTML block (no
    * blank lines inside, no indentation) with valid SVG attribute names and
-   * {literal} values quoted.
+   * {literal} values quoted. It is model-written markup going into files
+   * other apps render, so anything that runs code goes: <script>,
+   * <foreignObject> (HTML inside), on* handlers and javascript: links.
    */
   const svgMarkup = (svg) =>
     svg
+      .replace(/<script\b[\s\S]*?<\/script\s*>|<script\b[^>]*\/>/gi, '')
+      .replace(/<foreignObject\b[\s\S]*?<\/foreignObject\s*>|<foreignObject\b[^>]*\/>/gi, '')
       .replace(/<[A-Za-z][^<>]*>/g, (tag) =>
         tag
+          .replace(/\sstyle=\{\{([\s\S]*?)\}\}/g, (_, body) => {
+            const css = cssFromObject(`{${body}}`);
+            return css ? ` style="${css}"` : '';
+          })
+          .replace(/\son[A-Za-z]+\s*=\s*(?:"[^"]*"|'[^']*'|\{[^}]*\}|[^\s>]+)/g, '')
+          .replace(/(\s(?:xlink:)?href\s*=\s*)(["'])\s*javascript:[^"']*\2/gi, '$1$2#$2')
           .replace(/(\s)([a-z]+[A-Z][A-Za-z]*)(?=\s*=)/g, (_, sp, name) => sp + svgAttrName(name))
           .replace(/=\{\s*(?:(-?\d+(?:\.\d+)?)|"([^"]*)"|'([^']*)')\s*\}/g, (_, n, d, q) => `="${n ?? d ?? q}"`))
       .split('\n')
