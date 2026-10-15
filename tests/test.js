@@ -424,6 +424,42 @@ test('live checks: scopes of md / assistant / output matches', () => {
 });
 
 /**
+ * ChatGPT generative UI: a layout tag inside a table cell stays inline, an
+ * <svg> is kept whole with valid attribute names, a <Chart> becomes a table
+ * of its data. (Shapes from a real chat, 2026-10-14.)
+ */
+test('chatgpt genui: table cells, svg drawings, charts', () => {
+  const sandbox = {};
+  sandbox.self = sandbox;
+  const context = require('node:vm').createContext(sandbox);
+  require('./scaffolding/loader').loadScripts(context, ['src/adapters/chatgpt/genui.js']);
+  const { render } = sandbox.__exporter.chatgptGenui;
+  const md = render([
+    '| Пара осей | Что показывают исследования |',
+    '|---|---|',
+    '| Доход ↔ Образование | <text color="green">Устойчивая связь</text> |',
+    '| A | <text>x</text><text>y</text> |',
+    '',
+    '<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">',
+    '  <rect x="1" y="1" width="8" height="8" fillOpacity="0.13" strokeWidth={1.2}/>',
+    '',
+    '  <g fontSize="12" textAnchor="middle"><text x="5" y="5">Hi</text></g>',
+    '</svg>',
+    '<Chart content={{"chartType":"bar","meta":{"footer":"Source: ACS."},"xKey":"education","series":[{"dataKey":"income","label":"Median","valuePrefix":"$"}],"data":[{"education":"High school","income":40684},{"education":"Graduate","income":90191}]}}/>',
+    '<box><text>Block</text></box>',
+  ].join('\n'), { model_dil_v2: {} });
+  assert.match(md, /^\| Доход ↔ Образование \| Устойчивая связь \|$/m);
+  assert.match(md, /^\| A \| x y \|$/m);
+  assert.match(md, /\n\n<svg viewBox="0 0 10 10"[^\n]*>\n<rect [^\n]*fill-opacity="0.13" stroke-width="1.2"\/>\n<g font-size="12" text-anchor="middle"><text x="5" y="5">Hi<\/text><\/g>\n<\/svg>\n\n/);
+  assert.match(md, /📊 _Chart \(bar\)_\n\n\| education \| Median \|\n\|---\|---\|\n\| High school \| \$40684 \|\n\| Graduate \| \$90191 \|\n\n_Source: ACS\._/);
+  assert.match(md, /\n\nBlock$/);
+  const { audit } = require('../tools/audit-export');
+  assert.deepEqual(audit({ md: `# C\n\n## Assistant\n\n${md}\n`, files: new Map() }).filter((f) => f.severity === 'error'), []);
+  const broken = '# C\n\n## Assistant\n\n| a | b |\n|---|---|\n| x |\n\ny\n\n |\n';
+  assert.ok(audit({ md: broken, files: new Map() }).some((f) => f.code === 'broken-table-row'));
+});
+
+/**
  * Provider day: the plan follows scenarios.json (research first, provider
  * filter, paste text embedded, every dialog export carries the page
  * inventory), and the scenario catalog stays consistent.

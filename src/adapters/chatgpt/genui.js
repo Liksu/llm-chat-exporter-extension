@@ -18,6 +18,9 @@
  *              <WritingBlock variant="chat_message">…</WritingBlock>  draft
  *                                                   to copy (a card)
  *              {turnNbusinessM.address}            a place's field
+ *              <Chart content={{chartType, xKey, series, data, meta}}/>
+ *                                                   a bar/line chart
+ *   graphics   <svg>…</svg> with JSX attribute names (fillOpacity=…)
  *
  * What the tags resolved to sits in model_dil_v2.appData.opGenui
  * .componentResults (keyed by an opaque id, not by position): Cite items
@@ -35,8 +38,11 @@
  * Entity → its text, Cite → inline source links like the chips
  * ([Reddit](url)), AsyncImage → the image it showed, a map → a list of its
  * places with map links, WritingBlock → a ```text block (a draft to copy
- * and send as is, like the card's copy button), CodeCite and other icons
- * → nothing. {#each}/{#if} template blocks and {place.field} values are
+ * and send as is, like the card's copy button), Chart → a table of its
+ * data (the numbers the bars stood for), <svg> → kept as an inline SVG with
+ * its attributes made valid SVG, CodeCite and other icons → nothing. A
+ * layout tag opened in the middle of a line and closed on it (a table cell
+ * written as `| <text>…</text> |`) stays inline, so the row isn't split. {#each}/{#if} template blocks and {place.field} values are
  * expanded first; a place the chat never resolved renders as nothing (as
  * on the page). Unknown tags are left as they are, and code (fenced or
  * inline) is never touched.
@@ -56,7 +62,7 @@
   // Rendered from their attributes / resolved data.
   const DATA = new Set([
     'Link', 'Cite', 'Entity', 'AsyncImage', 'MapWidgetV2', 'MapWidget', 'image', 'Image',
-    'divider', 'Divider', 'icon', 'Icon',
+    'divider', 'Divider', 'icon', 'Icon', 'Chart',
   ]);
   // Containers whose content becomes a text block (drafts to copy).
   const DRAFTS = new Set(['WritingBlock']);
@@ -258,6 +264,66 @@
   // Icons that carry meaning in a diagram (the flow arrows between boxes);
   // every other icon is decoration.
   const ARROWS = { 'arrow-down': '↓', 'arrow-up': '↑', 'arrow-right': '→', 'arrow-left': '←' };
+
+  /**
+   * A chart → its data as a table: one row per x value, one column per
+   * series, values with the series' prefix/suffix ($, %). The chart's footer
+   * (source, notes) follows in italics.
+   */
+  const chartTable = (c) => {
+    if (!isObject(c) || !Array.isArray(c.data)) return '';
+    const data = c.data.filter(isObject);
+    const xKey = typeof c.xKey === 'string' ? c.xKey : '';
+    let series = (Array.isArray(c.series) ? c.series : []).filter((x) => isObject(x) && typeof x.dataKey === 'string');
+    if (!series.length) series = [...new Set(data.flatMap(Object.keys))].filter((k) => k !== xKey).map((k) => ({ dataKey: k }));
+    if (!data.length || !series.length) return '';
+    const cell = (v) => (v == null ? '' : oneLine(String(v)).replace(/\|/g, '\\|'));
+    const value = (x, v) => (v == null || v === '' ? '' : `${x.valuePrefix || ''}${v}${x.valueSuffix || ''}`);
+    const head = [xKey, ...series.map((x) => x.label || x.dataKey)].map(cell);
+    const rows = data.map((d) => [cell(d[xKey]), ...series.map((x) => cell(value(x, d[x.dataKey])))]);
+    const meta = isObject(c.meta) ? c.meta : {};
+    const kind = typeof c.chartType === 'string' && c.chartType ? ` (${c.chartType})` : '';
+    const title = typeof meta.title === 'string' && meta.title ? `: ${oneLine(meta.title)}` : '';
+    const footer = typeof meta.footer === 'string' && meta.footer.trim() ? `\n\n_${oneLine(meta.footer)}_` : '';
+    return (
+      `\n\n📊 _Chart${kind}${title}_\n\n| ${head.join(' | ')} |\n|${head.map(() => '---').join('|')}|\n` +
+      `${rows.map((r) => `| ${r.join(' | ')} |`).join('\n')}${footer}\n\n`
+    );
+  };
+
+  // SVG attributes that really are camelCase; any other camelCase name is
+  // JSX (fillOpacity, strokeWidth, textAnchor) and becomes kebab-case.
+  const SVG_CAMEL = new Set([
+    'viewBox', 'preserveAspectRatio', 'gradientUnits', 'gradientTransform', 'patternUnits',
+    'patternContentUnits', 'patternTransform', 'markerWidth', 'markerHeight', 'markerUnits',
+    'refX', 'refY', 'clipPathUnits', 'maskUnits', 'maskContentUnits', 'textLength',
+    'lengthAdjust', 'startOffset', 'stdDeviation', 'baseFrequency', 'numOctaves', 'pathLength',
+    'spreadMethod', 'primitiveUnits', 'filterUnits', 'tableValues', 'xChannelSelector',
+    'yChannelSelector', 'surfaceScale', 'kernelMatrix', 'keyTimes', 'keySplines', 'keyPoints',
+    'calcMode', 'attributeName', 'attributeType', 'repeatCount', 'repeatDur',
+  ]);
+
+  const svgAttrName = (name) =>
+    name === 'className' ? 'class'
+      : name === 'xlinkHref' ? 'xlink:href'
+        : SVG_CAMEL.has(name) ? name
+          : name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+
+  /**
+   * An <svg> the model drew, as markdown can show it: an HTML block (no
+   * blank lines inside, no indentation) with valid SVG attribute names and
+   * {literal} values quoted.
+   */
+  const svgMarkup = (svg) =>
+    svg
+      .replace(/<[A-Za-z][^<>]*>/g, (tag) =>
+        tag
+          .replace(/(\s)([a-z]+[A-Z][A-Za-z]*)(?=\s*=)/g, (_, sp, name) => sp + svgAttrName(name))
+          .replace(/=\{\s*(?:(-?\d+(?:\.\d+)?)|"([^"]*)"|'([^']*)')\s*\}/g, (_, n, d, q) => `="${n ?? d ?? q}"`))
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join('\n');
 
   // -- Templates ------------------------------------------------------------
   // Besides tags the model writes Svelte-style blocks to repeat markup:
@@ -535,6 +601,19 @@
         }
       } else if (BLOCKS.has(name)) {
         if (tag.selfClosing) continue;
+        // Opened after other text on the line and closed on that line (a
+        // table cell, a phrase): it stays inline.
+        if (!tag.closing) {
+          const line = out.slice(out.lastIndexOf('\n') + 1);
+          const eol = text.indexOf('\n', i);
+          const close = text.indexOf(`</${name}>`, i);
+          const inline = line.trim() !== '' && close >= 0 && (eol < 0 || close < eol);
+          state.blocks.push(inline);
+          if (inline) {
+            if (!/\s$/.test(out)) out += ' ';
+            continue;
+          }
+        } else if (state.blocks.pop()) continue;
         // A grid's direct children are its cells; each becomes one list
         // item with its lines joined (R — Reset), so a row of tiles stays
         // a compact list instead of a column of one-word paragraphs.
@@ -602,6 +681,8 @@
           .filter((p) => p && typeof p.name === 'string' && p.name)
           .map((p) => `- 📍 [${linkText(p.name)}](${mapLink(p)})${p.address ? ` — ${oneLine(p.address)}` : ''}`);
         if (items.length) out += `\n\n🗺️ **Map**\n\n${items.join('\n')}\n\n`;
+      } else if (name === 'Chart') {
+        out += chartTable(attrs.content);
       } else if (name === 'image' || name === 'Image') {
         const src = typeof attrs.src === 'string' ? attrs.src : '';
         if (src) out += `![${linkText(attrs.alt || '')}](${src})`;
@@ -620,7 +701,7 @@
   const render = (text, meta) => {
     if (typeof text !== 'string' || !text.includes('<')) return text;
     const data = resolvedData(meta);
-    const state = { depth: 0, grids: [], usedImages: new Set(), data };
+    const state = { depth: 0, grids: [], blocks: [], usedImages: new Set(), data };
     // {turnNbusinessM.address} reads the place's fields.
     const scope = Object.fromEntries(data.places);
     // Split off fenced code; protect inline code spans inside the rest.
@@ -655,12 +736,18 @@
         continue;
       }
       const spans = [];
-      // Inline code is masked first, so neither templates nor tags in it
-      // are touched.
-      const masked = expandTemplates(c.text.replace(/(`+)[\s\S]*?\1/g, (s) => {
+      const mask = (s) => {
         spans.push(s);
         return `\u0000${spans.length - 1}\u0000`;
-      }), scope);
+      };
+      // Inline code and SVG drawings are masked first, so neither templates
+      // nor tags in them are touched (an SVG's <text> is not the layout tag).
+      const masked = expandTemplates(
+        c.text
+          .replace(/(`+)[\s\S]*?\1/g, mask)
+          .replace(/<svg\b[\s\S]*?<\/svg>/g, (s) => `\n\n${mask(svgMarkup(s))}\n\n`),
+        scope
+      );
       // Tidy the blank lines and stray hard breaks the removed tags left.
       const trailing = /\n*$/.exec(masked)[0];
       out += renderChunk(masked, state)

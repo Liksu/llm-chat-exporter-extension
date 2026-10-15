@@ -258,6 +258,10 @@ const TEXT_MARKERS = [
   ['component-markup', 'error',
     /<[A-Z][A-Za-z0-9]*\s+[\w-]+=["{][^\n]*?>|<[A-Z][A-Za-z0-9]*\s*\/>|<\/[A-Z][A-Za-z0-9]*>|<[a-z][\w-]*\s[^<>\n]*=\{[^<>\n]*>/g,
     (m) => `UI component markup leaked into the text: ${m[0].slice(0, 80)}`],
+  // A table row cut by a block the exporter put inside a cell: the row's
+  // tail ends up as a line holding only its closing pipe.
+  ['broken-table-row', 'error', /^[ \t]*\|[ \t]*$/g,
+    () => 'table row split across lines (a cell held a block?)'],
   // A data binding the UI fills in (ChatGPT places: {turn7business0.address},
   // value={turn7business0.name}) left as its name.
   ['unresolved-binding', 'error', /\bturn\d+(?:business|search|news|image|view|product|entity)\d+(?:\.\w+)?/g,
