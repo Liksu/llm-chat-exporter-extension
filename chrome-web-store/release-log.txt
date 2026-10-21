@@ -1,5 +1,10 @@
 ﻿# LLM Chat Exporter — Release Log
 
+## Next release (not built yet)
+
+ChatGPT
+• Fixed: in a row of picture cards, each card's picture, name and caption ran together on one line. They now stay on separate lines, as in the chat.
+
 ## v0.7.50 — 2026-10-14
 
 ChatGPT
