@@ -453,6 +453,21 @@ test('chatgpt genui: table cells, svg drawings, charts', () => {
   assert.match(md, /\n\n<svg viewBox="0 0 10 10"[^\n]*>\n<rect [^\n]*fill-opacity="0.13" stroke-width="1.2"\/>\n<g font-size="12" text-anchor="middle"><text x="5" y="5">Hi<\/text><\/g>\n<\/svg>\n\n/);
   assert.match(md, /📊 _Chart \(bar\)_\n\n\| education \| Median \|\n\|---\|---\|\n\| High school \| \$40684 \|\n\| Graduate \| \$90191 \|\n\n_Source: ACS\._/);
   assert.match(md, /\n\nBlock$/);
+  // A grid of picture cards: picture, name and caption each on its own line
+  // of the list item; plain tiles stay one line (R — Reset).
+  const img = (u) => ({ componentName: 'AsyncImage', status: 'resolved', state: { images: [{ url: `https://p/${u}`, content_url: `https://i/${u}.jpg`, title: `T ${u}` }] } });
+  const cards = render([
+    '<grid columns={2}>',
+    '  <grid-item>',
+    '    <AsyncImage query="a"/>',
+    '    <text weight="medium">«Український»</text>',
+    '    <caption>Ржаная обдирная</caption>',
+    '  </grid-item>',
+    '</grid>',
+    '<grid columns={4}><grid-item><text>R</text><caption>Reset</caption></grid-item></grid>',
+  ].join('\n'), { model_dil_v2: { appData: { opGenui: { componentResults: { a: img('a') } } } } });
+  assert.match(cards, /^- \[!\[T a\]\(https:\/\/i\/a\.jpg\)\]\(https:\/\/p\/a\)\n {2}«Український»\n {2}_Ржаная обдирная_$/m);
+  assert.match(cards, /^- R — _Reset_$/m);
   // Nothing that runs code survives; JSX style objects become CSS.
   const unsafe = render([
     '<svg viewBox="0 0 10 10">',

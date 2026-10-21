@@ -255,9 +255,17 @@
   };
 
   /** Grid cells → a list, one item per cell, its lines joined by " — ". */
+  // A cell with a picture (a card: photo, name, caption) keeps each line,
+  // picture first, as lines of the same list item -- the way the card shows.
   const gridList = (cells) => {
+    const isPicture = (l) => /^\[?!\[[^\]]*\]\([^)]*\)(?:\]\([^)]*\))?$/.test(l);
     const items = cells
-      .map((c) => c.split('\n').map((l) => l.trim()).filter(Boolean).join(' — '))
+      .map((c) => {
+        const lines = c.split('\n').map((l) => l.trim()).filter(Boolean);
+        return lines.some(isPicture)
+          ? [...lines.filter(isPicture), ...lines.filter((l) => !isPicture(l))].join('\n  ')
+          : lines.join(' — ');
+      })
       .filter(Boolean);
     return items.length ? `\n\n${items.map((x) => `- ${x}`).join('\n')}\n\n` : '';
   };
