@@ -1,0 +1,34 @@
+event: delta_encoding
+data: "v1"
+
+event: delta
+data: {"p":"","o":"add","v":{"type":"__debug","data":{"conversation_id":"sidebar-conv","entity_knowledge_source":"generation","entity_knowledge_id":null}},"c":0}
+
+event: delta
+data: {"v":{"type":"message","data":{"id":"s-1","author":{"role":"system","name":null,"metadata":{}},"create_time":null,"update_time":null,"content":{"content_type":"text","parts":[""]},"status":"finished_successfully","end_turn":null,"weight":0,"metadata":{},"recipient":"all","channel":null},"conversation_id":"sidebar-conv"},"c":1}
+
+event: delta
+data: {"v":{"type":"message","data":{"id":"u-1","author":{"role":"user","name":null,"metadata":{}},"create_time":null,"update_time":null,"content":{"content_type":"text","parts":["Tell me about Other v. Case. The entity category is other."]},"status":"finished_successfully","end_turn":null,"weight":1,"metadata":{},"recipient":"all","channel":null},"conversation_id":"sidebar-conv"},"c":2}
+
+event: delta
+data: {"v":{"type":"message","data":{"id":"a-1","author":{"role":"assistant","name":null,"metadata":{}},"create_time":null,"update_time":null,"content":{"content_type":"text","parts":[""]},"status":"finished_successfully","end_turn":null,"weight":1,"metadata":{},"recipient":"web","channel":null},"conversation_id":"sidebar-conv"},"c":3}
+
+event: delta
+data: {"p":"/data/content/parts/0","o":"append","v":"{\"search_query\":[{\"q\":\"Other v. Case\"}]}"}
+
+event: delta
+data: {"v":{"type":"message","data":{"id":"t-1","author":{"role":"tool","name":null,"metadata":{}},"create_time":null,"update_time":null,"content":{"content_type":"text","parts":[""]},"status":"finished_successfully","end_turn":null,"weight":1,"metadata":{},"recipient":"all","channel":null},"conversation_id":"sidebar-conv"},"c":4}
+
+event: delta
+data: {"v":{"type":"message","data":{"id":"a-2","author":{"role":"assistant","name":null,"metadata":{}},"create_time":null,"update_time":null,"content":{"content_type":"text","parts":[""]},"status":"in_progress","end_turn":null,"weight":1,"metadata":{},"recipient":"all","channel":"final"},"conversation_id":"sidebar-conv"},"c":5}
+
+event: delta
+data: {"p":"/data/content/parts/0","o":"append","v":"Not this chat."}
+
+event: delta
+data: {"o":"patch","v":[{"p":"/data/status","o":"replace","v":"finished_successfully"},{"p":"/data/end_turn","o":"replace","v":true},{"p":"/data/metadata","o":"append","v":{"is_complete":true,"finish_details":{"type":"stop"}}}]}
+
+data: {"type":"__debug","data":{"prefetch_info":null,"is_cacheable":false}}
+
+data: [DONE]
+

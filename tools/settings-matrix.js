@@ -46,11 +46,17 @@ const { audit, stripCode, findLinks } = require('./audit-export');
 
 // -- scenario from HARs -------------------------------------------------------
 
-/** Record each HAR and merge them into one scenario directory. */
+/**
+ * Record each HAR and merge them into one scenario directory: the mocks,
+ * and the page captures (ChatGPT side panels, scenario.pageCaptures) --
+ * every HAR made in one tab carries the same panels, so each is kept once.
+ */
 const scenarioFromHars = (hars, dir) => {
   let base = null;
   const mocks = [];
   const seen = new Set();
+  const pageCaptures = [];
+  const seenCaptures = new Set();
   fs.mkdirSync(path.join(dir, 'responses'), { recursive: true });
   hars.forEach((har, i) => {
     const one = path.join(dir, `_rec${i}`);
@@ -65,9 +71,22 @@ const scenarioFromHars = (hars, dir) => {
       fs.copyFileSync(path.join(one, 'responses', m.file), path.join(dir, 'responses', file));
       mocks.push({ ...m, host: m.host || sc.host, file });
     }
+    for (const c of sc.pageCaptures || []) {
+      const files = [c.request, c.response];
+      const key = JSON.stringify([c.kind, ...files.map((f) => fs.readFileSync(path.join(one, f), 'utf8'))]);
+      if (seenCaptures.has(key)) continue;
+      seenCaptures.add(key);
+      const [request, response] = files.map((f) => {
+        const rel = `responses/r${i}-${path.basename(f)}`;
+        fs.copyFileSync(path.join(one, f), path.join(dir, rel));
+        return rel;
+      });
+      pageCaptures.push({ ...c, request, response });
+    }
     fs.rmSync(one, { recursive: true, force: true });
   });
-  const scenario = { ...base, mocks, exports: [] };
+  const { pageCaptures: _recorded, ...rest } = base;
+  const scenario = { ...rest, mocks, ...(pageCaptures.length ? { pageCaptures } : {}), exports: [] };
   fs.writeFileSync(path.join(dir, 'scenario.json'), JSON.stringify(scenario, null, 2));
   return scenario;
 };

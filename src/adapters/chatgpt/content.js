@@ -9,7 +9,7 @@
  */
 (function () {
   const ns = (self.__exporter = self.__exporter || {});
-  const { chatgptApi, chatgptNormalize, markdown, zip, download, utils } = ns;
+  const { chatgptApi, chatgptSidebar, chatgptNormalize, markdown, zip, download, utils } = ns;
   const { sanitizeFilename, todayStamp, utf8ToBytes, log } = utils;
 
   const handleExport = async ({ mode, includeReasoning, includeDates, link, dateFormat, inlineImages, inlineTextFiles, attachmentsAsMarkdown }) => {
@@ -27,8 +27,29 @@
 
     const raw = await chatgptApi.fetchConversation(convId, token);
 
+    // Entity side panels opened in this tab (hook-iso.js keeps their streams;
+    // they can't be fetched from the server, see chatgpt/sidebar.js).
+    const messageIds = new Set(raw && raw.mapping ? Object.keys(raw.mapping) : []);
+    const captures = chatgptSidebar.capturesFor(chatgptSidebar.stored(), convId, messageIds);
+    const entityPanels = chatgptSidebar.panelsFor(captures);
+    if (ns.dev && ns.dev.notePageCapture) {
+      // Debug HAR: this chat's panel streams as the page received them --
+      // also the ones that didn't decode, that's when they're needed.
+      for (const c of captures) {
+        ns.dev.notePageCapture({
+          kind: 'chatgpt-sidebar',
+          method: 'POST',
+          url: c.url,
+          requestBody: c.request,
+          mime: 'text/event-stream',
+          text: c.stream,
+          capturedAt: c.capturedAt,
+        });
+      }
+    }
+
     const { conversation, imageRefs, binaryAttachmentRefs, textFileRefs } =
-      chatgptNormalize.normalize(raw, { inlineTextFiles });
+      chatgptNormalize.normalize(raw, { inlineTextFiles, entityPanels });
 
     // Images: zip always fetches (writes to /assets/); md respects the
     // inlineImages toggle. When skipped, empty bytes from normalize() turn

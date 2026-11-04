@@ -459,6 +459,24 @@
       "notes": "gpt-6 answers are markdown + JSX-like components (metadata.model_dil_v2): layout tags are dropped, Link/Cite/Entity/AsyncImage become markdown (src/adapters/chatgpt/genui.js). The model decides whether to use components; if the md shows none, the check is weak -- say so."
     },
     {
+      "id": "chatgpt.entity-panels",
+      "provider": "chatgpt",
+      "title": "Side panels opened from highlighted names (people, places, cases) quoted under the answer",
+      "support": "supported",
+      "refresh": "each-run",
+      "prompt": "In two sentences: what is the Eiffel Tower and who designed it?",
+      "followUps": [
+        "Click a highlighted name in the answer (for example Gustave Eiffel) to open its side panel; wait until the panel has finished writing, then close it.",
+        "Open a second highlighted name the same way and let it finish. Export from this tab without reloading it."
+      ],
+      "expect": {
+        "mdMatches": [
+          "^> \\*\\*ℹ️ .+\\*\\* _\\(side panel\\)_"
+        ]
+      },
+      "notes": "The panel is a hidden sidebar conversation the page streams on click; it isn't saved with the chat, so only panels opened in the exporting tab since its last load are exported (hook-main.js copies the stream, src/adapters/chatgpt/sidebar.js decodes it). Hence a fresh chat every run. No highlighted names in the answer: the model didn't mark any -- say so, the check is weak."
+    },
+    {
       "id": "chatgpt.reasoning",
       "provider": "chatgpt",
       "title": "Reasoning (thinking) model",

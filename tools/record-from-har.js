@@ -368,8 +368,17 @@ function main() {
   const relevant = [];
   const skipped = []; // {host, count}
   const skippedCounts = new Map();
+  // Responses the page received and a hook copied for the export (ChatGPT
+  // entity side panels, debug-capture.js notePageCapture). They aren't the
+  // export's own requests, so they go back as scenario.pageCaptures, not as
+  // mocks.
+  const pageCaptures = [];
   for (const entry of allEntries) {
     if (!entry.request || !entry.response) continue;
+    if (entry._pageCapture) {
+      pageCaptures.push(entry);
+      continue;
+    }
     let u;
     try {
       u = new URL(entry.request.url);
@@ -460,6 +469,21 @@ function main() {
     routes.push(route);
   }
 
+  // -- Page captures: request body + response, one pair of files each
+  const pageCaptureRefs = [];
+  pageCaptures.forEach((entry, i) => {
+    const stem = `page-${pad3(i + 1)}-${String(entry._pageCapture).replace(/[^\w-]+/g, '_')}`;
+    const request = entry.request.postData && typeof entry.request.postData.text === 'string' ? entry.request.postData.text : '';
+    fs.writeFileSync(path.join(outDir, 'responses', `${stem}.request.json`), request);
+    fs.writeFileSync(path.join(outDir, 'responses', `${stem}.txt`), decodeBody(entry.response.content) || '');
+    pageCaptureRefs.push({
+      kind: entry._pageCapture,
+      ...(entry.request.url ? { url: entry.request.url } : {}),
+      request: `responses/${stem}.request.json`,
+      response: `responses/${stem}.txt`,
+    });
+  });
+
   // -- Page metadata for location/title hints
   let inferredLocation = '';
   let inferredTitle = '';
@@ -524,6 +548,7 @@ function main() {
     host: primaryHost,
     auth,
     mocks: routes,
+    ...(pageCaptureRefs.length ? { pageCaptures: pageCaptureRefs } : {}),
     // exports[] is a scaffold — one variant with no expectedFilename
     // (so UPDATE_GOLDEN works straight away): the options the recorded
     // export ran with when the HAR says so, else plain md. Add zip /

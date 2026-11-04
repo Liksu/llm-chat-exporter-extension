@@ -4,6 +4,7 @@
 
 ChatGPT
 • Fixed: in a row of picture cards, each card's picture, name and caption ran together on one line. They now stay on separate lines, as in the chat.
+• Side panels you opened by clicking a highlighted name (a person, place, case or product) are added under the answer as a quote, with their sources. ChatGPT writes a panel only when you open it and doesn't save it with the chat, so the export has the panels opened in this tab since it was last loaded; they are kept in the tab's memory only and never leave your browser. A panel you closed before it finished writing is exported as far as it got, marked as cut off.
 
 ## v0.7.50 — 2026-10-14
 

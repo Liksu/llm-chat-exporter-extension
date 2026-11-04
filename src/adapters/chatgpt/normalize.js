@@ -210,10 +210,13 @@
     return out;
   };
 
-  /**
-   * Pull plain text out of a `parts` array, ignoring non-string entries.
-   * With the message's metadata, citation markers become source links.
-   */
+  /** Markdown text as a quote: `> ` on every line, a bare `>` on blank ones. */
+  const quoteLines = (text) =>
+    text
+      .split('\n')
+      .map((l) => (l.trim() ? `> ${l}` : '>'))
+      .join('\n');
+
   /**
    * A reply to a selected piece of an answer (the "quote" button; the chat
    * shows the selection as a collapsed chip above the message). ChatGPT
@@ -227,10 +230,13 @@
     if (!m) return text;
     const selections = m[1].split(/^## Selection \d+[ \t]*$/m).map((s) => s.trim()).filter(Boolean);
     if (!selections.length) return text;
-    const quotes = selections.map((s) => s.split('\n').map((l) => (l.trim() ? `> ${l}` : '>')).join('\n'));
-    return [...quotes, m[2].trim()].filter(Boolean).join('\n\n');
+    return [...selections.map(quoteLines), m[2].trim()].filter(Boolean).join('\n\n');
   };
 
+  /**
+   * Pull plain text out of a `parts` array, ignoring non-string entries.
+   * With the message's metadata, citation markers become source links.
+   */
   const partsToText = (parts, meta) => {
     if (!Array.isArray(parts)) return '';
     const text = parts.filter((p) => typeof p === 'string').join('\n\n').trim();
@@ -847,6 +853,111 @@
     return out;
   };
 
+  /** The text blocks transformMessage makes of a message, as one string. */
+  const exportedText = (m) =>
+    transformMessage(m)
+      .filter((it) => it.block && it.block.kind === 'text' && typeof it.block.text === 'string')
+      .map((it) => it.block.text.trim())
+      .filter(Boolean)
+      .join('\n\n');
+
+  /** Closes a side panel's quote when its text was cut off. */
+  const CUT_OFF_NOTE = '_[Cut off: the side panel was closed before it finished writing.]_';
+
+  /**
+   * An entity side panel (chatgpt/sidebar.js) as a quote under the answer it
+   * was opened from: `> **ℹ️ <title>** _(side panel)_`, then the panel's
+   * reply with its sources (and CUT_OFF_NOTE when it was cut off). The reply
+   * usually opens with a heading naming the entity -- that heading becomes
+   * the title; the remaining headings move down to level 4+ so they nest
+   * under the answer's own.
+   */
+  const renderEntityPanel = (panel) => {
+    const text = exportedText(panel.message);
+    if (!text) return null;
+    const lines = text.split('\n');
+    // The request's name is plain text; a heading is markdown already, where
+    // emphasis would only add stars inside the bold title.
+    let title = panel.name.replace(/[*_]/g, (c) => `\\${c}`);
+    const first = lines.findIndex((l) => l.trim());
+    const head = first >= 0 ? /^#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/.exec(lines[first]) : null;
+    if (head) {
+      title = head[1].replace(/\*+/g, '').replace(/(^|[^\p{L}\p{N}])_+|_+(?=[^\p{L}\p{N}]|$)/gu, '$1').trim() || title;
+      lines.splice(first, 1);
+    }
+    // Headings outside code. A fence closes on the same character, at least
+    // as long, with nothing after it (CommonMark): ``` inside ```` is code.
+    let fence = null;
+    const isHeading = [];
+    let minLevel = 7;
+    lines.forEach((l, i) => {
+      const f = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(l);
+      if (fence) {
+        if (f && f[1][0] === fence.ch && f[1].length >= fence.len && !f[2].trim()) fence = null;
+        return;
+      }
+      if (f) {
+        fence = { ch: f[1][0], len: f[1].length };
+        return;
+      }
+      const h = /^(#{1,6})[ \t]/.exec(l);
+      if (h) {
+        isHeading[i] = h[1].length;
+        minLevel = Math.min(minLevel, h[1].length);
+      }
+    });
+    const shift = minLevel < 4 ? 4 - minLevel : 0;
+    const body = lines
+      .map((l, i) => (isHeading[i] ? '#'.repeat(Math.min(6, isHeading[i] + shift)) + l.slice(isHeading[i]) : l))
+      .join('\n')
+      .trim();
+    // A copy cut off while it streamed (`finished: false`, the only copy
+    // there is): say so where the text stops -- after closing the code
+    // block it may have stopped in.
+    const cutOff =
+      panel.finished === false
+        ? `${fence ? `\n${fence.ch.repeat(fence.len)}` : ''}\n\n${CUT_OFF_NOTE}`
+        : '';
+    return { kind: 'text', text: quoteLines(`**ℹ️ ${title}** _(side panel)_\n\n${body}${cutOff}`) };
+  };
+
+  /**
+   * Which exported message each captured panel goes under, one panel per
+   * (message, name): the message the request named, or -- when that one
+   * isn't exported (not in this chat, or on a branch the export doesn't
+   * show) -- the last assistant message whose exported text mentions the
+   * name. A name opened twice there keeps its latest finished copy (an
+   * unfinished one only while there is no finished one), in the place it
+   * was first opened.
+   *
+   * @returns {Map<string, object[]>} message id → its panels, in order
+   */
+  const panelsByMessage = (panels, ordered) => {
+    const shown = ordered.filter((n) => !shouldDropNode(n)).map((n) => n.message);
+    const shownIds = new Set(shown.map((m) => m.id));
+    const texts = new Map(); // message id → exportedText, made on first use
+    const mentions = (m, name) => {
+      if (!texts.has(m.id)) texts.set(m.id, exportedText(m));
+      return texts.get(m.id).includes(name);
+    };
+    const byMessage = new Map(); // message id → Map(name → panel)
+    for (const panel of Array.isArray(panels) ? panels : []) {
+      if (!isObject(panel) || !isObject(panel.message) || typeof panel.name !== 'string') continue;
+      let id = shownIds.has(panel.messageId) ? panel.messageId : null;
+      for (let i = shown.length - 1; i >= 0 && !id; i--) {
+        const m = shown[i];
+        if (m.author && m.author.role === 'assistant' && mentions(m, panel.name)) id = m.id;
+      }
+      if (!id) continue;
+      if (!byMessage.has(id)) byMessage.set(id, new Map());
+      const byName = byMessage.get(id);
+      const prev = byName.get(panel.name);
+      // Map.set on a known key keeps its place: where it was first opened.
+      if (!prev || panel.finished !== false || prev.finished === false) byName.set(panel.name, panel);
+    }
+    return new Map([...byMessage].map(([id, byName]) => [id, [...byName.values()]]));
+  };
+
   /**
    * Pull file/audio attachments from message.metadata.attachments. ChatGPT
    * lists user-uploaded files there with { id, name, mime_type, size, ... }.
@@ -981,6 +1092,9 @@
     // of producing duplicates. We register the artifact_ref block ONLY on
     // first sighting; later updates just mutate the existing artifact.
     const appsSdkArtifactBySession = new Map();
+    // Entity side panels opened in the tab (opts.entityPanels, from
+    // chatgptSidebar.panelsFor), keyed by the message they go under.
+    const entityPanels = panelsByMessage(opts.entityPanels, ordered);
 
     const flush = () => {
       if (!currentRole) return;
@@ -1119,6 +1233,10 @@
         if (item._imageRef) {
           imageRefs.push({ turnIndex: ti, blockIndex, ref: item._imageRef });
         }
+      }
+      for (const panel of entityPanels.get(m.id) || []) {
+        const block = renderEntityPanel(panel);
+        if (block) currentBlocks.push(block);
       }
 
       // Attachments ride on user messages (and rarely on assistant ones).

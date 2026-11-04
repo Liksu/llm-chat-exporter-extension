@@ -132,6 +132,116 @@ test('debug capture: HAR replays into an identical export', async () => {
   }
 });
 
+test('chatgpt entity panels: debug HAR keeps them and replays into the same export', async () => {
+  const srcDir = path.join(SCENARIOS_DIR, 'examples', 'chatgpt-entity-panel');
+  const scenario = JSON.parse(fs.readFileSync(path.join(srcDir, 'scenario.json'), 'utf8'));
+  const mdExport = scenario.exports.find((e) => e.message.mode === 'md');
+  const message = { ...mdExport.message, debugCapture: true };
+
+  const original = await executeExport(srcDir, scenario, message, { dev: true });
+  assert.ok(original.response && original.response.ok, 'export failed');
+  const md = await original.captured.downloads[0].blob.text();
+  assert.match(md, /ℹ️ Bowser v\. Noem/);
+  const har = JSON.parse(await original.captured.downloads[1].blob.text());
+  const pages = har.log.entries.filter((e) => e._pageCapture === 'chatgpt-sidebar');
+  // This chat's four panel streams (the other chat's one stays out).
+  assert.equal(pages.length, 4);
+  assert.ok(pages.every((e) => /"message_id"/.test(e.request.postData.text)));
+  assert.ok(pages.every((e) => /\/backend-api\/sidebar\/conversation$/.test(e.request.url)), 'the URL the page called');
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'exporter-panels-'));
+  try {
+    const harPath = path.join(tmp, 'capture.har');
+    fs.writeFileSync(harPath, JSON.stringify(har));
+    const outDir = path.join(tmp, 'scenario');
+    execFileSync(process.execPath, [path.join(__dirname, '..', 'tools', 'record-from-har.js'), harPath, outDir], { stdio: 'pipe' });
+    const recorded = JSON.parse(fs.readFileSync(path.join(outDir, 'scenario.json'), 'utf8'));
+    assert.equal(recorded.pageCaptures.length, 4);
+    assert.ok(recorded.mocks.every((m) => !/sidebar/.test(m.path || '')), 'panels must not become mocks');
+    const replay = await executeExport(outDir, recorded, recorded.exports[0].message);
+    assert.ok(replay.response && replay.response.ok, 'replayed export failed');
+    assert.equal(await replay.captured.blob.text(), md);
+
+    // The settings matrix merges HARs of one tab: every HAR carries the
+    // same panels, the merged scenario keeps one copy and replays them.
+    const { runMatrix, summarize } = require('../tools/settings-matrix');
+    const sum = summarize(await runMatrix({ hars: [harPath, harPath] }));
+    assert.equal(sum.total, 160);
+    assert.deepEqual(sum.findings, []);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/**
+ * Which copy of a panel is exported and where, and how its markdown is
+ * built -- on the fixture's conversation and its Bowser v. Noem stream.
+ */
+test('chatgpt entity panels: finished copy wins, one per answer, code stays code', () => {
+  const sandbox = {};
+  sandbox.self = sandbox;
+  const context = require('node:vm').createContext(sandbox);
+  require('./scaffolding/loader').loadScripts(context, [
+    'src/core/utils.js',
+    'src/adapters/chatgpt/genui.js',
+    'src/adapters/chatgpt/sidebar.js',
+    'src/adapters/chatgpt/normalize.js',
+  ]);
+  const { chatgptSidebar, chatgptNormalize } = sandbox.__exporter;
+  const dir = path.join(SCENARIOS_DIR, 'examples', 'chatgpt-entity-panel', 'responses');
+  const conv = JSON.parse(fs.readFileSync(path.join(dir, 'conversation.json'), 'utf8'));
+  const full = fs.readFileSync(path.join(dir, 'page-005-bowser.txt'), 'utf8');
+  const capture = (stream, messageId = 'msg-2') => ({
+    request: JSON.stringify({ conversation_id: conv.conversation_id, message_id: messageId, generic_entity_params: { name: 'Bowser v. Noem' } }),
+    stream,
+  });
+  // The text of a reply delta is a JSON string inside the stream.
+  const edit = (from, to) => full.split(JSON.stringify(from)).join(JSON.stringify(to));
+  const cut = full.slice(0, full.indexOf('in the District of Massachusetts'));
+  const panelsOf = (captures, raw = conv) => {
+    const { conversation } = chatgptNormalize.normalize(raw, { entityPanels: chatgptSidebar.panelsFor(captures) });
+    return conversation.turns
+      .flatMap((t) => t.blocks)
+      .filter((b) => b.kind === 'text' && /side panel/.test(b.text))
+      .map((b) => b.text);
+  };
+
+  // Reopened and closed while it streamed: the finished copy stays.
+  assert.equal(chatgptSidebar.parseCapture(capture(cut)).finished, false);
+  const cutOffNote = /\n>\n> _\[Cut off: the side panel was closed before it finished writing\.\]_$/;
+  let out = panelsOf([capture(full), capture(cut)]);
+  assert.equal(out.length, 1);
+  assert.match(out[0], /Key ruling/);
+  assert.doesNotMatch(out[0], /Cut off/);
+  // Only a cut-off copy: still exported, as much as there is, and says so.
+  out = panelsOf([capture(cut)]);
+  assert.equal(out.length, 1);
+  assert.doesNotMatch(out[0], /Key ruling/);
+  assert.match(out[0], cutOffNote);
+  // Cut off inside a code block: the block is closed before the note.
+  const openCode = edit('```text\n## not a heading\n```', '```text\nprint(1)');
+  const inCode = openCode.slice(0, openCode.indexOf('{"o":"patch","v":[{"p":"/data/status"'));
+  [out] = panelsOf([capture(inCode)]);
+  assert.match(out, /^> ```text\n> print\(1\)\n> ```\n>\n> _\[Cut off/m);
+
+  // An id that isn't in the chat lands on the answer naming the entity --
+  // the same answer as the right id, so one panel, not two.
+  assert.equal(panelsOf([capture(full, 'msg-unknown'), capture(full)]).length, 1);
+  // An answer on a branch the export doesn't show: the shown one naming it.
+  const branched = JSON.parse(JSON.stringify(conv));
+  branched.mapping['msg-2b'] = { id: 'msg-2b', parent: 'msg-1', children: [], message: { ...conv.mapping['msg-2'].message, id: 'msg-2b' } };
+  assert.equal(panelsOf([capture(full, 'msg-2b')], branched).length, 1);
+
+  // ``` inside a ```` fence is code: its "heading" stays, the real one after
+  // the fence moves under the answer's headings.
+  [out] = panelsOf([capture(edit('```text\n## not a heading\n```', '````md\n```\n## inside\n````\n\n# Real H1'))]);
+  assert.match(out, /^> ## inside$/m);
+  assert.match(out, /^> #### Real H1$/m);
+  // An italic heading becomes the title without escaped stars.
+  [out] = panelsOf([capture(edit('## Bowser v. Noem (2026)\n\n', '## *Bowser v. Noem* (2026)\n\n'))]);
+  assert.match(out, /^> \*\*ℹ️ Bowser v\. Noem \(2026\)\*\* _\(side panel\)_$/m);
+});
+
 /**
  * "+link" only adds a line under the title and `url` in metadata.json, so one
  * on/off check covers it -- it doesn't interact with the other options.

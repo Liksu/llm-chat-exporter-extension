@@ -1,7 +1,7 @@
 # Privacy Policy
 
 **Extension:** LLM Chat Exporter
-**Last updated:** 2026-05-10
+**Last updated:** 2026-11-04
 
 ## Summary
 
@@ -11,6 +11,8 @@ LLM Chat Exporter does not collect, transmit, sell, or share any personal data. 
 
 When you open the popup on a supported site ([claude.ai](https://claude.ai), [chatgpt.com](https://chatgpt.com), or [gemini.google.com](https://gemini.google.com)) and click **Export**, the extension reads the contents of the conversation in the active tab — text, images, file attachments, artifacts, and (optionally) reasoning — and assembles a Markdown file or a ZIP archive. The result is saved to your computer through Chrome's normal download flow.
 
+On chatgpt.com, the side panel that opens when you click a highlighted name (a person, place, case or product) is not saved with the conversation, so it can't be read back at export time. The extension therefore keeps a copy of each side panel the page receives in that tab, in the tab's memory only, so the panels can be included when you export. The copy is never written to disk or sent anywhere, and it is gone when the tab is reloaded or closed.
+
 The extension includes a small service worker that proxies asset downloads (uploaded files and inline / generated images) when those live on a different host than the chat page. This is purely a CORS workaround so the same bytes the page already displays can be embedded in the export — the bytes never leave your browser and are not transmitted to any third party.
 
 ## Data the extension accesses
@@ -18,6 +20,7 @@ The extension includes a small service worker that proxies asset downloads (uplo
 | Data | Where it goes |
 |---|---|
 | Conversation content on the active tab | Used to build the export file. Never leaves your browser. |
+| ChatGPT side panels you open in a tab | Kept in that tab's memory until it is reloaded or closed, used only to build the export. Never leaves your browser. |
 | Your option preferences (default format, toggle states) | Stored in [`chrome.storage.sync`](https://developer.chrome.com/docs/extensions/reference/api/storage). Synced across your Chrome profile by Google if you have Chrome Sync enabled. |
 
 The extension does not read tabs other than the active one, and does not access browsing history, cookies, passwords, or any data outside the supported sites.

@@ -1,0 +1,81 @@
+{
+  "name": "chatgpt-entity-panel",
+  "adapter": "chatgpt",
+  "location": "https://chatgpt.com/c/00000000-0000-0000-0000-000000000005",
+  "fakeDate": "2026-11-04T12:00:00Z",
+  "host": "https://chatgpt.com",
+  "auth": {
+    "chatgpt-token": "mock-token"
+  },
+  "mocks": [
+    {
+      "method": "GET",
+      "path": "/backend-api/conversation/00000000-0000-0000-0000-000000000005",
+      "file": "conversation.json"
+    }
+  ],
+  "pageCaptures": [
+    {
+      "kind": "chatgpt-sidebar",
+      "url": "https://chatgpt.com/backend-api/sidebar/conversation",
+      "request": "responses/page-001-bowser-old.request.json",
+      "response": "responses/page-001-bowser-old.txt"
+    },
+    {
+      "kind": "chatgpt-sidebar",
+      "url": "https://chatgpt.com/backend-api/sidebar/conversation",
+      "request": "responses/page-002-karami.request.json",
+      "response": "responses/page-002-karami.txt"
+    },
+    {
+      "kind": "chatgpt-sidebar",
+      "url": "https://chatgpt.com/backend-api/sidebar/conversation",
+      "request": "responses/page-003-other-chat.request.json",
+      "response": "responses/page-003-other-chat.txt"
+    },
+    {
+      "kind": "chatgpt-sidebar",
+      "url": "https://chatgpt.com/backend-api/sidebar/conversation",
+      "request": "responses/page-004-aborted.request.json",
+      "response": "responses/page-004-aborted.txt"
+    },
+    {
+      "kind": "chatgpt-sidebar",
+      "url": "https://chatgpt.com/backend-api/sidebar/conversation",
+      "request": "responses/page-005-bowser.request.json",
+      "response": "responses/page-005-bowser.txt"
+    }
+  ],
+  "exports": [
+    {
+      "name": "md-default",
+      "message": {
+        "kind": "export",
+        "mode": "md",
+        "includeReasoning": false,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": true,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "Entity panels-2026-11-04.md",
+      "expectedContent": "expected/md-default.md"
+    },
+    {
+      "name": "zip-default",
+      "message": {
+        "kind": "export",
+        "mode": "zip",
+        "includeReasoning": false,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": false,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "Entity panels-2026-11-04.zip",
+      "expectedContent": "expected/zip-default"
+    }
+  ]
+}

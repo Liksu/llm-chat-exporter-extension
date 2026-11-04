@@ -1,0 +1,131 @@
+{
+  "title": "Entity panels",
+  "create_time": 1793800000,
+  "update_time": 1793800300,
+  "default_model_slug": "gpt-6-thinking",
+  "current_node": "msg-4",
+  "mapping": {
+    "root": {
+      "id": "root",
+      "message": null,
+      "parent": null,
+      "children": [
+        "msg-1"
+      ]
+    },
+    "msg-1": {
+      "id": "msg-1",
+      "message": {
+        "id": "msg-1",
+        "author": {
+          "role": "user",
+          "name": null,
+          "metadata": {}
+        },
+        "create_time": 1793800060,
+        "content": {
+          "content_type": "text",
+          "parts": [
+            "Find a mandamus case won in 2026."
+          ]
+        },
+        "status": "finished_successfully",
+        "end_turn": null,
+        "weight": 1,
+        "metadata": {},
+        "recipient": "all",
+        "channel": null
+      },
+      "parent": "root",
+      "children": [
+        "msg-2"
+      ]
+    },
+    "msg-2": {
+      "id": "msg-2",
+      "message": {
+        "id": "msg-2",
+        "author": {
+          "role": "assistant",
+          "name": null,
+          "metadata": {}
+        },
+        "create_time": 1793800120,
+        "content": {
+          "content_type": "text",
+          "parts": [
+            "## Cases\n\nOne example is entity[\"other\",\"Bowser v. Noem\",\"Federal immigration lawsuit, 2026\"], decided in February.\n\nAnother one is entity[\"other\",\"Karami v. Edlow\",\"Federal immigration lawsuit, Oregon, 2026\"]."
+          ]
+        },
+        "status": "finished_successfully",
+        "end_turn": true,
+        "weight": 1,
+        "metadata": {
+          "model_slug": "gpt-6-thinking"
+        },
+        "recipient": "all",
+        "channel": "final"
+      },
+      "parent": "msg-1",
+      "children": [
+        "msg-3"
+      ]
+    },
+    "msg-3": {
+      "id": "msg-3",
+      "message": {
+        "id": "msg-3",
+        "author": {
+          "role": "user",
+          "name": null,
+          "metadata": {}
+        },
+        "create_time": 1793800180,
+        "content": {
+          "content_type": "text",
+          "parts": [
+            "Thanks!"
+          ]
+        },
+        "status": "finished_successfully",
+        "end_turn": null,
+        "weight": 1,
+        "metadata": {},
+        "recipient": "all",
+        "channel": null
+      },
+      "parent": "msg-2",
+      "children": [
+        "msg-4"
+      ]
+    },
+    "msg-4": {
+      "id": "msg-4",
+      "message": {
+        "id": "msg-4",
+        "author": {
+          "role": "assistant",
+          "name": null,
+          "metadata": {}
+        },
+        "create_time": 1793800240,
+        "content": {
+          "content_type": "text",
+          "parts": [
+            "You are welcome."
+          ]
+        },
+        "status": "finished_successfully",
+        "end_turn": true,
+        "weight": 1,
+        "metadata": {
+          "model_slug": "gpt-6-thinking"
+        },
+        "recipient": "all",
+        "channel": "final"
+      },
+      "parent": "msg-3",
+      "children": []
+    }
+  }
+}

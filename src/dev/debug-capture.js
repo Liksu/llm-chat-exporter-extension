@@ -81,6 +81,33 @@
   };
 
   /**
+   * Record a response the page itself received and a hook copied for the
+   * export (ChatGPT entity side panels) -- it is export input like a fetch,
+   * just not made by the export. Its request body is kept (it carries no
+   * token); `_pageCapture` names the kind so the recorder can put it back.
+   * No-op unless a capture is running.
+   *
+   * @param {{kind:string, method:string, url:string, requestBody?:string,
+   *   mime:string, text:string, capturedAt?:string}} r
+   */
+  const notePageCapture = (r) => {
+    if (!active) return;
+    const started = r.capturedAt ? new Date(r.capturedAt) : new Date();
+    const entry = blankEntry(r.method || 'POST', typeof r.url === 'string' ? r.url : '', isNaN(started) ? new Date() : started);
+    entry._pageCapture = r.kind;
+    if (typeof r.requestBody === 'string') {
+      entry.request.postData = { mimeType: 'application/json', text: r.requestBody };
+    }
+    entry.response.status = 200;
+    entry.response.statusText = 'OK';
+    entry.response.headers.push({ name: 'content-type', value: r.mime });
+    entry.response.content.mimeType = r.mime;
+    entry.response.content.text = r.text || '';
+    entry.response.content.size = (r.text || '').length;
+    active.entries.push(entry);
+  };
+
+  /**
    * Replace self.fetch with a recording wrapper. Returns { entries, stop }.
    * The wrapper hands the caller the original Response and reads a clone,
    * so adapters see no difference.
@@ -207,6 +234,8 @@
     debugCapture: { run },
     // Called by geminiApi.fetchAsset for service-worker proxied fetches.
     noteProxied,
+    // Called by the ChatGPT content script for captured side panels.
+    notePageCapture,
     // Hook used by core/export-entry.js around every export.
     aroundExport: async (ctx, exec) => {
       const enabled = typeof ctx.msg.debugCapture === 'boolean'

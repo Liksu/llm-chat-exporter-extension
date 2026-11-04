@@ -15,6 +15,12 @@
  *     "host": "https://chatgpt.com",                      // default for mocks
  *     "auth": { "chatgpt-token": "mock-token" },          // seed token caches
  *     "mocks": [ ...routes ],                             // see fetch-mock.js
+ *     "pageCaptures": [                                   // what page hooks
+ *       { "kind": "chatgpt-sidebar",                      // copied before the
+ *         "url": "https://chatgpt.com/backend-api/…",     // export (ChatGPT
+ *         "request": "responses/x.request.json",          // side panels)
+ *         "response": "responses/x.txt" }
+ *     ],
  *     "exports": [
  *       {
  *         "name": "default",
@@ -86,6 +92,25 @@ function seedAuth(sandbox, auth) {
   // and the Claude content script's auth flow just calls fetch directly with
   // credentials:include. As long as mocks reply with valid bodies it works
   // without explicit token seeding.
+}
+
+/**
+ * Seed what the page hooks would have copied from the page's own traffic
+ * before the export: ChatGPT entity side panels (hook-iso.js keeps them in
+ * self.__exporterChatGPT.sidebars).
+ */
+function seedPageCaptures(sandbox, scenarioDir, captures) {
+  if (!Array.isArray(captures)) return;
+  const read = (rel) => fs.readFileSync(path.join(scenarioDir, rel), 'utf8');
+  for (const c of captures) {
+    if (c.kind !== 'chatgpt-sidebar') throw new Error(`unknown page capture kind: ${c.kind}`);
+    const store = (sandbox.self.__exporterChatGPT = sandbox.self.__exporterChatGPT || {});
+    (store.sidebars = store.sidebars || []).push({
+      url: typeof c.url === 'string' ? c.url : '',
+      request: read(c.request),
+      stream: read(c.response),
+    });
+  }
 }
 
 /**
@@ -162,6 +187,7 @@ async function executeExport(scenarioDir, scenario, message, env = {}) {
   // Seed token caches BEFORE content.js loads (some adapters synchronously
   // touch self.__exporter<Adapter>.token at module init).
   seedAuth(browser.sandbox, scenario.auth);
+  seedPageCaptures(browser.sandbox, scenarioDir, scenario.pageCaptures);
 
   loadScripts(browser.context, scriptsFor(scenario.adapter, { dev: !!env.dev }));
   installDownloadCapture(browser.sandbox, browser.captured);

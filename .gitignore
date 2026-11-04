@@ -34,3 +34,6 @@ notes.local.md
 
 # Logs
 *.log
+
+# Secrets
+.env
