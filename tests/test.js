@@ -572,6 +572,22 @@ test('live day: what the page showed vs the export', () => {
   const all = compareScreen({ ...screen, text: screen.text.split('\n')[0], images: screen.images.slice(0, 1), links: screen.links.slice(0, 2) }, exp);
   assert.deepEqual(all.errors, []);
 
+  // Claude's collapsed tool-step summary is UI, not lost text.
+  const statusRow = compareScreen({ ...screen, images: [], links: [], text: [
+    screen.text.split('\n')[0],
+    'Використано «Claude Docs: Guide», додано завдання: Create the 13-day plan as an editable doc, а також ще 2 кроки',
+    'Створив файл, поділився файлом і ще 19 кроків',
+    'Searched the web, read three pages, created a file and 4 more steps',
+  ].join('\n') }, exp);
+  assert.deepEqual(statusRow.missingText, []);
+  assert.deepEqual(statusRow.errors, []);
+
+  const { checkCapabilities } = require('../tools/live-day');
+  const docsSeen = (link) => checkCapabilities(['out.docs-artifact'], 'claude', [], { md: `🧩 [Plan.md](#artifact-docs-x) · [online](${link})` }, '', '')[0].seen;
+  assert.equal(docsSeen('https://claude.ai/code/artifact/31630647-699c-4191-95b1-593d3d8cb02c'), true);
+  assert.equal(docsSeen('https://claude.ai/artifact/76iLSb19bAnGUE1iMzf571'), true, 'short viewer link since 2026-11');
+  assert.equal(docsSeen('https://example.com/artifact/x'), false);
+
   const har = (status) => ({ entries: [{ request: { url: 'https://chatgpt.com/backend-api/conversation/00000000-0000-0000-0000-000000000001' }, response: { content: { text: JSON.stringify({ current_node: 'm', mapping: { m: { message: { status } } } }) } } }] });
   assert.deepEqual(completeness('chatgpt', har('finished_successfully')), { complete: true });
   assert.equal(completeness('chatgpt', har('in_progress')).complete, false);

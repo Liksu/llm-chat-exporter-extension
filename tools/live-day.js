@@ -381,6 +381,11 @@ const flatten = (s) => String(s)
 // "in the export".
 const TOOL_DUMP_RE = /^\*\*(?:Tool call: `[^`\n]*`|Tool result|Tool error)\*\*\n\n(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\1[ \t]*$/gm;
 
+// Claude's collapsed tool-step summary ("status row", 2026-11): one line
+// over a reply's steps, e.g. "Створив файл, поділився файлом і ще 19 кроків".
+// The steps themselves are exported; the summary is UI, like a button label.
+const STATUS_ROW_RE = /(?:^|[\s,])(?:(?:and|plus) \d+ more steps?|(?:і|а також) ще \d+ крок\p{L}*|(?:и|а также) ещё \d+ шаг\p{L}*)\s*$/iu;
+
 const compareScreen = (screen, exp) => {
   const files = exp.files ? [...exp.files.entries()] : [];
   const md = (exp.md || '').replace(TOOL_DUMP_RE, '');
@@ -398,7 +403,7 @@ const compareScreen = (screen, exp) => {
   let present = 0;
   for (const line of lines) {
     const w = words(flatten(line));
-    if (w.length < 4) {
+    if (w.length < 4 || STATUS_ROW_RE.test(line)) {
       present++;
       continue;
     }
@@ -467,7 +472,8 @@ const CAPABILITY_EVIDENCE = {
   'out.file': (x) => x.artifacts.length + x.files.length > 0 || /📎 \[/.test(x.assistant),
   'out.code-chart': (x) => /!\[[^\]]*\]\((assets\/|data:image)/.test(x.assistant),
   'out.chart-widget': (x) => /^\*\*📊 /m.test(x.assistant),
-  'out.docs-artifact': (x) => /🧩 \[[^\]]*\]\([^)]*\) · \[online\]\(https:\/\/claude\.ai\/code\/artifact\//.test(x.md),
+  // Viewer link: claude.ai/code/artifact/<uuid>, since 2026-11 also claude.ai/artifact/<short id>.
+  'out.docs-artifact': (x) => /🧩 \[[^\]]*\]\([^)]*\) · \[online\]\(https:\/\/claude\.ai\/(?:code\/)?artifact\//.test(x.md),
   'out.slides': (x) => x.artifacts.filter((k) => /\.html$/i.test(k)).length >= 2,
   'out.recipe': (x) => /^\*\*🍳 /m.test(x.assistant),
   'out.places': (x) => /^\*\*🗺️ /m.test(x.assistant) || /📍 \[/.test(x.assistant),

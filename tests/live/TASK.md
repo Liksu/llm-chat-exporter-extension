@@ -49,6 +49,13 @@ Gemini), every 3–4 weeks. Each day stands alone.
 
 ## 0. Preconditions (check, don't fix silently)
 
+Scheduled runs are unattended: a command that needs a permission prompt
+stops the whole day (that is what happened on 2026-11-01…03). Run the
+commands of this file as written, **one per call** — no `;` / `&&`
+chains, pipes or `2>&1` — and read files with the Read tool, not
+`Get-Content` / `cat`. The repo's `.claude/settings.local.json` allows
+exactly these commands.
+
 1. In the repo, run `git status --short` and `npm test`. Report a dirty
    tree or failing tests to the user before going on (the day is still
    useful, but they should know).
