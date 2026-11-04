@@ -237,10 +237,45 @@ const renderPlan = (plan) => {
 // -- day ----------------------------------------------------------------------
 
 /**
- * One provider's day (tests/live/TASK.md): research, re-exports of its
- * known test chats, the scenario dialogs from scenarios.json.
+ * Download the official release-notes pages for the day (public pages, no
+ * cookies) into <runDir>/release-notes/: plain text, entries since `since`
+ * only. Each source gets `file` (repo-relative), `nothingNew` or `error`;
+ * a failure only means the agent opens the page in Chrome instead.
  */
-const day = (args) => {
+const fetchReleaseNotes = async (sources, since, dir, liveDay) => {
+  for (const [i, s] of (sources || []).entries()) {
+    try {
+      const res = await fetch(s.url, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(30000),
+        // a browser-like UA: help centers answer bots with a challenge page
+        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36', 'accept-language': 'en' },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const today = new Intl.DateTimeFormat('sv-SE', { timeZone: SYSTEM_TZ }).format(new Date());
+      const slice = liveDay.sinceSlice(liveDay.htmlToText(await res.text()), since, { today });
+      if (slice.dated && !slice.text) {
+        s.nothingNew = `no entries since ${since} (newest ${slice.newest})`;
+        continue;
+      }
+      if (slice.text.length < 500) throw new Error('page has almost no text (rendered by scripts?)');
+      const name = `${i + 1}-${new URL(s.url).hostname.replace(/^www\./, '').replace(/[^a-z0-9]+/gi, '-')}.txt`;
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, name);
+      fs.writeFileSync(file, `${s.title}\n${s.url}\nDownloaded ${new Date().toISOString()}; entries since ${since}${slice.dated ? '' : ' (no dates found: first part of the page)'}\n\n${slice.text}\n`);
+      Object.assign(s, { file: path.relative(REPO_ROOT, file), chars: slice.text.length, newest: slice.newest });
+    } catch (e) {
+      s.error = e.name === 'TimeoutError' ? 'timed out' : e.message;
+    }
+  }
+};
+
+/**
+ * One provider's day (tests/live/TASK.md): research, the official release
+ * notes, re-exports of its known test chats, the scenario dialogs from
+ * scenarios.json.
+ */
+const day = async (args) => {
   const provider = args.provider;
   const catalog = readJson(CATALOG);
   if (!provider || !catalog.providers[provider]) {
@@ -271,6 +306,8 @@ const day = (args) => {
   });
   plan.createdAt = new Date().toISOString();
   plan.runDir = runDir;
+  const notesTask = plan.tasks.find((t) => t.kind === 'research');
+  if (notesTask) await fetchReleaseNotes(notesTask.releaseNotes, plan.since, path.join(runDir, 'release-notes'), liveDay);
   writeJson(path.join(runDir, 'plan.json'), plan);
   fs.writeFileSync(path.join(runDir, 'plan.md'), liveDay.renderDayPlan(plan, POLL_SNIPPET));
   const notes = path.join(runDir, 'notes.md');
@@ -278,6 +315,9 @@ const day = (args) => {
   const count = (k) => plan.tasks.filter((t) => t.kind === k).length;
   console.log(`Day: ${path.relative(REPO_ROOT, runDir)} (research since ${plan.since})`);
   console.log(`  research 1, re-export ${count('reexport')}, scenarios ${count('scenario')}`);
+  for (const s of (notesTask && notesTask.releaseNotes) || []) {
+    console.log(`  release notes: ${s.file ? `${s.file} (${s.chars} chars${s.newest ? `, newest ${s.newest}` : ''})` : s.nothingNew ? `${s.nothingNew} — ${s.url}` : `NOT downloaded (${s.error}) — ${s.url}`}`);
+  }
   console.log(`  Plan: ${path.relative(REPO_ROOT, path.join(runDir, 'plan.md'))}`);
   console.log('  After the browser part: node tools/live.js collect');
 };
@@ -923,4 +963,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { checkExpectations, findDownloads, snippetFor, renderPlan, renderReport, compareOp, visibleText, checkDialog };
+module.exports = { checkExpectations, findDownloads, snippetFor, renderPlan, renderReport, compareOp, visibleText, checkDialog, fetchReleaseNotes };

@@ -189,10 +189,16 @@ const planDay = ({ provider, scenarios, catalog, fixtures, project, uploadsDir, 
   const since = previousDay(runsDir, provider, today, monthsBack(today, 3));
   const tiers = scenarios.modelTiers[provider] || {};
   const exportOptions = { ...catalog.defaults.export, debugCapture: true };
-  const vars = { providerName: PROVIDER_NAMES[provider], appUrl: APP_URLS[provider], since };
+  const research = scenarios.research;
+  const releaseNotes = ((research.releaseNotes || {})[provider] || []).map((s) => ({ title: s.title, url: s.url }));
+  const vars = {
+    providerName: PROVIDER_NAMES[provider],
+    appUrl: APP_URLS[provider],
+    since,
+    releaseNotes: releaseNotes.map((s) => s.url).join(', ') || 'the provider\'s own release notes',
+  };
   const tasks = [];
 
-  const research = scenarios.research;
   // Not `${provider}.research`: that catalog feature re-exports a chat of
   // the user's own; sharing its id made collect mix the two up.
   const researchId = `${provider}.day.research`;
@@ -211,6 +217,8 @@ const planDay = ({ provider, scenarios, catalog, fixtures, project, uploadsDir, 
     prompt: fill(research.prompt, vars),
     clarify: Object.fromEntries(Object.entries(research.clarify.answers).map(([k, v]) => [k, fill(v, vars)])),
     planApproval: research.clarify.planApproval,
+    // Filled in by `live.js day` after downloading: { title, url, file? | nothingNew? | error? }.
+    releaseNotes,
     exercises: ['out.research'],
     exportDetail: researchDetail,
     exportSnippet: exportWithScreenSnippet(researchDetail, provider),
@@ -305,6 +313,16 @@ const renderDayPlan = (plan, pollSnippet) => {
       out.push('Then move on. When it has finished (STATUS, every 2 min), run:', '');
       out.push('```js', t.exportSnippet, '```', '');
       out.push(...extraLines(t));
+      if ((t.releaseNotes || []).length) {
+        out.push(`**Official release notes** (TASK.md step 6: check them against the research report; entries since ${plan.since}):`, '');
+        for (const s of t.releaseNotes) {
+          const where = s.file ? `downloaded: \`${s.file}\` — read it with the Read tool`
+            : s.nothingNew ? `nothing new: ${s.nothingNew}`
+              : `not downloaded (${s.error || 'not fetched'}) — open it in a new Chrome tab and read it with get_page_text`;
+          out.push(`- ${s.title}: ${s.url} — ${where}`);
+        }
+        out.push('');
+      }
       return;
     }
     if (t.kind === 'reexport') {
@@ -517,6 +535,65 @@ const checkCapabilities = (exercises, provider, capabilities, exp, assistantText
   });
 };
 
+// -- release notes ----------------------------------------------------------------
+
+/** A release-notes page as plain text, one block element per line. */
+const htmlToText = (html) => String(html)
+  .replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, ' ')
+  // a heading always starts a line (entry dates are headings)
+  .replace(/<h[1-6]\b/gi, '\n$&')
+  .replace(/<br\s*\/?>|<\/(?:p|div|li|h[1-6]|tr|section|article|header|footer|nav|main|aside|ul|ol|dl|dt|dd|table|blockquote|pre|details|summary)>/gi, '\n')
+  .replace(/<[^>]+>/g, ' ')
+  .replace(/&nbsp;|&#160;/g, ' ')
+  .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+  .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+  .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+  .replace(/&amp;/g, '&')
+  .split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean)
+  .join('\n');
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const MONTH = '(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\\.?';
+const DATE_RES = [
+  [new RegExp(`\\b${MONTH} (\\d{1,2}),? (20\\d\\d)\\b`, 'g'), (m) => [m[3], MONTHS.indexOf(m[1].slice(0, 3).toLowerCase()) + 1, m[2]]],
+  [new RegExp(`\\b(\\d{1,2}) ${MONTH},? (20\\d\\d)\\b`, 'g'), (m) => [m[3], MONTHS.indexOf(m[2].slice(0, 3).toLowerCase()) + 1, m[1]]],
+  [/\b(20\d\d)[-./](\d{2})[-./](\d{2})\b/g, (m) => [m[1], m[2], m[3]]],
+];
+
+/** Every date in the text: [{ at, iso }] in text order. */
+const datesIn = (text) => {
+  const out = [];
+  for (const [re, parts] of DATE_RES) {
+    for (const m of text.matchAll(re)) {
+      const [y, mo, d] = parts(m).map(Number);
+      if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) out.push({ at: m.index, iso: `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}` });
+    }
+  }
+  return out.sort((a, b) => a.at - b.at);
+};
+
+/**
+ * The part of a newest-first release-notes text that covers `since` (ISO
+ * day) and later: up to the first older date after the last date >= since,
+ * cut at that line. Entry dates are the ones on short heading-like lines
+ * ("October 21, 2026", "v4.16336.0 2026-11-03", "2026.10.13"), never later
+ * than `today`: dates inside an entry's text ("Redeem until December 31")
+ * would drag the slice months back. No dates at all: the first 60k chars.
+ */
+const sinceSlice = (text, since, { today = '9999-12-31', max = 150000 } = {}) => {
+  const lineOf = (at) => text.slice(text.lastIndexOf('\n', at) + 1, (text.indexOf('\n', at) + 1 || text.length + 1) - 1);
+  const all = datesIn(text).filter((d) => d.iso <= today);
+  const headings = all.filter((d) => lineOf(d.at).length <= 60);
+  const dates = headings.length ? headings : all;
+  if (!dates.length) return { text: text.slice(0, 60000), dated: false, newest: null };
+  const fresh = dates.filter((d) => d.iso >= since);
+  if (!fresh.length) return { text: '', dated: true, newest: dates.map((d) => d.iso).sort().pop() };
+  const last = fresh[fresh.length - 1].at;
+  const older = dates.find((d) => d.at > last && d.iso < since);
+  const end = older ? text.lastIndexOf('\n', older.at) + 1 || older.at : text.length;
+  return { text: text.slice(0, Math.min(end, max)), dated: true, newest: fresh.map((d) => d.iso).sort().pop() };
+};
+
 /**
  * Was the last reply complete when exported? Looks at the conversation the
  * export fetched (HAR). ChatGPT: the current node's message status; Claude:
@@ -562,5 +639,7 @@ module.exports = {
   compareScreen,
   checkCapabilities,
   completeness,
+  htmlToText,
+  sinceSlice,
   flatten,
 };

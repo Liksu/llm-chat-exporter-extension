@@ -533,9 +533,51 @@ test('live day: plan and scenario catalog', () => {
     const md = liveDay.renderDayPlan({ ...plan, createdAt: '2026-10-12T10:00:00Z' }, 'POLL');
     assert.match(md, /RESEARCH — start first/);
     assert.match(md, /Scenario `road-trip`/);
+
+    // Official release notes: named in the research prompt and listed in the plan.
+    const notes = plan.tasks[0].releaseNotes;
+    assert.ok(notes.length >= 1 && notes.every((s) => /^https:\/\//.test(s.url) && s.title), 'claude has release-notes sources');
+    for (const s of notes) assert.ok(plan.tasks[0].prompt.includes(s.url), `research prompt names ${s.url}`);
+    for (const p of ['chatgpt', 'gemini']) assert.ok((scenarios.research.releaseNotes[p] || []).length, `${p} has release-notes sources`);
+    const fetched = [{ ...notes[0], file: 'tests/live/runs/x/release-notes/1-a.txt' }, { title: 'B', url: 'https://b.example/notes', nothingNew: 'no entries since 2026-09-01' }, { title: 'C', url: 'https://c.example/notes', error: 'HTTP 403' }];
+    const md2 = liveDay.renderDayPlan({ ...plan, createdAt: '2026-10-12T10:00:00Z', tasks: [{ ...plan.tasks[0], releaseNotes: fetched }] }, 'POLL');
+    assert.match(md2, /Official release notes/);
+    assert.match(md2, /downloaded: `tests\/live\/runs\/x\/release-notes\/1-a\.txt`/);
+    assert.match(md2, /nothing new: no entries since 2026-09-01/);
+    assert.match(md2, /not downloaded \(HTTP 403\) — open it in a new Chrome tab/);
   } finally {
     fs.rmSync(runsDir, { recursive: true, force: true });
   }
+});
+
+/** Release-notes pages: plain text, entries since the previous day only. */
+test('live day: release notes since the previous day', () => {
+  const { htmlToText, sinceSlice } = require('../tools/live-day');
+  const text = htmlToText([
+    '<html><head><style>.x{}</style><script>var a = "October 1, 2026";</script></head><body>',
+    '<nav>Release notes &amp; updates</nav>',
+    '<h2>October 30, 2026</h2><p>Maps in replies&nbsp;now show photos. Offer valid until December 31, 2026.</p>',
+    '<h3>v4.29.0 2026-10-27</h3><p>Fixed charts.<br>Works since September 2, 2026 for some users.</p>',
+    '<h2>2026.10.13</h2><p>Skills in chat &#8212; rolling out.</p>',
+    '<h2>October 9, 2026</h2><p>Older entry.</p>',
+    '<h2>September 30, 2026</h2><p>Much older.</p>',
+    '</body></html>',
+  ].join(''));
+  assert.ok(!/October 1, 2026|\.x\{\}/.test(text), 'scripts and styles are dropped');
+  assert.match(text, /^Release notes & updates$/m);
+  assert.match(text, /Skills in chat — rolling out\./);
+
+  const s = sinceSlice(text, '2026-10-12', { today: '2026-11-04' });
+  assert.equal(s.newest, '2026-10-30', 'a future date inside an entry is not an entry date');
+  assert.match(s.text, /Maps in replies/);
+  assert.match(s.text, /Works since September 2, 2026/, 'an older date inside an entry does not cut it');
+  assert.match(s.text, /Skills in chat/);
+  assert.ok(!/Older entry|Much older/.test(s.text), 'entries before the previous day are cut');
+
+  assert.deepEqual(sinceSlice(text, '2026-11-01', { today: '2026-11-04' }), { text: '', dated: true, newest: '2026-10-30' });
+  const undated = sinceSlice('Some page\nwithout any dates', '2026-10-12');
+  assert.equal(undated.dated, false);
+  assert.match(undated.text, /without any dates/);
 });
 
 /** Page inventory vs export: lost text, pictures and links are errors. */

@@ -81,7 +81,10 @@ all before starting) and `plan.json`. The plan has, in this order:
   `POLL` (result of a long export), `PASTE` (paste a long text into the
   composer the way a user would).
 - **Research** — the prompt (with the date of this provider's previous
-  test day filled in) and how to answer its questions.
+  test day filled in) and how to answer its questions, plus the
+  provider's **official release notes**: `live.js day` downloaded each
+  page into `release-notes/` of the run (entries since that date only),
+  or says it couldn't.
 - **Re-export** — existing test chats of this provider (from
   `tests/live/fixtures.local.json`), each with its export snippet. Tasks
   may carry a **note from the user** about that chat ("changed by hand,
@@ -219,6 +222,26 @@ chat, how to trigger it, the source, and a proposed capability entry
 prompt), try it now in a new chat in the test project, export it, and
 include the result.
 
+Then the **official release notes** listed under the research task in
+`plan.md` — a check that doesn't depend on what the research happened to
+find:
+
+- Read each downloaded file in `release-notes/` with the Read tool. A
+  source marked *not downloaded* — open its URL in a new Chrome tab and
+  read it with `get_page_text`; if that fails too, note it and move on.
+  *Nothing new* means the page has no entries since the previous day.
+- Take every entry that can change what appears **inside a chat** (the
+  same five groups as the research prompt). Skip API, pricing, admin,
+  Code/CLI-only and desktop-only entries (say "desktop-only" when the
+  entry says so).
+- In `discovery.md` add a section **Release notes** — a table: date ·
+  entry · source · in the research? (yes / no) · in the catalog? (the
+  capability id, or "new"). Entries the research missed get the same
+  treatment as research findings above (what it shows, how to trigger it,
+  a proposed capability; try it if cheap).
+- Research findings that no official page mentions stay, marked
+  "unconfirmed" (as before).
+
 Run `npm test` again: the newly recorded scenarios must pass.
 
 ## 7. Put things back
@@ -235,8 +258,10 @@ In this order:
 2. **The model writes differently** — new keys / types / tags from schema
    drift and the audit (e.g. a new component markup), even if nothing
    broke yet.
-3. **New features** — from the research and your own observations;
-   confirmed (tried and seen) or not.
+3. **New features** — from the research, the official release notes and
+   your own observations; confirmed (tried and seen) or not. Name the
+   release-notes entries the research missed, and sources that couldn't
+   be read.
 4. **Gaps** — `unknown` / `unsupported` capabilities that appeared and
    aren't exported.
 5. **Couldn't do** — skipped turns, missing controls, sign-in walls,
