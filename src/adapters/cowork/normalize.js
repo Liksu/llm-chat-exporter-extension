@@ -38,6 +38,24 @@
 
   const isObject = (v) => v !== null && typeof v === 'object';
 
+  const mimeFromName = (name) => {
+    const ext = String(name || '').toLowerCase().split('.').pop();
+    const map = {
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      webp: 'image/webp',
+      pdf: 'application/pdf',
+      zip: 'application/zip',
+      json: 'application/json',
+      md: 'text/markdown',
+      txt: 'text/plain',
+      csv: 'text/csv',
+    };
+    return map[ext] || 'application/octet-stream';
+  };
+
   /** Injected context blocks that the UI never shows the user. */
   const isSystemReminder = (s) => /^\s*<system-reminder>/.test(String(s || ''));
 
@@ -134,6 +152,7 @@
 
     let currentRole = null;
     let currentBlocks = null;
+    let currentAttachments = null;
     let currentCreatedAt;
     // Consecutive Agent summaries merge into a single thinking block —
     // agents are launched in parallel batches, and six <details> sections
@@ -146,10 +165,11 @@
         role: currentRole,
         createdAt: currentCreatedAt,
         blocks: currentBlocks,
-        attachments: [],
+        attachments: currentAttachments,
       });
       currentRole = null;
       currentBlocks = null;
+      currentAttachments = null;
       currentCreatedAt = undefined;
       openAgentBlock = null;
     };
@@ -159,6 +179,7 @@
         flush();
         currentRole = role;
         currentBlocks = [];
+        currentAttachments = [];
         currentCreatedAt = createdAt;
       }
     };
@@ -167,6 +188,42 @@
       ensureTurn(role, createdAt);
       currentBlocks.push(block);
       openAgentBlock = null;
+    };
+
+    /**
+     * Files the human attached to a message (`payload.file_attachments`:
+     * `{file_name, file_uuid, is_image}`). Images go inline like in the chat
+     * UI, with their bytes fetched by the content script; other files are
+     * listed as attachments of the turn.
+     */
+    const imageRefs = [];
+    const addUploads = (list, createdAt) => {
+      if (!Array.isArray(list)) return;
+      for (const f of list) {
+        if (!isObject(f)) continue;
+        const fileName = (typeof f.file_name === 'string' && f.file_name.trim()) || 'file.bin';
+        const fileUuid = typeof f.file_uuid === 'string' ? f.file_uuid : null;
+        const mime = mimeFromName(fileName);
+        if (f.is_image === true || mime.startsWith('image/')) {
+          const block = {
+            kind: 'image',
+            mime: mime.startsWith('image/') ? mime : 'image/png',
+            name: fileName,
+            bytes: new Uint8Array(0),
+          };
+          pushBlock('human', block, createdAt);
+          imageRefs.push({ block, ref: { url: null, fileUuid, mime: block.mime } });
+          continue;
+        }
+        ensureTurn('human', createdAt);
+        currentAttachments.push({
+          category: 'binary',
+          fileName,
+          mime,
+          fileUuid,
+          isImage: false,
+        });
+      }
     };
 
     const pushAgentLine = (line, createdAt) => {
@@ -193,19 +250,19 @@
       // ---- human input -------------------------------------------------
       if (e.event_type === 'user' && e.source === 'client' && msg) {
         const c = msg.content;
+        let text = '';
         if (typeof c === 'string') {
-          if (!c.trim() || isSystemReminder(c)) continue;
-          pushBlock('human', { kind: 'text', text: c.trim() }, createdAt);
+          text = c.trim();
         } else if (Array.isArray(c)) {
-          const text = c
+          text = c
             .filter((b) => isObject(b) && b.type === 'text' && typeof b.text === 'string')
             .map((b) => b.text)
             .join('\n\n')
             .trim();
-          if (text && !isSystemReminder(text)) {
-            pushBlock('human', { kind: 'text', text }, createdAt);
-          }
         }
+        if (isSystemReminder(text)) text = '';
+        if (text) pushBlock('human', { kind: 'text', text }, createdAt);
+        addUploads(p.file_attachments, createdAt);
         continue;
       }
 
@@ -338,7 +395,8 @@
 
     // Drop turns with nothing renderable (same lenient rule the other
     // adapters use — markdown.js makes the final visibility call).
-    const filtered = turns.filter((t) => t.blocks.length > 0);
+    const filtered = turns.filter((t) => t.blocks.length > 0 || t.attachments.length > 0);
+    const binaryAttachments = filtered.flatMap((t) => t.attachments.filter((a) => a.category === 'binary' && a.fileUuid));
 
     const conversation = {
       title: (session && session.title) || 'Cowork session',
@@ -350,7 +408,9 @@
       artifacts,
     };
 
-    return { conversation };
+    // imageRefs / binaryAttachments point at objects inside `conversation`;
+    // the content script fills in their bytes.
+    return { conversation, imageRefs, binaryAttachments };
   };
 
   ns.coworkNormalize = { normalize };

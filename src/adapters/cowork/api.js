@@ -156,11 +156,64 @@
     return events;
   };
 
+  /**
+   * Scheduled tasks: every run is a cowork session, but claude.ai opens it
+   * as a plain chat at /chat/<uuid> (a version-8 uuid, the run's
+   * `conversation_uuid`). The regular conversation endpoint answers 404
+   * (`chat_conversation_not_found`) for it, and nothing converts the uuid
+   * into the `cse_` id locally — the link lives only in the task's run
+   * list:
+   *
+   *   GET /api/organizations/{org}/cowork/scheduled_tasks
+   *       → { data: [{ id: 'trig_…', … }] }          (ended tasks included)
+   *   GET /api/organizations/{org}/cowork/scheduled_tasks/{trig}/runs?limit=&cursor=
+   *       → { data: [{ id: 'cse_…', conversation_uuid, … }], next_cursor }
+   *
+   * Returns the session id of the run with that conversation uuid, or null.
+   */
+  const findScheduledRunSession = async (orgId, convUuid) => {
+    if (!orgId || !convUuid) return null;
+    const getOrgJson = async (path) => {
+      const res = await fetch(`https://claude.ai/api/organizations/${orgId}${path}`, {
+        credentials: 'include',
+        headers: { accept: 'application/json' },
+      });
+      if (!res.ok) {
+        throw new ApiError(`GET ${path} → ${res.status} ${res.statusText}`, res.status);
+      }
+      return res.json();
+    };
+    const tasksBody = await getOrgJson('/cowork/scheduled_tasks');
+    const tasks = Array.isArray(tasksBody && tasksBody.data) ? tasksBody.data : [];
+    const want = String(convUuid).toLowerCase();
+    const MAX_PAGES = 50;
+    for (const task of tasks) {
+      const trig = task && task.id;
+      if (!trig) continue;
+      let cursor = null;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const qs = `?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+        const body = await getOrgJson(`/cowork/scheduled_tasks/${encodeURIComponent(trig)}/runs${qs}`);
+        const runs = Array.isArray(body && body.data) ? body.data : [];
+        const hit = runs.find((r) => r && String(r.conversation_uuid || '').toLowerCase() === want);
+        if (hit && hit.id) {
+          log.debug('cowork: scheduled run', convUuid, '→', hit.id, 'of', trig);
+          return hit.id;
+        }
+        const next = body && body.next_cursor;
+        if (!next || next === cursor || !runs.length) break;
+        cursor = next;
+      }
+    }
+    return null;
+  };
+
   ns.coworkApi = {
     parseSessionIdFromUrl,
     isCoworkUrl,
     fetchSession,
     fetchAllEvents,
+    findScheduledRunSession,
     ApiError,
   };
 })();

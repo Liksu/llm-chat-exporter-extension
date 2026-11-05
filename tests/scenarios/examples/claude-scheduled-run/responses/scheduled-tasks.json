@@ -1,0 +1,4 @@
+{"data":[
+  {"id":"trig_01TestDaily","name":"Daily digest","enabled":true,"created_kind":"ROUTINE_CREATED_KIND_COWORK_TASK","ended_reason":""},
+  {"id":"trig_01TestOnce","name":"Forecast check","enabled":false,"created_kind":"ROUTINE_CREATED_KIND_COWORK_TASK","ended_reason":"run_once_fired"}
+]}

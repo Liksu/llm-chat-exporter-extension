@@ -1,0 +1,110 @@
+{
+  "name": "claude-scheduled-run",
+  "adapter": "claude",
+  "location": "https://claude.ai/chat/00000000-0000-8000-8000-000000000005",
+  "fakeDate": "2026-10-01T12:00:00Z",
+  "host": "https://claude.ai",
+  "mocks": [
+    {
+      "method": "GET",
+      "path": "/api/organizations",
+      "file": "organizations.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/organizations/00000000-0000-0000-0000-0000000000aa/chat_conversations/00000000-0000-8000-8000-000000000005",
+      "file": "conversation-not-found.json",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "path": "/api/organizations/00000000-0000-0000-0000-0000000000aa/cowork/scheduled_tasks",
+      "file": "scheduled-tasks.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/organizations/00000000-0000-0000-0000-0000000000aa/cowork/scheduled_tasks/trig_01TestDaily/runs",
+      "file": "runs-daily.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/organizations/00000000-0000-0000-0000-0000000000aa/cowork/scheduled_tasks/trig_01TestOnce/runs",
+      "queryMatch": { "cursor": "page2" },
+      "file": "runs-once-2.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/organizations/00000000-0000-0000-0000-0000000000aa/cowork/scheduled_tasks/trig_01TestOnce/runs",
+      "file": "runs-once-1.json"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/code/sessions/cse_01TestScheduledRun",
+      "file": "session.json"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/code/sessions/cse_01TestScheduledRun/events",
+      "file": "events.json"
+    },
+    {
+      "method": "GET",
+      "pathRegex": "^/api/(00000000-0000-0000-0000-0000000000aa|organizations/00000000-0000-0000-0000-0000000000aa)/files/00000000-0000-0000-0000-0000000000f9/(preview|contents)$",
+      "file": "photo-preview.webp",
+      "contentType": "image/webp"
+    },
+    {
+      "method": "GET",
+      "path": "/api/organizations/00000000-0000-0000-0000-0000000000aa/files/00000000-0000-0000-0000-0000000000fa/contents",
+      "file": "notes.pdf",
+      "contentType": "application/pdf"
+    }
+  ],
+  "exports": [
+    {
+      "name": "md-default",
+      "message": {
+        "kind": "export",
+        "mode": "md",
+        "includeReasoning": false,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": true,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "Forecast check, 5 November-2026-10-01.md",
+      "expectedContent": "expected/md-default.md"
+    },
+    {
+      "name": "md-with-reasoning",
+      "message": {
+        "kind": "export",
+        "mode": "md",
+        "includeReasoning": true,
+        "includeDates": true,
+        "dateFormat": "iso-utc",
+        "inlineImages": false,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "Forecast check, 5 November-2026-10-01.md",
+      "expectedContent": "expected/md-with-reasoning.md"
+    },
+    {
+      "name": "zip-default",
+      "message": {
+        "kind": "export",
+        "mode": "zip",
+        "includeReasoning": false,
+        "includeDates": false,
+        "dateFormat": "iso-utc",
+        "inlineImages": false,
+        "inlineTextFiles": false,
+        "attachmentsAsMarkdown": false
+      },
+      "expectedFilename": "Forecast check, 5 November-2026-10-01.zip",
+      "expectedContent": "expected/zip-default"
+    }
+  ]
+}

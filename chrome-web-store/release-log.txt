@@ -12,6 +12,9 @@ ChatGPT
 • Anything new ChatGPT may add later falls back to ChatGPT's own plain-text version of the answer instead of raw tags.
 • Files ChatGPT no longer serves (expired uploads) are no longer reported on the extension's Errors page; the export still marks them as unavailable.
 
+Claude
+• Fixed: chats started by a scheduled task failed to export with "404". They now export like any chat, including pictures you attached to your messages.
+
 ## v0.7.50 — 2026-10-14
 
 ChatGPT
