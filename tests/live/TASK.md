@@ -271,6 +271,33 @@ In this order:
 End with concrete next steps for the user to approve. Don't do them
 unasked.
 
+## Keeping the run lean
+
+Most of a day's cost is context: every step re-reads the whole
+conversation so far, so whatever goes into it early is paid for again on
+every later step. Save where it costs nothing in quality — never skip a
+check, a look you need to judge the page, or a file a step needs.
+
+- **Screenshots.** To see where things are after a click or a navigation,
+  take them at `scale: 0.5`; to read small text, `zoom` into that region.
+  Take a full-size one when you judge something new on the page (a widget,
+  a card, a side panel — gap-hunting) or when the half-size one isn't
+  clear. Whether a reply is finished is `STATUS`'s job; finding a control
+  is `find`'s.
+- **Batches.** Put steps you can predict into one `browser_batch`: switch
+  tab + `STATUS`, click + type + zoom check. A navigation stays a call of
+  its own (UI notes), and so does each export snippet.
+- **Big outputs.** Don't print whole exports, HARs or logs into the
+  conversation — `grep` / `head` the part you are checking; `report.md`
+  has what `collect` found. `read_page` without a filter and
+  `get_page_text` return tens of thousands of characters on a long chat
+  page: use them when a step needs the page's text (release notes), not to
+  look around.
+- **Files when they're needed.** This file and `plan.md` in full at the
+  start; `scenarios.json` at step 6.
+- **Connectors stay as they are.** Don't switch them on or off: the switch
+  also changes the user's defaults for new sessions.
+
 ## UI notes (learned the hard way)
 
 - Typing right after a navigation in the same batch of browser actions
@@ -316,10 +343,12 @@ export).
   the user to allow it for the site.
 - `{"ok":false,"error":"Page-triggered exports are disabled …"}` — stop
   and ask the user to enable the dev option (precondition 2), then retry.
-- `TIMEOUT` or the tool returns nothing useful — the dev tooling isn't
-  loaded: reload the tab once and retry. Still nothing → the extension
-  isn't the unpacked dev build or needs a reload in `chrome://extensions`;
-  ask the user, don't continue blindly.
+- `TIMEOUT`, `{}` or nothing useful — run `POLL` first: if it returns a
+  result, the export ran and the tool just didn't wait for it (don't run
+  the export snippet again). `POLL` still `PENDING` after a minute → the
+  dev tooling isn't loaded: reload the tab once and retry. Still nothing →
+  the extension isn't the unpacked dev build or needs a reload in
+  `chrome://extensions`; ask the user, don't continue blindly.
 - `{"ok":false,"error":"…"}` (anything else) — that's a finding. Note it
   and continue; the `.debug.har` was still saved.
 

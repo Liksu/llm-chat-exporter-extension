@@ -107,8 +107,8 @@ const inventoryJs = (provider) => `const sel = ${JSON.stringify(PAGE[provider] |
     },
   };`;
 
-/** Inventory + export (+ wait up to 30 s for the result, like snippetFor). */
-const exportWithScreenSnippet = (detail, provider) => `(async () => {
+/** Inventory + export (+ wait up to 30 s for the result; top-level await, like snippetFor). */
+const exportWithScreenSnippet = (detail, provider) => `await (async () => {
   ${inventoryJs(provider)}
   const detail = Object.assign(${JSON.stringify(detail)}, { screen });
   const el = document.documentElement;

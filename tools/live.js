@@ -81,9 +81,11 @@ const exportDetail = (catalog, feature) => ({
  * JS to run on the chat page (page world): start the export, then wait up
  * to 30 s for the result. Browser tools cut scripts off after ~45 s and a
  * big chat can take longer to export, so on 'PENDING' run POLL_SNIPPET
- * until it returns the result.
+ * until it returns the result. The snippets start with a top-level `await`
+ * (the browser tools evaluate with REPL semantics): without it a tool can
+ * hand back the pending promise as `{}` while the export runs on.
  */
-const snippetFor = (detail) => `(async () => {
+const snippetFor = (detail) => `await (async () => {
   const el = document.documentElement;
   delete el.dataset.llmExporterResult;
   window.dispatchEvent(new CustomEvent('llm-exporter:export', { detail: ${JSON.stringify(JSON.stringify(detail))} }));
@@ -94,7 +96,7 @@ const snippetFor = (detail) => `(async () => {
   return 'PENDING: export still running -- run the poll snippet';
 })()`;
 
-const POLL_SNIPPET = `(async () => {
+const POLL_SNIPPET = `await (async () => {
   const el = document.documentElement;
   for (let i = 0; i < 60; i++) {
     if (el.dataset.llmExporterResult) return el.dataset.llmExporterResult;
