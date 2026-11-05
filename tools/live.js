@@ -168,6 +168,7 @@ const prepare = (args) => {
       uploads: wantNew ? (f.uploads || []).map((u) => path.join(UPLOADS_DIR, u)) : [],
       prompt: wantNew ? f.prompt || null : null,
       followUps: wantNew ? f.followUps || [] : [],
+      manualSteps: f.manualSteps || null,
       // fixtures.local.json "note": what the user wants the tester to know
       // about this test chat (e.g. "continued by hand on …, differences
       // expected"). Shown in plan.md and the report.
@@ -204,6 +205,7 @@ const renderPlan = (plan) => {
     out.push(`## ${i + 1}. ${t.featureId} — ${t.action === 'create' ? 'CREATE a new chat' : 're-export'}`, '');
     out.push(`_${t.title}_`, '');
     if (t.note) out.push(`> **Note from the user about this chat:** ${t.note}`, '');
+    if (t.manualSteps) out.push(`> **Manual step, required before exporting:** ${t.manualSteps}`, '');
     if (t.action === 'reexport') {
       out.push(`1. Open ${t.url} and wait until the conversation has loaded.`);
       out.push('2. Run the export snippet below.', '');
@@ -764,7 +766,13 @@ const collectRun = async (args) => {
     }
     const pass = auditErrors.length === 0 && r.expect.results.every((x) => x.ok) && matrixOk;
     const supported = r.support === 'supported';
-    r.status = pass ? (supported ? 'OK' : 'NEWLY_WORKING') : (supported ? 'BROKEN' : 'GAP');
+    // A feature that needs a manual step (clicking something on the page)
+    // fails its expectations when the step was skipped -- that alone is
+    // MANUAL. Audit or matrix errors are breakage whatever the step.
+    const onlyExpectations = auditErrors.length === 0 && matrixOk;
+    r.status = pass ? (supported ? 'OK' : 'NEWLY_WORKING')
+      : feature && feature.manualSteps && onlyExpectations ? 'MANUAL'
+        : (supported ? 'BROKEN' : 'GAP');
     try {
       const rec = await recordScenario(task.featureId, harPath, auditErrors.map((f) => f.code));
       r.scenario = path.relative(REPO_ROOT, rec.dir);
@@ -806,14 +814,15 @@ const collectRun = async (args) => {
   fs.writeFileSync(path.join(runDir, 'report.md'), md);
   console.log(md);
   console.log(`\nReport: ${path.relative(REPO_ROOT, path.join(runDir, 'report.md'))}`);
-  process.exit(results.some((r) => r.status === 'BROKEN' || r.status === 'EXPORT_FAILED') ? 1 : 0);
+  process.exit(results.some((r) => ['BROKEN', 'EXPORT_FAILED', 'MANUAL'].includes(r.status)) ? 1 : 0);
 };
 
-const STATUS_ORDER = ['BROKEN', 'EXPORT_FAILED', 'PREMATURE', 'GAP', 'NEWLY_WORKING', 'NOT_RUN', 'OK'];
+const STATUS_ORDER = ['BROKEN', 'EXPORT_FAILED', 'PREMATURE', 'MANUAL', 'GAP', 'NEWLY_WORKING', 'NOT_RUN', 'OK'];
 const STATUS_TITLE = {
   BROKEN: 'Broken — the export lost or damaged something',
   EXPORT_FAILED: 'Export failed',
   PREMATURE: 'Exported too early — the last reply was not finished; re-export these chats',
+  MANUAL: 'Expectations failed on a feature that needs a manual step — the step was skipped, or it is broken: do the step (see the plan), re-export, and if it still fails it is broken',
   GAP: 'Gaps — not supported yet',
   NEWLY_WORKING: 'Newly working — marked unsupported/unknown in features.json, but pass',
   NOT_RUN: 'Not run — no export found for these tasks',

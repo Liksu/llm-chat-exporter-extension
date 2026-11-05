@@ -32,54 +32,23 @@ const vm = require('node:vm');
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
 /**
- * Content-script ordering per adapter. Mirrors manifest.json's
- * content_scripts entries (the document_idle batch — we skip document_start
- * hooks since tests bypass token capture by direct injection).
+ * Content-script ordering per adapter, read from manifest.json's
+ * content_scripts (the document_idle batch that ends with the adapter's
+ * content.js -- the document_start hooks are skipped since tests bypass
+ * token capture by direct injection). Reading the manifest keeps the tests
+ * loading exactly what Chrome loads: a script missing from the manifest
+ * fails here too.
  */
-const SCRIPTS_BY_ADAPTER = {
-  chatgpt: [
-    'src/vendor/fflate.min.js',
-    'src/core/utils.js',
-    'src/core/fetch-binary.js',
-    'src/core/markdown.js',
-    'src/core/zip.js',
-    'src/core/download.js',
-    'src/core/export-entry.js',
-    'src/core/dev-loader.js',
-    'src/adapters/chatgpt/api.js',
-    'src/adapters/chatgpt/genui.js',
-    'src/adapters/chatgpt/sidebar.js',
-    'src/adapters/chatgpt/normalize.js',
-    'src/adapters/chatgpt/content.js',
-  ],
-  claude: [
-    'src/vendor/fflate.min.js',
-    'src/core/utils.js',
-    'src/core/fetch-binary.js',
-    'src/core/markdown.js',
-    'src/core/zip.js',
-    'src/core/download.js',
-    'src/core/export-entry.js',
-    'src/core/dev-loader.js',
-    'src/adapters/claude/api.js',
-    'src/adapters/claude/widgets.js',
-    'src/adapters/claude/normalize.js',
-    'src/adapters/claude/content.js',
-  ],
-  gemini: [
-    'src/vendor/fflate.min.js',
-    'src/core/utils.js',
-    'src/core/fetch-binary.js',
-    'src/core/markdown.js',
-    'src/core/zip.js',
-    'src/core/download.js',
-    'src/core/export-entry.js',
-    'src/core/dev-loader.js',
-    'src/adapters/gemini/api.js',
-    'src/adapters/gemini/normalize.js',
-    'src/adapters/gemini/content.js',
-  ],
-};
+const MANIFEST = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'manifest.json'), 'utf8'));
+const SCRIPTS_BY_ADAPTER = Object.fromEntries(
+  ['chatgpt', 'claude', 'gemini'].map((adapter) => {
+    const entry = (MANIFEST.content_scripts || []).find((c) => (c.js || []).includes(`src/adapters/${adapter}/content.js`));
+    if (!entry) throw new Error(`manifest.json has no content script for ${adapter}`);
+    return [adapter, entry.js];
+  }),
+);
+// ChatGPT generative UI modules, in manifest order.
+const GENUI_SCRIPTS = SCRIPTS_BY_ADAPTER.chatgpt.filter((s) => s.includes('/chatgpt/genui/'));
 
 /**
  * Developer tooling (src/dev/). In the extension, core/dev-loader.js
@@ -388,6 +357,7 @@ function installDownloadCapture(sandbox, captured) {
 
 module.exports = {
   SCRIPTS_BY_ADAPTER,
+  GENUI_SCRIPTS,
   DEV_SCRIPTS,
   scriptsFor,
   createBrowserContext,

@@ -401,6 +401,29 @@
   };
 
   /**
+   * The text followed by a numbered **Sources** list: the unique urls of the
+   * message's content_references, with page titles (as the Claude adapter's
+   * reports end).
+   */
+  const withSourcesList = (text, meta) => {
+    const refs = isObject(meta) && Array.isArray(meta.content_references) ? meta.content_references : [];
+    const rows = new Map();
+    for (const ref of refs) {
+      if (!isObject(ref)) continue;
+      for (const it of Array.isArray(ref.items) ? ref.items : []) {
+        for (const s of [it, ...(isObject(it) && Array.isArray(it.supporting_websites) ? it.supporting_websites : [])]) {
+          if (!isObject(s) || typeof s.url !== 'string' || !s.url) continue;
+          const url = cleanSourceUrl(s.url);
+          if (!rows.has(url)) rows.set(url, String(s.title || s.attribution || url).replace(/\s+/g, ' ').replace(/[[\]]/g, '').trim());
+        }
+      }
+    }
+    if (!rows.size) return text;
+    const list = [...rows].map(([url, title], i) => `${i + 1}. [${title}](${url})`).join('\n');
+    return `${text.trimEnd()}\n\n## Sources\n\n${list}\n`;
+  };
+
+  /**
    * ChatGPT Apps SDK reports — Deep Research, custom connectors that render
    * inside the chat as an embedded widget. The visible assistant message has
    * `chatgpt_sdk_suppressed_response: true` with empty parts (because the UI
@@ -445,7 +468,7 @@
     const text = parts.filter((p) => typeof p === 'string').join('\n\n').trim();
     if (!text) return null;
 
-    const cleaned = stripCiteMarkers(text);
+    const cleaned = withSourcesList(stripCiteMarkers(resolveCiteMarkers(text, reportMsg.metadata)), reportMsg.metadata);
 
     // Title preference: plan title (set when the deep-research planner ran),
     // then the report's first H1, then a generic fallback.
@@ -675,8 +698,12 @@
       if (!text) return out;
       if (role === 'user') text = quoteSelections(text);
       // Generative-UI answers: components (<box>, <Link/>, <Cite/>…) → markdown.
-      if (role === 'assistant' && ns.chatgptGenui && ns.chatgptGenui.isGenUi(meta)) {
-        text = ns.chatgptGenui.render(text, meta);
+      // When they can't all be rendered it is the server's static version,
+      // whose entity/url markers are resolved here like any answer's.
+      // render.js, genui's last file, sets render: if a genui file failed to
+      // load, the text stays as it is rather than the whole export failing.
+      if (role === 'assistant' && ns.chatgptGenui && ns.chatgptGenui.render && ns.chatgptGenui.isGenUi(meta)) {
+        text = stripCiteMarkers(resolveCiteMarkers(ns.chatgptGenui.render(text, meta), meta));
       }
       // Assistant -> tool dispatch: the message has content_type "text" but
       // recipient is a specific tool id (e.g. image-gen's "t2uay3k.sj1i4kz"

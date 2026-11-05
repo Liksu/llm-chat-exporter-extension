@@ -64,7 +64,7 @@
           if (r.fileName) block.name = r.fileName;
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          log.warn('chatgpt image fetch failed', ref, msg);
+          log.fetchFailed('chatgpt image fetch failed', ref.fileId, msg);
           block.fetchError = msg;
         }
       }
@@ -93,7 +93,7 @@
           }
           if (r.fileName && !att.fileName) att.fileName = r.fileName;
         } catch (err) {
-          log.warn('chatgpt file fetch failed', att.fileName, err);
+          log.fetchFailed('chatgpt file fetch failed', att.fileName, err);
           // Mark so markdown renderer can show the file as expired/removed
           // instead of emitting a dangling link to a file the zip doesn't
           // contain.
@@ -115,7 +115,7 @@
           const mime = utils.sniffImageMime(r.bytes);
           if (mime) sandboxRewriteMap.set(att.sandboxPath, `data:${mime};base64,${utils.uint8ToBase64(r.bytes)}`);
         } catch (err) {
-          log.warn('chatgpt sandbox image fetch failed', att.fileName, err);
+          log.fetchFailed('chatgpt sandbox image fetch failed', att.fileName, err);
         }
       }
     }
@@ -131,7 +131,7 @@
           att.category = 'text';
           delete att.needsContentFetch;
         } catch (err) {
-          log.warn('chatgpt text file fetch failed', att.fileName, err);
+          log.fetchFailed('chatgpt text file fetch failed', att.fileName, err);
         }
       }
     }

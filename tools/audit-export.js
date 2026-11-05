@@ -270,7 +270,7 @@ const TEXT_MARKERS = [
   ['selection-markup', 'error', /^# Selected text:\s*$|^## (?:Selection \d+|My request:)\s*$/g,
     (m) => `reply-to-selection wrapper leaked into the text: ${m[0]}`],
   // Svelte-style template blocks around such components ({#each … as p}).
-  ['template-markup', 'error', /\{[#:/](?:each|if|else|await|key)\b[^}\n]*\}/g,
+  ['template-markup', 'error', /\{[#:/](?:each|if|else|await|key)\b[^}\n]*\}|\{@body\b[^}\n]*\}?|\bDIL\.\w+/g,
     (m) => `UI template markup leaked into the text: ${m[0].slice(0, 80)}`],
   ['object-object', 'error', /\[object Object\]/g,
     () => '"[object Object]" in output — something stringified an object'],

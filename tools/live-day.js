@@ -438,7 +438,8 @@ const compareScreen = (screen, exp) => {
 
   // Pictures: web pictures by URL; the rest (uploads, generated) by count.
   const exportImageCount = (md.match(/!\[[^\]]*\]\(/g) || []).length;
-  const screenImages = (screen.images || []).filter((i) => i.src && !/^data:image\/svg/i.test(i.src));
+  // Business logos next to places/restaurants are decorative.
+  const screenImages = (screen.images || []).filter((i) => i.src && !/^data:image\/svg/i.test(i.src) && !/\/chatgpt\/clients\/business-logos\//.test(i.src));
   const mdUrls = new Set((md.match(/\]\((https?:\/\/[^)\s]+)/g) || []).map((m) => normUrl(m.slice(2))));
   const missingImages = screenImages.filter((i) => {
     if (!/^https?:/i.test(i.src)) return false;
@@ -505,7 +506,8 @@ const CAPABILITY_EVIDENCE = {
   // table rows end in "|  " (the renderer's line breaks)
   'out.formatting': (x) => /^\|.*\|[ \t]*$/m.test(x.assistant) || /^#{1,6} /m.test(x.assistant) || /^\s*[-*] /m.test(x.assistant),
   'out.reasoning': (x) => /<details><summary>Thinking<\/summary>/.test(x.md),
-  'out.research': (x) => x.artifacts.length > 0 || x.assistant.length > 3000,
+  // A research report cites its sources: links in the report, plus a Sources list.
+  'out.research': (x) => x.reports.some((r) => /\]\(https?:\/\//.test(r) && /^#+ Sources|^\*\*Sources\*\*/m.test(r)),
   'in.image': (x) => /!\[[^\]]*\]\(/.test(x.human),
   'in.pdf': (x) => /\.pdf\b/i.test(x.md),
   'in.text-file': (x) => /\.(md|csv|js|txt)\b/i.test(x.human) || /\.(md|csv|js|txt)\b/i.test(x.md),
@@ -523,8 +525,11 @@ const checkCapabilities = (exercises, provider, capabilities, exp, assistantText
     assistant: assistantText,
     human: humanText,
     artifacts: keys.filter((k) => k.startsWith('artifacts/')),
+    // Texts of the report artifacts (md mode keeps them inside the .md).
+    reports: keys.filter((k) => /^artifacts\/.+\.md$/i.test(k)).map((k) => exp.files.get(k).toString('utf8')),
     files: keys.filter((k) => k.startsWith('files/')),
   };
+  if (!x.reports.length) x.reports = [x.md];
   const byId = new Map(capabilities.map((c) => [c.id, c]));
   return exercises.map((id) => {
     const cap = byId.get(id);
@@ -596,7 +601,8 @@ const sinceSlice = (text, since, { today = '9999-12-31', max = 150000 } = {}) =>
 
 /**
  * Was the last reply complete when exported? Looks at the conversation the
- * export fetched (HAR). ChatGPT: the current node's message status; Claude:
+ * export fetched (HAR). ChatGPT: the current node's message status (an empty
+ * trailing reply behind a finished tool result doesn't count); Claude:
  * the last message's stop_reason. Gemini: can't tell (null).
  */
 const completeness = (provider, harLog) => {
@@ -609,7 +615,13 @@ const completeness = (provider, harLog) => {
       if (!b) return null;
       const conv = JSON.parse(b.text);
       const node = conv.mapping && conv.mapping[conv.current_node];
-      const m = node && node.message;
+      let m = node && node.message;
+      // After an image-generation call the server leaves an empty, never
+      // finalized assistant text message behind the finished tool result.
+      const prev = node && conv.mapping[node.parent];
+      const emptyText = m && m.author && m.author.role === 'assistant' && m.content && m.content.content_type === 'text' &&
+        !(m.content.parts || []).some((p) => typeof p === 'string' && p.trim());
+      if (emptyText && m.status !== 'finished_successfully' && prev && prev.message && prev.message.author.role === 'tool' && prev.message.status === 'finished_successfully') m = prev.message;
       if (!m) return null;
       return m.status === 'finished_successfully' ? { complete: true } : { complete: false, why: `last message status ${m.status}` };
     }

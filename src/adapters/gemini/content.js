@@ -77,7 +77,7 @@
           block.bytes = r.bytes;
           if (r.mime) block.mime = r.mime;
         } catch (err) {
-          log.warn('gemini image fetch failed', ref.url, err);
+          log.fetchFailed('gemini image fetch failed', ref.url, err);
           block.fetchError = err instanceof Error ? err.message : String(err);
         }
       }
@@ -94,7 +94,7 @@
             att.mime = r.mime;
           }
         } catch (err) {
-          log.warn('gemini file fetch failed', att.fileName, err);
+          log.fetchFailed('gemini file fetch failed', att.fileName, err);
           att.fetchError = err instanceof Error ? err.message : String(err);
         }
       }
@@ -111,7 +111,7 @@
           att.category = 'text';
           delete att.needsContentFetch;
         } catch (err) {
-          log.warn('gemini text file fetch failed', att.fileName, err);
+          log.fetchFailed('gemini text file fetch failed', att.fileName, err);
         }
       }
     }

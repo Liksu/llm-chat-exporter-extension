@@ -456,7 +456,7 @@
           "[\\uE000-\\uF8FF]"
         ]
       },
-      "notes": "gpt-6 answers are markdown + JSX-like components (metadata.model_dil_v2): layout tags are dropped, Link/Cite/Entity/AsyncImage become markdown (src/adapters/chatgpt/genui.js). The model decides whether to use components; if the md shows none, the check is weak -- say so."
+      "notes": "gpt-6 answers are markdown + JSX-like components (metadata.model_dil_v2): layout tags are dropped, Link/Cite/Entity/AsyncImage become markdown (src/adapters/chatgpt/genui/). The model decides whether to use components; if the md shows none, the check is weak -- say so."
     },
     {
       "id": "chatgpt.entity-panels",
@@ -465,6 +465,7 @@
       "support": "supported",
       "refresh": "each-run",
       "prompt": "In two sentences: what is the Eiffel Tower and who designed it?",
+      "manualSteps": "Click the highlighted names in the answer (the follow-ups below) before exporting: the side panels exist only in this tab's memory, so a re-export or a reload cannot contain them.",
       "followUps": [
         "Click a highlighted name in the answer (for example Gustave Eiffel) to open its side panel; wait until the panel has finished writing, then close it.",
         "Open a second highlighted name the same way and let it finish. Export from this tab without reloading it."

@@ -5,6 +5,12 @@
 ChatGPT
 • Fixed: in a row of picture cards, each card's picture, name and caption ran together on one line. They now stay on separate lines, as in the chat.
 • Side panels you opened by clicking a highlighted name (a person, place, case or product) are added under the answer as a quote, with their sources. ChatGPT writes a panel only when you open it and doesn't save it with the chat, so the export has the panels opened in this tab since it was last loaded; they are kept in the tab's memory only and never leave your browser. A panel you closed before it finished writing is exported as far as it got, marked as cut off.
+• Fixed: GPT-6 interactive answers no longer leak raw code into the export. Forms and questionnaires, checklists, sliders, calculators and other little apps ChatGPT builds in a reply are exported as text, showing them as they first appear: options with the selected one marked, checkboxes, values and computed totals.
+• Quizzes (questions, options, the right answer folded), flashcards (both sides of every card), pronunciation cards, stock quotes, NBA scores, restaurant booking times (with booking links), ratings and picture groups are now in the export as text.
+• Citations to an uploaded file show the file name and the lines or page.
+• Deep Research reports keep their sources again: inline links like the chips in the chat and a numbered Sources list at the end.
+• Anything new ChatGPT may add later falls back to ChatGPT's own plain-text version of the answer instead of raw tags.
+• Files ChatGPT no longer serves (expired uploads) are no longer reported on the extension's Errors page; the export still marks them as unavailable.
 
 ## v0.7.50 — 2026-10-14
 

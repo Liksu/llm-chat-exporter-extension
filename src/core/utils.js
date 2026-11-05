@@ -67,6 +67,18 @@
     info: (...args) => console.info(LOG_PREFIX, ...args),
     warn: (...args) => console.warn(LOG_PREFIX, ...args),
     error: (...args) => console.error(LOG_PREFIX, ...args),
+    /**
+     * A file or picture the export couldn't download. One that the chat no
+     * longer serves (HTTP 404/410: an expired upload, a sandbox file gone)
+     * is the chat's state, not an exporter fault -- the export marks it as
+     * unavailable -- so it's logged as info and stays off the extension's
+     * Errors page. Anything else is a warning.
+     */
+    fetchFailed: (what, name, err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      const gone = /\b(?:404|410)\b/.test(msg);
+      (gone ? console.info : console.warn)(LOG_PREFIX, what, String(name == null ? '' : name), msg);
+    },
   };
 
   const escapeHtml = (s) =>

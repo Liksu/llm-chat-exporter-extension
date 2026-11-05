@@ -149,7 +149,7 @@
           }
         }
         if (!block.bytes || block.bytes.length === 0) {
-          if (lastErr) log.warn('image fetch failed', ref, lastErr);
+          if (lastErr) log.fetchFailed('image fetch failed', ref.fileName || ref.fileUuid || ref.url, lastErr);
           block.fetchError = lastErr
             ? (lastErr instanceof Error ? lastErr.message : String(lastErr))
             : sources.length ? 'empty response' : 'no download reference';
@@ -183,7 +183,7 @@
             if (r.mime) att.mime = r.mime;
           }
         } catch (err) {
-          log.warn('file fetch failed', att.fileName, err);
+          log.fetchFailed('file fetch failed', att.fileName, err);
           att.fetchError = err instanceof Error ? err.message : String(err);
         }
       }
@@ -199,7 +199,7 @@
         att.text = decoder.decode(r.bytes);
         delete att.needsContentFetch;
       } catch (err) {
-        log.warn('text file fetch failed', att.fileName, err);
+        log.fetchFailed('text file fetch failed', att.fileName, err);
         att.text = '_(failed to load file content)_';
         delete att.needsContentFetch;
       }

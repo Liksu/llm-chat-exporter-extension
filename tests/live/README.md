@@ -69,8 +69,11 @@ deleted automatically).
    (`tools/schema-drift.js`). Report: `runs/<date>/report.md`.
 
 Statuses: **BROKEN** (a `supported` feature fails) · **EXPORT_FAILED** ·
-**GAP** (`unsupported`/`unknown` feature fails) · **NEWLY_WORKING** ·
-**NOT_RUN** · **OK**.
+**PREMATURE** (exported before the last reply finished: re-export) ·
+**MANUAL** (a feature with `manualSteps` failed only its expectations: the
+step was skipped, or it is broken) · **GAP** (`unsupported`/`unknown`
+feature fails) · **NEWLY_WORKING** · **NOT_RUN** · **OK**. BROKEN,
+EXPORT_FAILED and MANUAL fail the run.
 
 The first run creates all test chats (one per feature, ~25); later runs
 mostly re-export them. That is cheap and catches changes in the API
@@ -161,6 +164,7 @@ Add an entry to `features.json`:
   "uploads": ["bar-chart.png"],      // from fixtures/
   "prompt": "What to send",
   "followUps": ["What to do after the reply"],
+  "manualSteps": "optional: clicks only a person can do before exporting; a failed expectation (with no audit or matrix error) is then MANUAL, not BROKEN; MANUAL still fails the run",
   "export": { "mode": "md" },        // optional overrides of defaults.export
   "expect": {
     "turns": ">=2", "images": "==2", "files": ">=1", "artifacts": ">=1",

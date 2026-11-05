@@ -31,6 +31,7 @@ const { findScenarios, runExport, executeExport, unzipBlob } = require('./scaffo
 const { audit, loadDir, loadMd } = require('../tools/audit-export');
 
 const SCENARIOS_DIR = path.join(__dirname, 'scenarios');
+const { GENUI_SCRIPTS } = require('./scaffolding/loader');
 
 const scenarios = findScenarios(SCENARIOS_DIR);
 
@@ -183,7 +184,7 @@ test('chatgpt entity panels: finished copy wins, one per answer, code stays code
   const context = require('node:vm').createContext(sandbox);
   require('./scaffolding/loader').loadScripts(context, [
     'src/core/utils.js',
-    'src/adapters/chatgpt/genui.js',
+    ...GENUI_SCRIPTS,
     'src/adapters/chatgpt/sidebar.js',
     'src/adapters/chatgpt/normalize.js',
   ]);
@@ -538,12 +539,34 @@ test('live checks: scopes of md / assistant / output matches', () => {
  * <svg> is kept whole with valid attribute names, a <Chart> becomes a table
  * of its data. (Shapes from a real chat, 2026-10-14.)
  */
-test('chatgpt genui: table cells, svg drawings, charts', () => {
+const loadGenui = () => {
   const sandbox = {};
   sandbox.self = sandbox;
   const context = require('node:vm').createContext(sandbox);
-  require('./scaffolding/loader').loadScripts(context, ['src/adapters/chatgpt/genui.js']);
-  const { render } = sandbox.__exporter.chatgptGenui;
+  require('./scaffolding/loader').loadScripts(context, GENUI_SCRIPTS);
+  return sandbox.__exporter.chatgptGenui;
+};
+
+/**
+ * Model data as model_dil_v2 carries it: component results keyed by opaque
+ * ids, listed in `constants` in the order of their tags.
+ */
+const genuiMeta = (results, extra = {}) => ({
+  model_dil_v2: {
+    constants: Object.fromEntries(results.map((_, i) => [String(i), `id-${i}`])),
+    appData: {
+      opGenui: {
+        componentResults: Object.fromEntries(results.map(([componentName, state], i) => [`id-${i}`, { status: 'resolved', componentName, state }]).reverse()),
+        modelDataBindings: extra.bindings || {},
+      },
+    },
+    ...(extra.fallbackMarkdown ? { fallbackMarkdown: extra.fallbackMarkdown } : {}),
+  },
+  ...(extra.meta || {}),
+});
+
+test('chatgpt genui: table cells, svg drawings, charts', () => {
+  const { render } = loadGenui();
   const md = render([
     '| Пара осей | Что показывают исследования |',
     '|---|---|',
@@ -593,6 +616,255 @@ test('chatgpt genui: table cells, svg drawings, charts', () => {
   assert.deepEqual(audit({ md: `# C\n\n## Assistant\n\n${md}\n`, files: new Map() }).filter((f) => f.severity === 'error'), []);
   const broken = '# C\n\n## Assistant\n\n| a | b |\n|---|---|\n| x |\n\ny\n\n |\n';
   assert.ok(audit({ md: broken, files: new Map() }).some((f) => f.code === 'broken-table-row'));
+});
+
+/**
+ * ChatGPT generative UI program and controls: useState and const values
+ * drive {#each}/{#if} and the controls' initial state; a value the
+ * evaluator can't work out shows as nothing; braces naming nothing bound
+ * stay text. (Shapes from the 2026-11-04 demo chats.)
+ */
+test('chatgpt genui: program state and controls', () => {
+  const { render, unrendered } = loadGenui();
+  const md = render([
+    '{@body const [days,setDays] = DIL.useState("14")}',
+    '{@body const [picked,setPicked] = DIL.useState(["a"])}',
+    '{@body const [n,setN] = DIL.useState(3)}',
+    '{@body const opts = [{id:"a",label:"Alpha"},{id:"b",label:"Beta"}]}',
+    '{@body const total = n*2+1}',
+    '{@body const money = v => "$"+v.toFixed(2)}',
+    '{@body const pick = () => { return Math.random() }}',
+    '<box gap={2}>',
+    '  <radio-group value={days} onChange={setDays}>',
+    '    <radio value="10">10 days</radio>',
+    '    <radio value="14">14 days</radio>',
+    '  </radio-group>',
+    '  {#each opts as o}',
+    '    <checkbox key={o.id} checked={picked.includes(o.id)} onChange={v=>setPicked(p=>[...p,o.id])}>{o.label}</checkbox>',
+    '  {/each}',
+    '  <slider min={0} max={30} step={1} value={n*6} marks={[{value:0,label:"0%"}]}/>',
+    '  <label>Name</label>',
+    '  <input value="" placeholder="Your name"/>',
+    '  <date-picker value={"2026-12-08"} onChange={x=>x}/>',
+    '  <segmented-control value="custom" options={[{value:"equal",label:"Split equally"},{value:"custom",label:"Custom"}]}/>',
+    '  {#if days === "14" && !picked.includes("b")}Long trip: {total} km{:else if n > 2}Mid{:else}Short{/if}',
+    '  <text>Each: {money(total)}</text>',
+    '  <text>Draw: {pick()}</text>',
+    '  <text>Width {`${n*10}%`}</text>',
+    '  <button onClick={()=>GenUI.copy("x")}>Copy it</button>',
+    '</box>',
+    'Range \\frac{2}{g} and {1, 2}.',
+  ].join('\n'), { model_dil_v2: {} });
+  assert.match(md, /^- ○ 10 days\n- ◉ 14 days$/m);
+  assert.match(md, /^- \[x\] Alpha\n- \[ \] Beta$/m);
+  assert.match(md, /^🎚️ 18 \(0–30\)$/m);
+  assert.match(md, /^Name\n\n____ _\(Your name\)_$/m);
+  assert.match(md, /^`2026-12-08`$/m);
+  assert.match(md, /^- ○ Split equally\n- ◉ Custom$/m);
+  assert.match(md, /^Long trip: 7 km$/m);
+  assert.match(md, /^Each: \$7\.00$/m);
+  assert.match(md, /^Draw:$/m);
+  assert.match(md, /^Width 30%$/m);
+  assert.match(md, /Range \\frac\{2\}\{g\} and \{1, 2\}\.$/);
+  assert.doesNotMatch(md, /Copy it|Mid|Short|DIL|@body|\{#|\{:|\{\//);
+  assert.equal(unrendered(md), false);
+});
+
+/**
+ * The genui expression interpreter: arrow functions, spread, the pure
+ * helpers the programs use -- and everything else unknown, bounded.
+ */
+test('chatgpt genui: expression interpreter', () => {
+  const { evaluate, MISSING } = loadGenui().expr;
+  const scope = {
+    events: [{ name: 'A', type: 'Test' }, { name: 'B', type: 'Landing' }, { name: 'C', type: 'Landing' }],
+    filter: 'Landing',
+    subtotal: '180',
+    tip: 18,
+    names: ['P1', 'P2'],
+    later: MISSING,
+  };
+  const ev = (src) => evaluate(src, scope);
+  // Arrows, object spread and shorthand, chained array helpers.
+  assert.equal(JSON.stringify(ev('events.map((e,i)=>({...e,i})).filter(e=>filter==="All"||e.type===filter).map(e=>e.i)')), '[1,2]');
+  assert.equal(ev('events.find(e=>e.type==="Landing").name'), 'B');
+  assert.equal(ev('events.findIndex(e=>e.name==="C")'), 2);
+  assert.equal(ev('events.some(e=>e.type==="Test") && events.every(e=>e.name.length===1)'), true);
+  assert.equal(ev('[3,1,2].sort((a,b)=>a-b).slice(1).join("-")'), '2-3');
+  assert.equal(ev('[1,2,3].reduce((a,b)=>a+b,0)'), 6);
+  assert.equal(JSON.stringify(ev('[[1],[2]].flatMap(x=>x)')), '[1,2]');
+  assert.equal(JSON.stringify(ev('Array.from({length:3},(_,i)=>i*2)')), '[0,2,4]');
+  assert.equal(JSON.stringify(ev('[0.4,1.6].map(Math.floor)')), '[0,1]');
+  // Numbers and strings as the page formats them (en-US only).
+  assert.equal(ev('Math.round((Number(subtotal)||0)*tip)/100'), 32.4);
+  assert.equal(ev('"$"+(1234.5).toFixed(2)'), '$1234.50');
+  assert.equal(ev('(1234567.891).toLocaleString("en-US",{maximumFractionDigits:1})'), '1,234,567.9');
+  assert.equal(ev('Math.max(...[1,5,3]) + Math.min(2, 4) + Math.pow(2, 3) + Math.abs(-1) + Math.sqrt(9)'), 19);
+  assert.equal(ev('2**3**2'), 512);
+  assert.equal(ev('"  Apollo ".trim().toUpperCase().replace("O", "0") + " " + "x".padStart(3, ".")'), 'AP0LLO ..x');
+  assert.equal(ev('names.includes("P2") && "a-b".split("-").length === 2 && "abc".startsWith("ab")'), true);
+  assert.equal(ev('parseInt("42px") + parseFloat("1.5") + String(3)'), '43.53');
+  assert.equal(ev('`${names.length} of ${events.length}`'), '2 of 3');
+  // A closure from the program, called later.
+  const money = evaluate('n => "$"+(n/100).toFixed(2)', scope);
+  assert.equal(evaluate('money(tip*100)', { ...scope, money }), '$18.00');
+  // Unknown: statement bodies, assignments, other globals, unknown names,
+  // Math.random, prototype methods, runaway recursion and huge arrays.
+  for (const src of [
+    '() => { return 1 }', 'tip = 2', 'Math.random()', 'window.location', 'Date.now()', 'later + 1', 'nope',
+    'names.push("x")', 'names.constructor(1)', '"a".replace(/a/, "b")', 'Array.from({length:1e7})',
+    // Lists that grow past the item cap as they are built.
+    'Array.from({length:200}).flatMap(() => Array.from({length:200}))',
+    'Array.from({length:9000}).concat(Array.from({length:9000}))',
+    // Strings that grow past the char cap: doubled in a loop, padded,
+    // joined, replaced; and a split into more items than the cap.
+    'Array.from({length:28}).reduce(s => s + s, "x")',
+    'Array.from({length:28}).reduce(s => `${s}${s}`, "x")',
+    'Array.from({length:28}).reduce(s => s.replace("y", s), "xy")',
+    '"x".padStart(1e9)',
+    'Array.from({length:2000}).map(() => "x".padStart(1000)).join("")',
+    '"x".padStart(2000).replaceAll(" ", "y".padStart(1000))',
+    'Array.from({length:10000}).map(() => "abcdefghij").join("").split("")',
+  ]) assert.equal(ev(src), MISSING, src);
+  // Within the caps they work.
+  assert.equal(ev('Array.from({length:19}).reduce(s => s + s, "x").length'), 2 ** 19);
+  assert.equal(ev('Array.from({length:1000}).map(() => "x".padStart(1000)).join("").length'), 1e6);
+  assert.equal(ev('names.constructor'), undefined); // no prototype access
+  const loop = evaluate('f => f(f)', scope);
+  assert.equal(evaluate('loop(loop)', { loop }), MISSING);
+  // Lazy: an unknown part in a branch not taken doesn't matter.
+  assert.equal(ev('tip > 10 ? "big" : later'), 'big');
+  assert.equal(ev('false && later.x'), false);
+});
+
+/**
+ * A {…} attribute value with quotes, a backslash or a line break is written
+ * back as one quoted attribute (entities), so the tag still parses.
+ */
+test('chatgpt genui: attribute values with quotes', () => {
+  const { render, unrendered } = loadGenui();
+  // As the model writes it: JSON-style escapes inside the braces.
+  const md = render(String.raw`See <Link url="https://x.test/a" title={"The \"Best\" guide & <more>"}/> now. <Link url="https://x.test/b" title={"C:\\temp"}/>`, { model_dil_v2: {} });
+  assert.equal(md, String.raw`See [The "Best" guide & <more>](https://x.test/a) now. [C:\temp](https://x.test/b)`);
+  assert.equal(unrendered(md), false);
+});
+
+/**
+ * ChatGPT generative UI named widgets, from their resolved results (in the
+ * order of their ids in `constants`) or their own attributes.
+ */
+test('chatgpt genui: named widgets', () => {
+  const { render, unrendered } = loadGenui();
+  const quizQ = (v) => ({ prompt: `Q${v}?`, options: [{ value: 'A', label: 'one', feedback: 'no' }, { value: 'B', label: 'two', feedback: 'yes, two' }], correct_values: ['B'] });
+  const meta = genuiMeta(
+    [
+      ['LearningQuiz', { title: 'Quiz T', questions: [quizQ(1)] }],
+      ['Rating', { rating_label: '4.3', review_count_label: '(1,740)', attribution: { provider_label: 'Tripadvisor', provider_url: 'https://ta/x' } }],
+      ['StockChart', { asset_display_name: 'NVIDIA Corp (NVDA)', current_price_text: '$200.13', price_status_text: 'Closed', fallback_summary: { price_change_text: '-$6.41 (3.1%)' }, metrics_display: [{ cols: [{ label: 'Open', value: '203.58' }] }], timeframe_configs: { '1D': { chart: { data: [{ close: 1 }] } } } }],
+      ['NbaScores', { rows: [{ games: [{ game: { game_id: 'g1', teams: [{ name: 'Celtics', score: '93' }, { name: 'Rockets', score: '109', winner: true }], primaryLabel: 'Final', secondaryLabel: 'Nov 2' } }] }] }],
+      ['ReservationTimePillsRefWidget', { reservation_identity: { name: 'Barolo' }, groups: [{ request_date_label: 'Thu, Nov 5', party_size_label: '4 guests', times: [{ formatted_time: '7:00 PM', url: 'https://book/7' }], change_options: [{ provider_name: 'OpenTable', url: 'https://ot' }] }] }],
+      ['FileCite', { refid: 'turn0file1', file_name: 'meeting-notes.md', file_action_payload: { input_pointer: { line_range_start: 12 } } }],
+      ['AsyncImageGroup', { images: [{ url: 'https://p/1', content_url: 'https://i/1.jpg', title: 'One' }, { url: 'https://p/2', content_url: 'https://i/2.jpg', title: 'Two' }] }],
+    ],
+    { bindings: { turn1business2: { name: 'Barolo', rating: { $type: 'business_rating' } } } }
+  );
+  const md = render([
+    '<LearningQuiz title="Ignored" questions={[{"question":"attr","options":[],"correctValues":[]}]}/>',
+    '<text><Entity ref="turn1business2" value={turn1business2.name}/></text>',
+    '<Rating data={turn1business2.rating}/>',
+    '<StockChart ticker="NVDA"/>',
+    '<NbaScores game_ids={["g1"]}/>',
+    '<ReservationTimePillsRefWidget ref="turn1business2"/>',
+    'Deadlines passed. <FileCite ref="turn0file1" line_range_start={12} line_range_end={16}/>',
+    '<AsyncImageGroup query={["a","b"]}/>',
+    '<row><favicon url="https://www.kayak.com" size="24px"/> **KAYAK**</row>',
+    '<LearningFlashcards title="Deck" cards={[{"front":"F1","back":"B1"},{"front":"F2","back":"B2"}]}/>',
+    '<LanguageLearningBlockWidgetPronunciation source_text="Worcestershire" pronunciation_hint="WUUS-tuh-shuh" pronunciation_language="en-GB"/>',
+  ].join('\n'), meta);
+  assert.match(md, /^\*\*📝 Quiz T\*\*\n\n\*\*1\. Q1\?\*\*\n\n- A\) one\n- B\) two\n\n<details><summary>Answer<\/summary>\n\n\*\*B\) two\*\* — yes, two\n\n<\/details>$/m);
+  assert.match(md, /^★ 4\.3 \(1,740 reviews · \[Tripadvisor\]\(https:\/\/ta\/x\)\)$/m);
+  assert.match(md, /^📈 \*\*NVIDIA Corp \(NVDA\)\*\* — \$200\.13 · -\$6\.41 \(3\.1%\) · Closed\n\n_Open 203\.58_$/m);
+  assert.match(md, /^- 🏀 Celtics 93 – \*\*Rockets 109\*\* \(Final · Nov 2\)$/m);
+  assert.match(md, /^- 🕒 Thu, Nov 5 · 4 guests: \[7:00 PM\]\(https:\/\/book\/7\) \(book: \[OpenTable\]\(https:\/\/ot\)\)$/m);
+  assert.match(md, /^Deadlines passed\. \(meeting-notes\.md, lines 12–16\)$/m);
+  assert.match(md, /^\[!\[One\]\(https:\/\/i\/1\.jpg\)\]\(https:\/\/p\/1\) \[!\[Two\]\(https:\/\/i\/2\.jpg\)\]\(https:\/\/p\/2\)$/m);
+  assert.match(md, /^\*\*KAYAK\*\*$/m);
+  assert.match(md, /^1\. \*\*F1\*\* — B1\n2\. \*\*F2\*\* — B2$/m);
+  assert.match(md, /^🔊 \*\*Worcestershire\*\* — _WUUS-tuh-shuh_ \(en-GB\)$/m);
+  assert.doesNotMatch(md, /object Object|attr|Ignored|favicon/);
+  assert.equal(unrendered(md), false);
+  // Without a result the tag's own data is used; with neither it can't render.
+  const own = render('<LearningQuiz questions={[{"question":"Own?","options":[{"value":"A","label":"x"}],"correctValues":["A"]}]}/>', { model_dil_v2: {} });
+  assert.match(own, /\*\*1\. Own\?\*\*\n\n- A\) x\n\n<details><summary>Answer<\/summary>\n\n\*\*A\) x\*\*/);
+  assert.equal(unrendered(render('<LearningViz type_id="DNS_RESOLUTION"/>', { model_dil_v2: {} })), true);
+});
+
+/**
+ * ChatGPT generative UI safety net: what can't be rendered (an unknown
+ * widget, a condition the evaluator can't work out) makes the message come
+ * from the server's static version, its genui markers resolved; the
+ * entity/url markers stay for normalize.js.
+ */
+test('chatgpt genui: safety net falls back to the static version', () => {
+  const { render } = loadGenui();
+  const M = (...parts) => `\uE200${parts.join('\uE202')}\uE201`;
+  const meta = genuiMeta(
+    [
+      ['Cite', { items: [{ ref_id: 'turn1search0', url: 'https://nps.gov/x', title: 'Sand temps', source_label: 'NPS' }] }],
+      ['AsyncImage', { images: [{ url: 'https://p/hotel', content_url: 'https://i/hotel.jpg', title: 'Hotel', refs: [{ turn_index: 1, ref_type: 'business', ref_index: 4 }] }] }],
+    ],
+    {
+      bindings: { turn1business4: { name: 'Aarchway Inn', address: 'Moab, UT' } },
+      fallbackMarkdown: [
+        `**${M('entity', '["turn1business4","Aarchway Inn"]')}** is hot. ${M('cite', 'turn1search0')}`,
+        '',
+        M('image_group', '{"entity_refs":["turn1business4"],"layout":"carousel"}'),
+        '',
+        M('genui', '{"map_widget_v2":{"points":[{"ref":"turn1business4"}]}}'),
+        '',
+        `Notes ${M('filecite', 'turn0file0', 'L44-L61')}`,
+        '',
+        '[Copy bill breakdown]',
+        '',
+        '[Previous] / [Next]',
+        '',
+        '[NASA](https://nasa.gov) [x]',
+      ].join('\n'),
+    }
+  );
+  const fromStatic = render('Intro\n\n<FancyFutureWidget data={turn1business4}/>\n\n<Cite ref="turn1search0"/>', meta);
+  assert.match(fromStatic, /^\*\*\uE200entity\uE202\["turn1business4","Aarchway Inn"\]\uE201\*\* is hot\. \(\[NPS\]\(https:\/\/nps\.gov\/x "Sand temps"\)\)$/m);
+  assert.match(fromStatic, /^\[!\[Hotel\]\(https:\/\/i\/hotel\.jpg\)\]\(https:\/\/p\/hotel\)$/m);
+  assert.match(fromStatic, /^- 📍 \[Aarchway Inn\]\(https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=Aarchway%20Inn%2C%20Moab%2C%20UT\) — Moab, UT$/m);
+  assert.match(fromStatic, /^Notes \(lines 44–61\)$/m);
+  // The static version's buttons go; a line with a link stays.
+  assert.match(fromStatic, /\(lines 44–61\)\n\n\[NASA\]\(https:\/\/nasa\.gov\) \[x\]$/);
+  assert.doesNotMatch(fromStatic, /Fancy|Intro|Copy bill|Previous/);
+  // An {#if} on a value nobody can work out → the static version too.
+  const cond = render('{@body const x = Math.random()}\n<box>{#if x > 0.5}Yes{:else}No{/if}</box>', meta);
+  assert.match(cond, /is hot/);
+  // No static version: the render is kept as it is.
+  const kept = render('<box>A</box>\n<FancyFutureWidget/>', { model_dil_v2: {} });
+  assert.equal(kept, 'A\n\n<FancyFutureWidget/>');
+});
+
+/**
+ * ChatGPT generative UI in a markdown table: a picture, a place and a
+ * control written inside a cell stay on the row (pipes in them escaped).
+ */
+test('chatgpt genui: components inside a table cell stay on the row', () => {
+  const { render } = loadGenui();
+  const meta = genuiMeta([['AsyncImage', { images: [{ url: 'https://p/a', content_url: 'https://i/a.jpg', title: 'Guide | Site' }] }]]);
+  const md = render([
+    '| Photo | Stop | Time |',
+    '|---|---|---|',
+    '| <AsyncImage query="a" aspectRatio="5:4"/> | **<Entity category="place" value="Bryce"/>** <text size="xs">Hoodoos.</text> <text size="xs"><Link url="https://maps/x" title="Map"/></text> | 4 h |',
+    '| <checkbox checked>Go</checkbox> | <Chart content={{"xKey":"k","data":[{"k":"a","v":1}]}}/> | 1 h |',
+  ].join('\n'), meta);
+  const rows = md.split('\n');
+  assert.equal(rows.length, 4);
+  assert.equal(rows[2], '| [![Guide \\| Site](https://i/a.jpg)](https://p/a) | **Bryce** Hoodoos. [Map](https://maps/x) | 4 h |');
+  assert.match(rows[3], /^\| - \[x\] Go \| 📊 _Chart_ \\\| k \\\| v \\\|.* \| 1 h \|$/);
 });
 
 /**
@@ -756,4 +1028,73 @@ test('debug capture: keeps the page inventory sent with the export', async () =>
   assert.ok(r.response && r.response.ok);
   const har = JSON.parse(await r.captured.downloads[1].blob.text());
   assert.deepEqual(har.log._exporter.screen, screen);
+});
+
+/** Deep Research report (Apps SDK widget): citations become links plus a Sources list. */
+test('chatgpt deep research: report keeps its sources', () => {
+  const sandbox = {};
+  sandbox.self = sandbox;
+  const context = require('node:vm').createContext(sandbox);
+  const loader = require('./scaffolding/loader');
+  loader.loadScripts(context, loader.SCRIPTS_BY_ADAPTER.chatgpt.filter((s) => !/content\.js$/.test(s)));
+  const { chatgptNormalize } = sandbox.__exporter;
+  const cite = (n) => `citeturn0search${n}`;
+  const source = (n, extra = {}) => ({ url: `https://example.com/p${n}?utm_source=chatgpt.com`, title: `Page ${n}`, attribution: `Site${n}`, ...extra });
+  const report = {
+    status: 'completed',
+    plan: { title: 'Trends' },
+    report_message: {
+      content: { content_type: 'text', parts: [`# Trends\n\nA claim ${cite(1)}. Another ${cite(2)} and ${cite(3)}.`] },
+      metadata: {
+        content_references: [
+          { matched_text: cite(1), items: [source(1)] },
+          { matched_text: cite(2), items: [source(2, { supporting_websites: [source(3)] })] },
+          { matched_text: cite(3), items: [source(1), source(3)] },
+        ],
+      },
+    },
+  };
+  const msg = (id, parent, message) => ({ id, parent, children: [], message: { id, ...message } });
+  const raw = {
+    conversation_id: 'c1', title: 'Research', current_node: 't', create_time: 1, update_time: 2,
+    mapping: {
+      root: { id: 'root', parent: null, children: ['u'], message: null },
+      u: msg('u', 'root', { author: { role: 'user' }, create_time: 1, status: 'finished_successfully', content: { content_type: 'text', parts: ['Research it'] }, metadata: {} }),
+      t: msg('t', 'u', {
+        author: { role: 'tool', name: 'api_tool.call_tool' }, create_time: 2, status: 'finished_successfully',
+        content: { content_type: 'text', parts: [''] },
+        metadata: { chatgpt_sdk: { widget_state: JSON.stringify(report), widget_session_id: 's1' } },
+      }),
+    },
+  };
+  raw.mapping.root.children = ['u'];
+  raw.mapping.u.children = ['t'];
+  const { conversation } = chatgptNormalize.normalize(raw, {});
+  const content = conversation.artifacts[0].content;
+  assert.match(content, /A claim \(\[Site1\]\(https:\/\/example\.com\/p1 "Page 1"\)\)\./);
+  assert.match(content, /Another \(\[Site2\]\(https:\/\/example\.com\/p2 "Page 2"\), \[Site3\]\(https:\/\/example\.com\/p3 "Page 3"\)\)/);
+  assert.doesNotMatch(content, /[-]/);
+  assert.match(content, /\n## Sources\n\n1\. \[Page 1\]\(https:\/\/example\.com\/p1\)\n2\. \[Page 2\]\(https:\/\/example\.com\/p2\)\n3\. \[Page 3\]\(https:\/\/example\.com\/p3\)\n$/);
+
+  // Live-test tooling: a research capability needs source links and a Sources list.
+  const { checkCapabilities, completeness, compareScreen } = require('../tools/live-day');
+  const seen = (text) => checkCapabilities(['out.research'], 'chatgpt', [], { md: '', files: new Map([['artifacts/r.md', Buffer.from(text)]]) }, '', '')[0].seen;
+  assert.equal(seen(content), true);
+  assert.equal(seen(content.replace(/\]\(https?:\/\/[^)]*\)/g, ']')), false, 'no links');
+  assert.equal(seen('# R\n\n[a](https://x.io)'), false, 'no Sources list');
+
+  // An empty, never finalized reply behind a finished image tool result is not "unfinished".
+  const har = (nodes) => ({ entries: [{ request: { url: 'https://chatgpt.com/backend-api/conversation/00000000-0000-0000-0000-000000000001' }, response: { content: { text: JSON.stringify({ current_node: 'c', mapping: nodes }) } } }] });
+  const done = (role) => ({ parent: null, message: { author: { role }, status: 'finished_successfully', content: { content_type: 'text', parts: ['x'] } } });
+  const empty = { parent: 'b', message: { author: { role: 'assistant' }, status: 'in_progress', content: { content_type: 'text', parts: [''] } } };
+  assert.deepEqual(completeness('chatgpt', har({ b: { ...done('tool'), parent: 'a' }, a: done('user'), c: empty })), { complete: true });
+  assert.equal(completeness('chatgpt', har({ b: { ...done('assistant'), parent: 'a' }, a: done('user'), c: empty })).complete, false, 'no tool result before it');
+  const typing = { ...empty, message: { ...empty.message, content: { content_type: 'text', parts: ['Half a sent'] } } };
+  assert.equal(completeness('chatgpt', har({ b: { ...done('tool'), parent: 'a' }, a: done('user'), c: typing })).complete, false, 'real text');
+
+  // Business logos beside places are decorative.
+  const logo = 'https://persistent.oaistatic.com/chatgpt/clients/business-logos/abc.png';
+  const shot = compareScreen({ text: '', images: [{ src: logo }], links: [], counts: {} }, { md: '', files: new Map() });
+  assert.deepEqual(shot.errors, []);
+  assert.equal(shot.images.screen, 0);
 });
