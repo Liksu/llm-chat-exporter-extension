@@ -117,6 +117,16 @@
   const escapeMdInline = (s) =>
     String(s ?? '').replace(/([\\`*_{}\[\]()#+!~<>|])/g, '\\$1');
 
+  /**
+   * A relative path as a markdown link destination. Whitespace ends a bare
+   * destination and `)` closes the link early (`[r](artifacts/Report (Q1).md)`
+   * stops at the first `)`), so they are percent-encoded, and `%` with them
+   * so the path decodes back exactly. Other characters (Cyrillic too) stay
+   * readable.
+   */
+  const linkPath = (p) =>
+    String(p ?? '').replace(/[\s()%]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+
   /** Human-readable byte count. */
   const formatBytes = (n) => {
     if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return '';
@@ -394,6 +404,7 @@
     VERSION,
     escapeHtml,
     escapeMdInline,
+    linkPath,
     formatBytes,
     formatTurnDate,
     isTextLikeMime,

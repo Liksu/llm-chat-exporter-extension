@@ -31,7 +31,7 @@ The extension does not read tabs other than the active one, and does not access 
 |---|---|
 | `activeTab` | Read the current chat tab when you click Export. |
 | `storage` | Remember your default-format and toggle preferences. |
-| `declarativeNetRequestWithHostAccess` | Rewrite CORS response headers on requests to Google's asset CDNs so the extension can read Gemini's inline images and file uploads. The rule is scoped to the asset hosts listed below and only modifies `Access-Control-Allow-Origin` and `Access-Control-Allow-Credentials`; no request URLs are changed and no traffic is redirected. |
+| `declarativeNetRequestWithHostAccess` | Rewrite CORS response headers on requests to Google's asset CDNs so the extension can read Gemini's inline images and file uploads. The rule is scoped to the asset hosts listed below and to the extension's own requests (web pages' requests are never touched), and only modifies `Access-Control-Allow-Origin` and `Access-Control-Allow-Credentials`; no request URLs are changed and no traffic is redirected. |
 | Host access to `claude.ai`, `chatgpt.com`, and `gemini.google.com` | Run the content scripts that extract the conversation. |
 | Host access to `*.googleusercontent.com`, `*.usercontent.google.com`, and `lh1.google.com`–`lh7.google.com` | Fetch Gemini-attached files and inline / generated images. The extension's service worker downloads these via the user's existing Google session — same files the browser already loads when displaying the chat. |
 

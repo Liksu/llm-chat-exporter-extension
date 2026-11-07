@@ -74,10 +74,22 @@
  * embeds image blocks as base64 (md mode) or asset paths (zip mode), but
  * doesn't resolve free-form `![](filename)` markdown, so leaving an inline
  * reference would render as a broken duplicate.
+ *
+ * Reply elements: a placeholder URL on a line of its own marks where the
+ * page draws an element whose data sits in the candidate:
+ *   http://googleusercontent.com/immersive_entry_chip/<N>
+ *     the chip of a document the reply opened in the side panel (Canvas
+ *     document, code, slides, quiz, Deep Research report); its data is
+ *     candidate[30][N] -- becomes an artifact, referenced where the chip was
+ *   http://googleusercontent.com/deep_research_confirmation_content/<N>
+ *     the Deep Research plan card -- becomes the plan as text
+ * Components written as tags (<Callout>, <TemplateWidget>…) are turned into
+ * markdown by components.js.
  */
 (function () {
   const ns = (self.__exporter = self.__exporter || {});
   const { isTextLikeMime, sanitizeFilename, log } = ns.utils;
+  const { render: renderComponents } = ns.geminiComponents;
 
   // ---------------------------------------------------------------------- //
   //  Round walker                                                           //
@@ -291,16 +303,107 @@
   };
 
   /**
-   * Deep Research report (an "immersive" document) at candidate[30][0]:
-   *   [0] id "im_…", [2] title of the research plan, [4] report markdown
-   *   with "[cite: 1, 2]" markers, [5] citation data where each source is
-   *   [[favicon, url, title, …], n, …] (n = the number used in markers).
-   * Returns an Artifact (markers turned into links, Sources list appended)
-   * or null.
+   * Immersive documents -- what a reply opens in the side panel -- are at
+   * candidate[30][N], N being the number in the reply's
+   * `immersive_entry_chip/<N>` placeholder. Common fields:
+   *   [0] id, [2] title, [9] file name (Canvas), [10] kind:
    */
-  const extractImmersiveDoc = (cand) => {
-    const doc = Array.isArray(cand) && Array.isArray(cand[30]) ? cand[30][0] : null;
-    if (!Array.isArray(doc) || typeof doc[4] !== 'string' || !doc[4].trim()) return null;
+  const IMMERSIVE = {
+    DOCUMENT: 1, // Canvas text document: [4] markdown
+    CODE: 2, //     Canvas code: [4] the file in one fenced block
+    RESEARCH: 3, // Deep Research report: [4] markdown, [5] sources
+    QUIZ: 4, //     interactive quiz: [15] questions
+    SLIDES: 15, //  slide deck: [19][0] one HTML page
+  };
+
+  /** Code-fence language for a file name's extension ('' when unknown). */
+  const LANGUAGE_BY_EXT = {
+    md: 'markdown',
+    html: 'html',
+    htm: 'html',
+    css: 'css',
+    js: 'javascript',
+    jsx: 'jsx',
+    ts: 'typescript',
+    tsx: 'tsx',
+    py: 'python',
+    json: 'json',
+    svg: 'xml',
+    xml: 'xml',
+  };
+  const languageOf = (fileName) => {
+    const ext = /\.([a-z0-9]+)$/i.exec(fileName || '');
+    return (ext && LANGUAGE_BY_EXT[ext[1].toLowerCase()]) || '';
+  };
+
+  const docTitle = (doc) => (typeof doc[2] === 'string' ? doc[2].trim() : '');
+
+  /** The Canvas file name ([9]), or one made from the title. */
+  const docFileName = (doc, ext) =>
+    typeof doc[9] === 'string' && /\.[a-z0-9]+$/i.test(doc[9])
+      ? sanitizeFilename(doc[9])
+      : `${sanitizeFilename(docTitle(doc) || 'canvas')}${ext}`;
+
+  const docId = (doc) => (typeof doc[0] === 'string' && doc[0] ? doc[0] : `immersive:${docTitle(doc)}`);
+
+  /**
+   * A Canvas document or code file. Code comes as the whole file in one
+   * fenced block (```html … ```); the file holds what is inside the fence.
+   */
+  const canvasDoc = (doc) => {
+    const fileName = docFileName(doc, '.md');
+    let content = doc[4];
+    let language = languageOf(fileName);
+    const fenced = doc[10] === IMMERSIVE.CODE && /^(`{3,}|~{3,})([^\n`]*)\n([\s\S]*)\n\1[ \t]*$/.exec(content.trim());
+    if (fenced) {
+      content = `${fenced[3]}\n`;
+      language = fenced[2].trim() || language;
+    }
+    return { id: docId(doc), title: docTitle(doc) || fileName, language, content, fileName };
+  };
+
+  /** A slide deck: one HTML page with every slide. */
+  const slidesDoc = (doc) => {
+    const html = Array.isArray(doc[19]) ? doc[19][0] : null;
+    if (typeof html !== 'string' || !html.trim()) return null;
+    const fileName = docFileName(doc, '.html');
+    return { id: docId(doc), title: docTitle(doc) || fileName, language: 'html', content: html, fileName };
+  };
+
+  /**
+   * A quiz as markdown: each question with its options, the right one
+   * ticked, and the explanation the quiz shows after an answer. Question
+   * tuples are at [15][0][0]: [question, [[option, isCorrect, explanation, …], …]].
+   */
+  const quizDoc = (doc) => {
+    const questions = Array.isArray(doc[15]) && Array.isArray(doc[15][0]) && Array.isArray(doc[15][0][0])
+      ? doc[15][0][0].filter((q) => Array.isArray(q) && typeof q[0] === 'string')
+      : [];
+    if (!questions.length) return null;
+    const title = docTitle(doc) || 'Quiz';
+    const out = [`# ${title}`];
+    questions.forEach((q, i) => {
+      out.push('', `### ${i + 1}. ${q[0].trim()}`, '');
+      for (const o of Array.isArray(q[1]) ? q[1] : []) {
+        if (!Array.isArray(o) || typeof o[0] !== 'string') continue;
+        const why = typeof o[2] === 'string' && o[2].trim() ? ` — _${o[2].trim()}_` : '';
+        out.push(`- [${o[1] === true ? 'x' : ' '}] ${o[0].trim()}${why}`);
+      }
+    });
+    // The file name says .json (what the page loads); the export is markdown.
+    const fileName = docFileName(doc, '.md').replace(/\.json$/i, '.md');
+    return { id: docId(doc), title, language: 'markdown', content: `${out.join('\n')}\n`, fileName };
+  };
+
+  /**
+   * Deep Research report: [0] id "im_…", [2] title of the research plan,
+   * [4] report markdown with "[cite: 1, 2]" markers, [5] citation data
+   * where each source is [[favicon, url, title, …], n, …] (n = the number
+   * used in markers). Returns an Artifact (markers turned into links,
+   * Sources list appended) or null.
+   */
+  const researchReport = (doc) => {
+    if (typeof doc[4] !== 'string' || !doc[4].trim()) return null;
     const sources = new Map();
     const visit = (node, depth) => {
       if (!Array.isArray(node) || depth > 12) return;
@@ -334,6 +437,55 @@
       fileName: `${sanitizeFilename(title)}.md`,
       source: 'Deep Research',
     };
+  };
+
+  /** One immersive document → an Artifact, or null when it has no content we know. */
+  const immersiveDoc = (doc) => {
+    if (!Array.isArray(doc)) return null;
+    const kind = doc[10];
+    // Reports from before the kind field have an "im_…" id.
+    if (kind === IMMERSIVE.RESEARCH || (typeof doc[0] === 'string' && doc[0].startsWith('im_'))) {
+      return researchReport(doc);
+    }
+    if (kind === IMMERSIVE.QUIZ) return quizDoc(doc);
+    if (kind === IMMERSIVE.SLIDES) return slidesDoc(doc);
+    if (typeof doc[4] === 'string' && doc[4].trim()) return canvasDoc(doc);
+    log.debug('gemini: immersive document of unknown kind', kind, docTitle(doc));
+    return null;
+  };
+
+  /** candidate[30] as Artifacts, index-aligned with the chip numbers (null = skipped). */
+  const extractImmersiveDocs = (cand) =>
+    (Array.isArray(cand) && Array.isArray(cand[30]) ? cand[30] : []).map(immersiveDoc);
+
+  /**
+   * The Deep Research plan card ("Start research" / "Edit plan") shown at a
+   * `deep_research_confirmation_content/<N>` placeholder. It sits in the
+   * round's candidate metadata, tied to the placeholder by its URL:
+   *   [title, [[1, step, details], [2, step], …], eta, [start label], [url, N], …]
+   * Returns the plan as markdown, or '' when it isn't there.
+   */
+  const extractResearchPlan = (candidates, url) => {
+    let plan = null;
+    const visit = (node, depth) => {
+      if (plan || depth > 20 || !Array.isArray(node)) return;
+      if (typeof node[0] === 'string' && Array.isArray(node[1]) && Array.isArray(node[4]) && node[4][0] === url) {
+        plan = node;
+        return;
+      }
+      for (const child of node) visit(child, depth + 1);
+    };
+    visit(candidates, 0);
+    if (!plan) return '';
+    const steps = plan[1]
+      .filter((s) => Array.isArray(s) && typeof s[1] === 'string')
+      .map((s, i) => {
+        const details = typeof s[2] === 'string' && s[2].trim()
+          ? `\n${s[2].trim().split('\n').map((l) => `   ${l.trim()}`).join('\n')}`
+          : '';
+        return `${i + 1}. ${s[1].trim()}${details}`;
+      });
+    return [`📋 **Research plan: ${plan[0].trim()}**`, ...(steps.length ? ['', ...steps] : [])].join('\n');
   };
 
   const extractCandidateText = (candidate) => {
@@ -462,6 +614,25 @@
       .replace(/[ \t]+\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n');
 
+  /**
+   * Split reply text at element placeholders (see header doc) into text
+   * pieces and {kind, index, url} markers. Only a placeholder alone on its
+   * line counts: a reply may quote such a URL as text.
+   */
+  const ELEMENT_PLACEHOLDER_RE =
+    /^[ \t]*(https?:\/\/googleusercontent\.com\/(immersive_entry_chip|deep_research_confirmation_content)\/(\d+))[ \t]*$/gm;
+  const splitPlaceholders = (text) => {
+    const parts = [];
+    let last = 0;
+    for (const m of text.matchAll(ELEMENT_PLACEHOLDER_RE)) {
+      parts.push(text.slice(last, m.index));
+      parts.push({ kind: m[2], index: Number(m[3]), url: m[1] });
+      last = m.index + m[0].length;
+    }
+    parts.push(text.slice(last));
+    return parts;
+  };
+
   // ---------------------------------------------------------------------- //
   //  Top-level normalize                                                    //
   // ---------------------------------------------------------------------- //
@@ -485,7 +656,7 @@
     const imageRefs = [];
     const binaryAttachmentRefs = [];
     const textFileRefs = [];
-    const artifacts = []; // Deep Research reports
+    const artifacts = []; // side-panel documents: Canvas, Deep Research reports
 
     for (const round of rounds) {
       // ------- USER TURN --------------------------------------------------
@@ -566,21 +737,35 @@
 
       const rawText = extractCandidateText(cand);
       const generatedImages = extractGeneratedImages(cand);
-      const cleanedText = stripImagePlaceholders(stripCitationMarkers(rawText));
+      const cleanedText = renderComponents(stripImagePlaceholders(stripCitationMarkers(rawText)));
       const thinking = extractThinking(cand);
+      const docs = extractImmersiveDocs(cand);
 
       const aBlocks = [];
       if (thinking) {
         aBlocks.push({ kind: 'thinking', text: thinking });
       }
-      if (cleanedText && cleanedText.trim()) {
-        aBlocks.push({ kind: 'text', text: cleanedText });
+      // Every round carries the document's latest version under the same
+      // id: one artifact, referenced from each turn that showed its chip.
+      const placedDocs = new Set();
+      const placeDoc = (doc) => {
+        if (!artifacts.some((a) => a.id === doc.id)) artifacts.push(doc);
+        aBlocks.push({ kind: 'artifact_ref', artifactId: doc.id });
+        placedDocs.add(doc);
+      };
+      for (const part of splitPlaceholders(cleanedText)) {
+        if (typeof part === 'string') {
+          const text = part.replace(/^\n+|\n+$/g, '');
+          if (text.trim()) aBlocks.push({ kind: 'text', text });
+        } else if (part.kind === 'immersive_entry_chip') {
+          if (docs[part.index]) placeDoc(docs[part.index]);
+        } else {
+          const plan = extractResearchPlan(round.candidates, part.url);
+          if (plan) aBlocks.push({ kind: 'text', text: plan });
+        }
       }
-      const report = extractImmersiveDoc(cand);
-      if (report) {
-        if (!artifacts.some((a) => a.id === report.id)) artifacts.push(report);
-        aBlocks.push({ kind: 'artifact_ref', artifactId: report.id });
-      }
+      // A document whose chip isn't in the text still belongs to the reply.
+      for (const doc of docs) if (doc && !placedDocs.has(doc)) placeDoc(doc);
       // Generated images get their own image blocks at the end of the turn,
       // since the renderer only embeds image blocks (it won't resolve any
       // free-form markdown image refs we'd leave behind in the text).

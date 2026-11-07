@@ -20,10 +20,13 @@
  * `Access-Control-Allow-Credentials: true`. The browser then sees a
  * matching named origin (no wildcard) and credentials are allowed.
  *
- * Scope: the rule applies only to requests to googleusercontent /
- * lh*.google.com / *.usercontent.google.com hosts, and only to XHR-style
- * requests, so we don't accidentally rewrite anything for the SPA's own
- * `<img>` loads (image resourceType is excluded).
+ * Scope: the rule applies only to requests this extension makes (its
+ * service worker, see fetchAsset), to googleusercontent / lh*.google.com /
+ * *.usercontent.google.com hosts, and only to XHR-style requests. Without
+ * the initiator check it also rewrote the SPA's own requests:
+ * gemini.google.com uploads files through contribution-rt.usercontent.google.com
+ * with XHR, got `ACAO: chrome-extension://…` back instead of its own origin,
+ * and every upload failed with a CORS error while the extension was on.
  */
 const log = (...args) => console.log('[exporter sw]', ...args);
 const warn = (...args) => console.warn('[exporter sw]', ...args);
@@ -75,6 +78,10 @@ const installDnrRule = async () => {
               'lh7.google.com',
               'contribution-rt.usercontent.google.com',
             ],
+            // Only our own fetches (initiator chrome-extension://<id>). The
+            // page's requests to the same hosts must keep their real CORS
+            // headers, or Gemini's own uploads break.
+            initiatorDomains: [chrome.runtime.id],
             // xmlhttprequest covers fetch() from the SW. We deliberately
             // do NOT include `image` so the SPA's own <img> loads on
             // gemini.google.com aren't affected.

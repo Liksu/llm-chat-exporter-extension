@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LLM Chat Exporter",
-  "version": "0.7.54",
+  "version": "0.7.56",
   "description": "Export LLM chat conversations (Claude, ChatGPT, Gemini...) to Markdown or ZIP, with images and pasted attachments inline.",
   "action": {
     "default_title": "LLM Chat Exporter",
@@ -122,6 +122,7 @@
         "src/core/export-entry.js",
         "src/core/dev-loader.js",
         "src/adapters/gemini/api.js",
+        "src/adapters/gemini/components.js",
         "src/adapters/gemini/normalize.js",
         "src/adapters/gemini/content.js"
       ]

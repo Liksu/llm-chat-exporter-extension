@@ -49,7 +49,7 @@ Required permissions:
 |---|---|
 | `activeTab` | Read the current chat tab when you trigger an export. |
 | `storage` | Persist your default-format and toggle preferences. |
-| `declarativeNetRequestWithHostAccess` | Rewrite CORS response headers from Google's asset CDNs (`lh*.googleusercontent.com`, `lh*.google.com`) so the extension can embed Gemini-generated images and uploaded files into the export. |
+| `declarativeNetRequestWithHostAccess` | Rewrite CORS response headers from Google's asset CDNs (`lh*.googleusercontent.com`, `lh*.google.com`) for the extension's own requests (never the page's), so it can embed Gemini-generated images and uploaded files into the export. |
 | Host access to `claude.ai`, `chatgpt.com`, `gemini.google.com` | Run the content scripts that read conversation data. |
 | Host access to `*.googleusercontent.com`, `*.usercontent.google.com`, `lh1.google.com`–`lh7.google.com` | Fetch Gemini-uploaded files and inline / generated images via the extension's service worker (these CDNs are not the chat origin and would otherwise be blocked by CORS). |
 

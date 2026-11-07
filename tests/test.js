@@ -374,6 +374,38 @@ test('debug capture: records service-worker proxied asset fetches', async () => 
 });
 
 /**
+ * The CORS rewrite is for the extension's own asset fetches only. Applied
+ * to the page too, it broke every Gemini upload: gemini.google.com posts
+ * files to contribution-rt.usercontent.google.com and got back
+ * `ACAO: chrome-extension://…` instead of its own origin.
+ */
+test('service worker: CORS rewrite rule only matches the extension\'s own requests', async () => {
+  const vm = require('node:vm');
+  const rules = [];
+  const chrome = {
+    runtime: {
+      id: 'aiienkcfiaklilljllikmckfopepglkd',
+      onInstalled: { addListener() {} },
+      onStartup: { addListener() {} },
+      onMessage: { addListener() {} },
+    },
+    declarativeNetRequest: {
+      updateDynamicRules: async (change) => { rules.push(...change.addRules); },
+    },
+  };
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'background', 'service-worker.js'), 'utf8');
+  vm.runInNewContext(src, { chrome, console: { log() {}, warn() {} }, fetch, btoa });
+  await new Promise((r) => setImmediate(r));
+
+  assert.equal(rules.length, 1);
+  const { condition } = rules[0];
+  // Spread: the array comes from the vm context, a different realm.
+  assert.deepEqual([...condition.initiatorDomains], [chrome.runtime.id]);
+  assert.ok(condition.requestDomains.includes('contribution-rt.usercontent.google.com'));
+  assert.equal(condition.excludedInitiatorDomains, undefined);
+});
+
+/**
  * Dev tooling (src/dev/) must stay out of store installs and must not be
  * needed by the product: the export works the same without it.
  */
@@ -1031,6 +1063,121 @@ test('debug capture: keeps the page inventory sent with the export', async () =>
 });
 
 /** Deep Research report (Apps SDK widget): citations become links plus a Sources list. */
+/**
+ * Gemini replies (2026-11): side-panel documents behind
+ * `immersive_entry_chip/<N>` placeholders (Canvas text, code, slides, quiz,
+ * Deep Research report), the research plan card behind
+ * `deep_research_confirmation_content/<N>`, and components written as tags.
+ */
+test('gemini: side-panel documents, plan card and components', () => {
+  const sandbox = {};
+  sandbox.self = sandbox;
+  const context = require('node:vm').createContext(sandbox);
+  const loader = require('./scaffolding/loader');
+  loader.loadScripts(context, loader.SCRIPTS_BY_ADAPTER.gemini.filter((s) => !/content\.js$/.test(s)));
+  const { geminiNormalize, markdown } = sandbox.__exporter;
+
+  const CHIP = 'http://googleusercontent.com/immersive_entry_chip';
+  const PLAN = 'http://googleusercontent.com/deep_research_confirmation_content';
+  // An immersive document: [0] id, [2] title, [4] content, [9] file name, [10] kind.
+  const doc = (fields) => {
+    const d = [];
+    for (const [i, v] of Object.entries(fields)) d[i] = v;
+    return d;
+  };
+  const candidate = (id, text, docs) => {
+    const c = [id, [text]];
+    if (docs) c[30] = docs;
+    return c;
+  };
+  const round = (req, prompt, cand, extra = {}) => {
+    const candidates = [[cand]];
+    if (extra.plan) candidates[12] = [[null, extra.plan]];
+    const r = [['c_test', req], null, [[prompt, 1, null, null, [[]]]], candidates];
+    if (extra.prev) r[5] = extra.prev;
+    return r;
+  };
+
+  const first = round('r_1', 'Research trends', candidate('rc_1', [
+    'Here is the plan.',
+    '',
+    `${PLAN}/0`,
+    '',
+    `Chips look like \`${CHIP}/0\` in raw text.`,
+  ].join('\n'), [
+    doc({ 0: 'im_report', 2: 'Trends', 4: '# Trends\n\nA claim.', 10: 3 }),
+  ]), { plan: ['Trends', [[1, 'Search', '(1) one\n(2) two'], [2, 'Report']], 'Soon', ['Start'], [`${PLAN}/0`, 0]] });
+
+  const second = round('r_2', 'Write it', candidate('rc_2', [
+    'Done.',
+    '',
+    `${CHIP}/0`,
+    '',
+    '<Callout title="Heads up" type="warning">',
+    'Check **this**.',
+    '</Callout>',
+    '',
+    '<TemplateWidget header_title="Revenue" templateName="bar_chart" component_placeholder_id="im_1">',
+    '```json',
+    '{"unit": "$", "data": [{"label": "North", "value": 10}, {"label": "South", "value": 5}]}',
+    '```',
+    '</TemplateWidget>',
+    '',
+    '```jsx',
+    '<Callout title="code" type="info">',
+    'stays code',
+    '</Callout>',
+    '```',
+    '',
+    '<Mystery foo="bar">',
+    'kept',
+    '</Mystery>',
+    '',
+    '<ElicitationsGroup message="More?">',
+    '  <Elicitation label="Ask A" query="a?"/>',
+    '  <Elicitation label="Ask B" query="b?"/>',
+    '<ElicitationsGroup>',
+  ].join('\n'), [
+    doc({ 0: 'c_test_report.md', 2: 'Report', 4: '# Report\n\n| a | b |\n|---|---|\n| 1 | 2 |', 9: 'report (Q1).md', 10: 1 }),
+    doc({ 0: 'c_test_parse.py', 2: 'Parser', 4: '```python\nprint(1)\n```', 9: 'parse.py', 10: 2 }),
+    doc({ 0: 'c_test_quiz.json', 2: 'Quiz', 9: 'quiz.json', 10: 4,
+      15: [[[['Which?', [['A', false, 'no'], ['B', true, 'because']]]]]] }),
+    doc({ 0: 'c_test_deck.html', 2: 'Deck', 9: 'deck.html', 10: 15, 19: ['<!DOCTYPE html><p>slides</p>'] }),
+  ]), { prev: first });
+
+  const { conversation } = geminiNormalize.normalize([[second]], { title: 'Gemini test' });
+  const byName = Object.fromEntries(conversation.artifacts.map((a) => [a.fileName, a]));
+  assert.deepEqual(Object.keys(byName).sort(), ['Trends.md', 'deck.html', 'parse.py', 'quiz.md', 'report (Q1).md']);
+  assert.equal(byName['Trends.md'].source, 'Deep Research');
+  for (const name of ['deck.html', 'parse.py', 'quiz.md', 'report (Q1).md']) assert.equal(byName[name].source, undefined, name);
+  assert.equal(byName['parse.py'].content, 'print(1)\n');
+  assert.equal(byName['parse.py'].language, 'python');
+  assert.equal(byName['deck.html'].language, 'html');
+  assert.match(byName['quiz.md'].content, /^# Quiz\n\n### 1\. Which\?\n\n- \[ \] A — _no_\n- \[x\] B — _because_\n$/);
+
+  const md = markdown.render(conversation, {
+    mode: 'zip',
+    includeReasoning: true,
+    artifactFileById: new Map(conversation.artifacts.map((a) => [a.id, `artifacts/${a.fileName}`])),
+  });
+  // Plan card in place of its placeholder; a URL quoted in text stays.
+  assert.match(md, /Here is the plan\.\n\n📋 \*\*Research plan: Trends\*\*\n\n1\. Search {2}\n {3}\(1\) one {2}\n {3}\(2\) two {2}\n2\. Report\n/);
+  assert.ok(md.includes(`\`${CHIP}/0\` in raw text.`));
+  assert.doesNotMatch(md, /^https?:\/\/googleusercontent\.com\//m);
+  // The chip becomes the document's link, where the chip was; a Canvas
+  // document is not captioned as a Deep Research result.
+  assert.match(md, /Done\.\n\n🧩 \[report \(Q1\)\.md\]\(artifacts\/report%20%28Q1%29\.md\)\n\n> ⚠️/);
+  assert.match(md, /\*\*Result of Deep Research:\*\*\n\n🧩 \[Trends\.md\]\(artifacts\/Trends\.md\)/);
+  assert.equal((md.match(/Result of Deep Research/g) || []).length, 1);
+  // Components.
+  assert.match(md, /> ⚠️ \*\*Heads up\*\* {2}\n>\n> Check \*\*this\*\*\.\n/);
+  assert.match(md, /📊 _Chart \(bar_chart\): Revenue_\n\n\| label \| value \| {2}\n\|---\|---\| {2}\n\| North \| \$10 \| {2}\n\| South \| \$5 \|\n/);
+  assert.match(md, /```jsx\n<Callout title="code" type="info">\nstays code\n<\/Callout>\n```/);
+  assert.match(md, /<Mystery foo="bar">/);
+  assert.match(md, /💬 _More\?_\n\n- Ask A {2}\n- Ask B\n/);
+  assert.doesNotMatch(md, /Elicitation|TemplateWidget|<Callout title="Heads up"/);
+});
+
 test('chatgpt deep research: report keeps its sources', () => {
   const sandbox = {};
   sandbox.self = sandbox;

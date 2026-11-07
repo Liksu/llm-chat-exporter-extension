@@ -43,6 +43,9 @@ const PAGE = {
     reply: 'model-response',
     // the composer's send button turns into a stop button while it writes
     streaming: 'mat-icon[fonticon="stop"], [aria-busy="true"]',
+    // UI text inside a reply, not content: the Canvas preview's editing
+    // hints ("Click anywhere to type and edit…"). Checked 2026-11-06.
+    uiOnly: 'inline-edit-education-tooltip, gem-discovery-tooltip',
   },
 };
 
@@ -85,9 +88,11 @@ const inventoryJs = (provider) => `const sel = ${JSON.stringify(PAGE[provider] |
     document.querySelector('main') || document.body;
   const big = (el) => { const r = el.getBoundingClientRect(); return Math.max(r.width, el.naturalWidth || 0) >= 64 && Math.max(r.height, el.naturalHeight || 0) >= 64; };
   // What a reader sees: without screen-reader-only hints ("Claude replied:",
-  // keyboard help) and button labels (copy, retry, collapsed tool groups).
+  // keyboard help), button labels (copy, retry, collapsed tool groups) and
+  // the provider's own UI text (sel.uiOnly).
   const readText = (el) => {
-    const hide = [...el.querySelectorAll('[class*="sr-only"], [class*="visually-hidden"], button, [role="button"]')];
+    const ui = ['[class*="sr-only"]', '[class*="visually-hidden"]', 'button', '[role="button"]', sel.uiOnly].filter(Boolean);
+    const hide = [...el.querySelectorAll(ui.join(', '))];
     const prev = hide.map((h) => h.style.display);
     hide.forEach((h) => { h.style.display = 'none'; });
     try { return el.innerText || ''; } finally { hide.forEach((h, i) => { h.style.display = prev[i]; }); }

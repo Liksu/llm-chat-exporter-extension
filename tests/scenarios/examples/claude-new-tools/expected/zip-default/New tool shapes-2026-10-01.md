@@ -63,7 +63,7 @@ I feel awful today. Also research rainfall trends.
 
 > ⚠️ claude.ai showed a support resource here: **Example Crisis Line** — call 000 · text 000 · chat: https://example.org/chat
 
-🧩 [Rainfall report.md](artifacts/Rainfall report.md)
+🧩 [Rainfall report.md](artifacts/Rainfall%20report.md)
 
 I'm sorry you're feeling this way. The rainfall report is ready.
 
@@ -77,6 +77,6 @@ I'm sorry you're feeling this way. The rainfall report is ready.
 
 - [hello.py](artifacts/hello.py)
 
-- [Rainfall report.md](artifacts/Rainfall report.md)
+- [Rainfall report.md](artifacts/Rainfall%20report.md)
 
 - [summary.json](artifacts/summary.json)

@@ -15,6 +15,16 @@ ChatGPT
 Claude
 • Fixed: chats started by a scheduled task failed to export with "404". They now export like any chat, including pictures you attached to your messages.
 
+Gemini
+• Fixed: with the extension on, attaching files to a Gemini message failed ("Couldn't upload"). The extension now only touches its own requests for pictures and files, never Gemini's.
+• Documents Gemini opens in the side panel (Canvas) are exported as files with their own names and types (report.md, index.html, parser.py), linked where the chat showed them, and no longer labelled as a Deep Research result.
+• Slide decks are exported as an HTML file, and quizzes as questions with their options, the right answer ticked and the explanations.
+• The Deep Research plan is exported as its list of steps.
+• Warning boxes, suggested follow-up questions and charts (as a table of their numbers) are exported as text instead of raw tags.
+
+All chats
+• Fixed: in ZIP exports, links to files whose names have spaces or parentheses didn't open. They now do.
+
 ## v0.7.50 — 2026-10-14
 
 ChatGPT

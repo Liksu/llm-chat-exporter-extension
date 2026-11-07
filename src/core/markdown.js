@@ -22,6 +22,7 @@
     uint8ToBase64,
     sniffImageMime,
     escapeMdInline,
+    linkPath,
     formatBytes,
     formatTurnDate,
   } = ns.utils;
@@ -143,7 +144,7 @@
     if (!map || map.size === 0 || typeof text !== 'string' || !text) return text;
     return text.replace(SANDBOX_LINK_RE, (full, open, path, close) => {
       const dest = map.get(path);
-      return dest ? `${open}${dest}${close}` : full;
+      return dest ? `${open}${linkPath(dest)}${close}` : full;
     });
   };
 
@@ -185,7 +186,7 @@
         const inline = opts.inlineImages ?? (opts.mode !== 'zip');
         if (opts.mode === 'zip' && !inline) {
           const path = opts.imagePathByName.get(block) ?? `${opts.assetsDir}/${alt}`;
-          return `![${alt}](${path})`;
+          return `![${alt}](${linkPath(path)})`;
         }
         const b64 = uint8ToBase64(block.bytes);
         // A data URL only displays with an image/* type; servers sometimes
@@ -208,7 +209,7 @@
         if (opts.mode === 'zip') {
           const path =
             opts.artifactFileById.get(art.id) ?? `${opts.artifactsDir}/${art.fileName}`;
-          return `${caption}🧩 [${art.fileName}](${path})${online}`;
+          return `${caption}🧩 [${art.fileName}](${linkPath(path)})${online}`;
         }
         return `${caption}🧩 [${art.fileName}](#artifact-${slugifyAnchor(art.id)})${online}`;
       }
@@ -268,7 +269,7 @@
     }
     if (opts.mode === 'zip') {
       const path = opts.filePathByName.get(att) ?? `${opts.filesDir}/${att.fileName}`;
-      return `📎 [${escapeMdInline(att.fileName)}](${path})`;
+      return `📎 [${escapeMdInline(att.fileName)}](${linkPath(path)})`;
     }
     return `📎 [${escapeMdInline(att.fileName)}](#${anchorId})`;
   };
@@ -276,7 +277,7 @@
   const renderArtifact = (art, opts) => {
     if (opts.mode === 'zip') {
       const path = opts.artifactFileById.get(art.id) ?? `${opts.artifactsDir}/${art.fileName}`;
-      return `- [${art.fileName}](${path})`;
+      return `- [${art.fileName}](${linkPath(path)})`;
     }
     const anchor = `<a id="artifact-${slugifyAnchor(art.id)}"></a>`;
     // The "Markdown attachments · render inline" toggle also covers
@@ -330,7 +331,7 @@
           if (opts.mode === 'zip') {
             const path =
               opts.filePathByName.get(item.att) ?? `${opts.filesDir}/${item.fileName}`;
-            label = `[${escapeMdInline(item.fileName)}](${path})`;
+            label = `[${escapeMdInline(item.fileName)}](${linkPath(path)})`;
           } else {
             label = `**${escapeMdInline(item.fileName)}**`;
           }

@@ -90,7 +90,7 @@ PERMISSIONS
 
 - activeTab – read the current chat when you click Export.
 - storage – remember your export preferences.
-- declarativeNetRequestWithHostAccess – adjust CORS headers from Google's image CDNs so Gemini images and attached files can be embedded or saved. Scoped to those hosts only.
+- declarativeNetRequestWithHostAccess – adjust CORS headers from Google's image CDNs so Gemini images and attached files can be embedded or saved. Scoped to those hosts and to the extension's own requests only.
 - Host access to claude.ai, chatgpt.com, and gemini.google.com – run the script that extracts the conversation.
 - Host access to *.googleusercontent.com, *.usercontent.google.com, and lh1.google.com–lh7.google.com – fetch Gemini images and uploaded files.
 
