@@ -1062,7 +1062,6 @@ test('debug capture: keeps the page inventory sent with the export', async () =>
   assert.deepEqual(har.log._exporter.screen, screen);
 });
 
-/** Deep Research report (Apps SDK widget): citations become links plus a Sources list. */
 /**
  * Gemini replies (2026-11): side-panel documents behind
  * `immersive_entry_chip/<N>` placeholders (Canvas text, code, slides, quiz,
@@ -1145,12 +1144,17 @@ test('gemini: side-panel documents, plan card and components', () => {
     doc({ 0: 'c_test_deck.html', 2: 'Deck', 9: 'deck.html', 10: 15, 19: ['<!DOCTYPE html><p>slides</p>'] }),
   ]), { prev: first });
 
-  const { conversation } = geminiNormalize.normalize([[second]], { title: 'Gemini test' });
+  // A later edit of the code file, same id: the export has the newest version.
+  const third = round('r_3', 'Edit the parser', candidate('rc_3', `Updated.\n\n${CHIP}/0`, [
+    doc({ 0: 'c_test_parse.py', 2: 'Parser', 4: '```python\nprint(2)\n```', 9: 'parse.py', 10: 2 }),
+  ]), { prev: second });
+
+  const { conversation } = geminiNormalize.normalize([[third]], { title: 'Gemini test' });
   const byName = Object.fromEntries(conversation.artifacts.map((a) => [a.fileName, a]));
   assert.deepEqual(Object.keys(byName).sort(), ['Trends.md', 'deck.html', 'parse.py', 'quiz.md', 'report (Q1).md']);
   assert.equal(byName['Trends.md'].source, 'Deep Research');
   for (const name of ['deck.html', 'parse.py', 'quiz.md', 'report (Q1).md']) assert.equal(byName[name].source, undefined, name);
-  assert.equal(byName['parse.py'].content, 'print(1)\n');
+  assert.equal(byName['parse.py'].content, 'print(2)\n');
   assert.equal(byName['parse.py'].language, 'python');
   assert.equal(byName['deck.html'].language, 'html');
   assert.match(byName['quiz.md'].content, /^# Quiz\n\n### 1\. Which\?\n\n- \[ \] A — _no_\n- \[x\] B — _because_\n$/);
@@ -1178,6 +1182,7 @@ test('gemini: side-panel documents, plan card and components', () => {
   assert.doesNotMatch(md, /Elicitation|TemplateWidget|<Callout title="Heads up"/);
 });
 
+/** Deep Research report (Apps SDK widget): citations become links plus a Sources list. */
 test('chatgpt deep research: report keeps its sources', () => {
   const sandbox = {};
   sandbox.self = sandbox;

@@ -745,11 +745,15 @@
       if (thinking) {
         aBlocks.push({ kind: 'thinking', text: thinking });
       }
-      // Every round carries the document's latest version under the same
-      // id: one artifact, referenced from each turn that showed its chip.
+      // A document keeps its id across rounds: one artifact, referenced
+      // from each turn that showed its chip. Rounds run oldest first and
+      // the last copy seen wins, so the file is the newest version even
+      // where an earlier round holds an older one.
       const placedDocs = new Set();
       const placeDoc = (doc) => {
-        if (!artifacts.some((a) => a.id === doc.id)) artifacts.push(doc);
+        const seen = artifacts.findIndex((a) => a.id === doc.id);
+        if (seen < 0) artifacts.push(doc);
+        else artifacts[seen] = doc;
         aBlocks.push({ kind: 'artifact_ref', artifactId: doc.id });
         placedDocs.add(doc);
       };
