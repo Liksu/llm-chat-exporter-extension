@@ -12,10 +12,12 @@ The export includes the conversation in order – your messages and the AI respo
 - Files you uploaded and files the AI created for you, in their final version
 - Long text pasted into the chat
 - Code blocks and formatting
-- Claude artifacts, ChatGPT canvas documents and tools, and drawings or diagrams rendered in the chat
+- Claude artifacts and Claude Docs, ChatGPT canvas documents and tools, Gemini Canvas documents, code and slide decks, and drawings or diagrams rendered in the chat
+- Cards and interactive elements in replies – charts (as tables of their numbers), quizzes, forms, checklists, maps of places, recipes, weather – as readable text
 - Deep Research and Research reports from Claude, ChatGPT, and Gemini, with their sources
 - Source links from web-search answers
-- Claude Cowork sessions
+- ChatGPT side panels you open by clicking a highlighted name (a person, place, or product)
+- Claude Cowork sessions and chats started by scheduled tasks
 - ChatGPT voice-mode messages as transcribed text
 - The model's thinking/reasoning and tool calls, when you enable that option
 
@@ -55,7 +57,7 @@ Depending on your export options and the chat content, the ZIP may include:
 
 - /assets for images
 - /files for uploaded files and files the AI created
-- /artifacts for artifacts, canvas documents, and research reports
+- /artifacts for artifacts, canvas documents, slide decks, and research reports
 
 ZIP is better for long conversations, image-heavy chats, or chats with uploaded files, because it can preserve files alongside the Markdown export instead of forcing everything into one document.
 
@@ -81,7 +83,7 @@ PRIVACY
 
 - No uploads. Export happens locally in your browser.
 - No accounts, no analytics, no telemetry, no tracking.
-- The extension reads the current chat page only when you click Export.
+- The extension reads the current chat page only when you click Export. One exception: ChatGPT doesn't save the side panels you open by clicking a highlighted name, so the extension keeps a copy of each one in that tab's memory until the tab is reloaded or closed. It is never written to disk or sent anywhere.
 - The only thing stored between sessions is your export preferences.
 
 When images or uploaded files need to be included in the export, the extension fetches them directly in your browser from the same services the chat page already uses. They are embedded into the Markdown file or included in the ZIP archive. Nothing is sent to any remote server.
